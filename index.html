@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.3.0 -->
+<!-- LP Planner v2.4.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -145,7 +145,8 @@
   /* SIDEBAR */
   .sidebar {
     width: 280px; flex-shrink: 0; background: var(--paper);
-    border-right: 1px solid var(--border);
+    border-right: none;
+    box-shadow: 2px 0 8px var(--shadow);
     display: flex; flex-direction: column; overflow-y: auto;
     padding: 20px;
   }
@@ -155,8 +156,8 @@
   /* WEEK NAV */
   .week-nav {
     display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 16px; padding: 8px 4px;
-    border-bottom: 1px solid var(--border);
+    margin-bottom: 18px; padding: 8px 4px 12px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
   }
   .week-nav-label { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--ink-light); font-weight: 500; }
   .nav-arrow {
@@ -190,8 +191,8 @@
   }
   .add-btn:hover { background: var(--accent); color: white; }
   .checklist-item {
-    display: flex; align-items: flex-start; gap: 8px; padding: 5px 4px;
-    border-radius: 4px; transition: background 0.1s;
+    display: flex; align-items: flex-start; gap: 8px; padding: 5px 6px;
+    border-radius: 6px; transition: background 0.15s;
     cursor: default;
   }
   .checklist-item:hover { background: var(--cream); }
@@ -226,7 +227,7 @@
   .checklist-item:hover .delete-item-btn { opacity: 1; }
 
   /* SIDEBAR LINKS */
-  .sidebar-links { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+  .sidebar-links { margin-top: auto; padding-top: 14px; border-top: 1px solid rgba(0,0,0,0.06); display: flex; flex-direction: column; gap: 6px; }
   .sidebar-link.daily { display: block; margin: 8px 12px 16px; }
   .sidebar-link {
     display: block; padding: 8px 12px; border-radius: var(--radius-sm); text-decoration: none;
@@ -259,22 +260,22 @@
   }
   .cal-header-cell {
     padding: 10px 8px; text-align: center;
-    border-right: 1px solid rgba(255,255,255,0.1);
+    border-right: 1px solid rgba(255,255,255,0.08);
     font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
     text-transform: uppercase;
-    background: var(--accent);
+    background: linear-gradient(180deg, #2d5a3d 0%, #244d33 100%);
     position: sticky; top: 0; z-index: 10;
   }
-  .cal-header-cell .day-name { color: var(--ink-faint); }
-  .cal-header-cell .day-date { color: var(--paper); font-family: 'Playfair Display', serif; font-size: 18px; margin-top: 2px; }
+  .cal-header-cell .day-name { color: rgba(255,255,255,0.55); }
+  .cal-header-cell .day-date { color: rgba(255,255,255,0.95); font-family: 'Playfair Display', serif; font-size: 18px; margin-top: 2px; }
   .cal-header-cell.today .day-date { color: var(--gold); }
   .cal-day {
-    border-right: 1px solid var(--border);
-    border-top: 1px solid var(--border);
+    border-right: 1px solid rgba(0,0,0,0.06);
+    border-top: none;
     padding: 10px; position: relative; background: var(--paper);
-    transition: background 0.1s; min-height: 200px;
+    transition: background 0.15s, box-shadow 0.15s; min-height: 200px;
   }
-  .cal-day:hover { background: #f8f4ee; }
+  .cal-day:hover { background: #f8f5ef; box-shadow: inset 0 0 0 1px var(--border); }
   .cal-day.today { background: var(--gold-light); }
   .add-task-btn {
     width: 100%; border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
@@ -284,7 +285,7 @@
   }
   .add-task-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
   .day-note-wrap {
-    margin-top: 8px; border-top: 1px solid var(--border); padding-top: 6px;
+    margin-top: 10px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 8px;
   }
   .day-note-label {
     font-family: 'DM Mono', monospace; font-size: 9px; color: var(--ink-faint);
@@ -310,7 +311,7 @@
   }
   .task-card:hover { box-shadow: 0 4px 12px var(--shadow-md), 0 0 0 1px rgba(0,0,0,0.03); }
   .task-card-header {
-    display: flex; align-items: center; gap: 6px; padding: 7px 8px;
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
     font-size: 12px; font-weight: 500;
   }
   .task-check {
@@ -361,7 +362,7 @@
   }
   .task-mobile-delete-btn:active { background: #c0392b; }
   .task-details {
-    padding: 0 8px 8px 28px; border-top: 1px solid rgba(0,0,0,0.08);
+    padding: 0 10px 10px 30px; border-top: 1px solid rgba(0,0,0,0.04);
   }
   .task-details-input {
     width: 100%; border: none; background: transparent; font-size: 11.5px;
@@ -473,8 +474,11 @@
 
   /* WEEK REVIEW */
   .week-review {
-    flex-shrink: 0; background: var(--cream);
-    border-top: 1px solid var(--border); padding: 18px 24px;
+    flex-shrink: 0; background: var(--paper);
+    border-top: none; padding: 20px 24px;
+    margin: 0 12px 12px;
+    border-radius: var(--radius-md);
+    box-shadow: 0 1px 6px var(--shadow), 0 0 0 1px rgba(0,0,0,0.03);
     display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
   }
   .review-section {}
@@ -500,7 +504,7 @@
   }
   .habit-qty-input:focus { outline: none; border-color: var(--accent); }
   .habit-qty-input::placeholder { color: var(--border); font-size: 10px; }
-  .date-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+  .date-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid rgba(0,0,0,0.06); }
   .date-nav-label { font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 600; }
 
   .goal-item {
@@ -549,18 +553,19 @@
   }
 
   /* MONTHLY HABIT CALENDAR */
-  .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; flex: 1; }
+  .month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; flex: 1; }
   .month-day-header {
     text-align: center; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
     color: var(--ink-faint); padding: 4px 0; font-weight: 500;
   }
   .month-day-cell {
-    border: 1px solid var(--border); border-radius: var(--radius-sm); background: white;
-    min-height: 80px; padding: 4px; position: relative; overflow: hidden;
+    border: none; border-radius: var(--radius-sm); background: white;
+    min-height: 80px; padding: 5px; position: relative; overflow: hidden;
     display: flex; flex-direction: column;
+    box-shadow: 0 1px 3px var(--shadow), 0 0 0 1px rgba(0,0,0,0.04);
   }
-  .month-day-cell.other-month { opacity: 0.35; background: var(--cream); }
-  .month-day-cell.selected-day { border-color: var(--accent); border-width: 2px; background: var(--accent-light); }
+  .month-day-cell.other-month { opacity: 0.35; background: var(--cream); box-shadow: none; }
+  .month-day-cell.selected-day { box-shadow: 0 0 0 2px var(--accent), 0 2px 8px var(--shadow-md); background: var(--accent-light); }
   .month-day-num { font-size: 11px; font-weight: 500; color: var(--ink-light); margin-bottom: 4px; }
   .month-day-cell.today-cell .month-day-num {
     background: var(--gold); color: white; border-radius: 50%;
@@ -585,7 +590,7 @@
   .year-month-label { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-light); margin-bottom: 4px; }
   .year-week-row { display: flex; gap: 2px; flex-wrap: wrap; }
   .year-day-dot {
-    width: 14px; height: 14px; border-radius: 3px; background: var(--cream);
+    width: 14px; height: 14px; border-radius: 4px; background: var(--cream);
     position: relative; cursor: pointer; transition: transform 0.1s;
   }
   .year-day-dot:hover { transform: scale(1.3); }
@@ -594,7 +599,7 @@
   .weekly-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; }
   .weekly-bar-col-label { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-light); margin-top: 4px; }
   .weekly-bar-seg {
-    width: 80%; border-radius: 4px; min-height: 10px; transition: height 0.3s;
+    width: 80%; border-radius: 6px; min-height: 10px; transition: height 0.3s;
   }
 
   /* DAILY VIEW */
@@ -689,18 +694,20 @@
   }
   .monthly-cal-grid {
     display: grid; grid-template-columns: repeat(7, 1fr);
-    border-left: 1px solid var(--border); border-top: 1px solid var(--border);
+    gap: 2px;
   }
   .monthly-cell {
-    border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    border: none; border-radius: var(--radius-sm);
     min-height: 110px; padding: 6px 6px 4px; cursor: pointer;
-    transition: background 0.1s; position: relative;
+    transition: background 0.15s, box-shadow 0.15s; position: relative;
+    background: var(--paper);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.06);
   }
-  .monthly-cell:hover { background: #f8f4ee; }
-  .monthly-cell.empty { background: var(--cream); cursor: default; min-height: 110px; }
+  .monthly-cell:hover { background: #f8f5ef; box-shadow: 0 0 0 1px var(--border), 0 2px 8px var(--shadow); }
+  .monthly-cell.empty { background: var(--cream); cursor: default; min-height: 110px; box-shadow: none; }
   .monthly-cell.today { background: var(--gold-light); }
   .monthly-cell.today .monthly-cell-date { color: var(--gold); font-weight: 700; }
-  .monthly-cell.drag-over { border-color: var(--accent) !important; background: var(--accent-light) !important; box-shadow: inset 0 0 0 2px var(--accent); }
+  .monthly-cell.drag-over { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-light) !important; }
   .monthly-event-chip { user-select: none; }
   .monthly-event-chip:active { cursor: grabbing; }
   .monthly-cell-date {
@@ -771,7 +778,7 @@
     width: 32px; min-width: 32px; flex-shrink: 0;
     display: flex; flex-direction: column;
     align-items: center; padding-top: 14px; gap: 8px;
-    border-left: 1px solid var(--border);
+    border-left: none;
     border-right: 1px solid var(--border);
     background: var(--paper);
     cursor: pointer; transition: background 0.15s;
@@ -849,7 +856,8 @@
     .mobile-day-nav {
       display: flex; align-items: center; justify-content: space-between;
       padding: 10px 14px; background: var(--paper);
-      border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5;
+      border-bottom: none; box-shadow: 0 1px 4px var(--shadow);
+      position: sticky; top: 0; z-index: 5;
     }
     .mobile-day-label {
       font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700;
@@ -869,7 +877,8 @@
     .mobile-add-btn:hover { border-color: var(--accent); color: var(--accent); }
     .mobile-week-dots {
       display: flex; justify-content: center; gap: 6px;
-      padding: 8px; background: var(--paper); border-top: 1px solid var(--border);
+      padding: 8px; background: var(--paper); border-top: none;
+      box-shadow: 0 -1px 4px var(--shadow);
     }
     .mobile-week-dot {
       width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border);
@@ -883,8 +892,9 @@
 
     /* ── Bottom sheet (sidebar content) ── */
     .mobile-sheet-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,0.35);
+      position: fixed; inset: 0; background: rgba(0,0,0,0.3);
       z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.25s;
+      backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
     }
     .mobile-sheet-overlay.open { opacity: 1; pointer-events: all; }
     .mobile-sheet {
@@ -903,7 +913,7 @@
     .mobile-sheet-header {
       display: flex; align-items: center; justify-content: space-between;
       padding: 10px 16px 8px;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid rgba(0,0,0,0.06);
     }
     .mobile-sheet-title {
       font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 700; color: var(--ink);
@@ -927,7 +937,8 @@
     /* ── Mobile bottom nav ── */
     .mobile-bottom-nav {
       position: fixed; bottom: 0; left: 0; right: 0; z-index: 80;
-      background: var(--paper); border-top: 1px solid var(--border);
+      background: var(--paper); border-top: none;
+      box-shadow: 0 -2px 8px var(--shadow-md);
       display: flex; height: 56px;
     }
     .mobile-bottom-nav-btn {
@@ -950,8 +961,8 @@
   /* Monthly habit checklist below calendar */
   /* Mobile metrics row inside HabitChecklist */
   .mhc-metrics-row {
-    display: flex; gap: 10px; margin-bottom: 10px; padding-bottom: 10px;
-    border-bottom: 1px solid var(--border);
+    display: flex; gap: 10px; margin-bottom: 12px; padding-bottom: 12px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
   }
   .mhc-metric-field { flex: 1; display: flex; flex-direction: column; gap: 3px; }
   .mhc-metric-label {
@@ -969,20 +980,21 @@
   @media (min-width: 768px) { .mhc-metrics-row { display: none; } }
 
   .monthly-habit-checklist {
-    border-top: 1px solid var(--border); padding: 12px 8px 8px;
+    border-top: 1px solid rgba(0,0,0,0.06); padding: 14px 10px 10px;
     background: var(--paper); flex-shrink: 0;
   }
   .monthly-habit-checklist-title {
     font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-light);
     text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;
   }
-  .monthly-habit-checklist-items { display: flex; flex-direction: column; gap: 6px; }
+  .monthly-habit-checklist-items { display: flex; flex-direction: column; gap: 8px; }
   .monthly-habit-check-row {
     display: flex; align-items: center; gap: 10px;
-    padding: 8px 12px; border-radius: var(--radius-sm); cursor: pointer;
-    background: var(--cream); transition: all 0.15s;
+    padding: 10px 14px; border-radius: var(--radius-sm); cursor: pointer;
+    background: white; transition: all 0.15s;
+    box-shadow: 0 1px 3px var(--shadow), 0 0 0 1px rgba(0,0,0,0.03);
   }
-  .monthly-habit-check-row:hover { opacity: 0.85; }
+  .monthly-habit-check-row:hover { box-shadow: 0 2px 8px var(--shadow-md), 0 0 0 1px rgba(0,0,0,0.03); }
   .monthly-habit-check-row.done { opacity: 0.75; }
   .mhc-check {
     width: 20px; height: 20px; border-radius: 50%; border: 2px solid;
@@ -999,12 +1011,13 @@
   /* ── Sidebar ── */
   .pages-sidebar {
     width: 260px; min-width: 260px; height: 100%; background: #ffffff;
-    border-right: 1px solid #e2e8f0;
+    border-right: none;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.04);
     display: flex; flex-direction: column; overflow: hidden;
   }
   .pages-sidebar-header {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 16px 14px 10px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0;
+    padding: 16px 14px 10px; border-bottom: 1px solid rgba(0,0,0,0.06); flex-shrink: 0;
   }
   .pages-sidebar-title {
     font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 700;
@@ -1104,8 +1117,8 @@
   /* Sticky title header */
   .pages-doc-header {
     flex-shrink: 0; padding: 24px 36px 8px; background: #ffffff;
-    border-bottom: 1px solid #e2e8f0;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    border-bottom: none;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.05);
   }
   .pages-scroll-area {
     flex: 1; overflow-y: auto; display: flex; flex-direction: column;
@@ -1135,7 +1148,7 @@
   .pages-toolbar {
     display: flex; gap: 1px; flex-wrap: wrap;
     padding: 4px 0; background: transparent;
-    border: none; border-top: 1px solid #e2e8f0;
+    border: none; border-top: 1px solid rgba(0,0,0,0.06);
     margin-top: 6px;
   }
   .pages-toolbar-btn {
@@ -1146,19 +1159,19 @@
   }
   .pages-toolbar-btn:hover { background: #f1f5f9; color: #0f172a; }
   .pages-toolbar-btn.active { background: var(--accent); color: white; }
-  .pages-toolbar-sep { width: 1px; background: #e2e8f0; margin: 3px 3px; align-self: stretch; }
+  .pages-toolbar-sep { width: 1px; background: rgba(0,0,0,0.08); margin: 3px 3px; align-self: stretch; }
 
   /* ── Rich text body ── */
   .pages-body {
-    min-height: 240px; padding: 16px 18px;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
+    min-height: 240px; padding: 18px 20px;
+    border: none;
+    border-radius: var(--radius-md);
     background: #ffffff; outline: none;
     font-family: 'DM Sans', sans-serif;
     font-size: 14px; line-height: 1.75; color: #1e293b;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.05);
   }
-  .pages-body:focus { border-color: var(--accent); }
+  .pages-body:focus { box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 0 0 2px var(--accent); }
   .pages-body h1 { font-family: 'DM Sans', sans-serif; font-size: 22px; font-weight: 700; margin: 16px 0 8px; color: #0f172a; letter-spacing: -0.02em; }
   .pages-body h2 { font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 600; margin: 12px 0 6px; color: #1e293b; }
   .pages-body h3 { font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; margin: 10px 0 5px; color: #334155; }
@@ -1193,7 +1206,7 @@
   .pages-tasks-header {
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 10px; padding-top: 20px;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid rgba(0,0,0,0.06);
   }
   .pages-tasks-title {
     font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 700;
@@ -1201,12 +1214,12 @@
   }
   .pages-task-item {
     display: flex; align-items: flex-start; gap: 10px;
-    padding: 10px 12px; border-radius: 10px; margin-bottom: 6px;
-    background: #ffffff; border: 1px solid #e2e8f0;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    transition: box-shadow 0.15s, border-color 0.15s;
+    padding: 12px 14px; border-radius: var(--radius-md); margin-bottom: 8px;
+    background: #ffffff; border: none;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.04);
+    transition: box-shadow 0.2s;
   }
-  .pages-task-item:hover { border-color: var(--accent); box-shadow: 0 2px 8px rgba(45,90,61,0.1); }
+  .pages-task-item:hover { box-shadow: 0 4px 12px rgba(45,90,61,0.1), 0 0 0 1px rgba(45,90,61,0.15); }
   .pages-task-check {
     width: 16px; height: 16px; border: 1.5px solid #cbd5e1; border-radius: 4px;
     flex-shrink: 0; background: white; cursor: pointer; margin-top: 2px;
@@ -1223,7 +1236,7 @@
   .pages-task-date-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
   .pages-task-date-input {
     font-family: 'DM Mono', monospace; font-size: 11px; color: #64748b;
-    border: 1px solid #e2e8f0; border-radius: 6px; padding: 2px 8px;
+    border: 1px solid rgba(0,0,0,0.08); border-radius: var(--radius-sm); padding: 2px 8px;
     background: #f8fafc; cursor: pointer;
   }
   .pages-task-date-input:focus { outline: none; border-color: var(--accent); }
@@ -1264,13 +1277,13 @@
   .pages-toggle-strip {
     width: 32px; min-width: 32px; flex-shrink: 0;
     display: flex; flex-direction: column; align-items: center; padding-top: 14px; gap: 8px;
-    border-right: 1px solid #e2e8f0; background: #ffffff;
+    border-right: 1px solid rgba(0,0,0,0.06); background: #ffffff;
     cursor: pointer; transition: background 0.15s;
   }
   .pages-toggle-strip:hover { background: #f8fafc; }
   .pages-toggle-btn {
     display: flex; align-items: center; justify-content: center;
-    width: 20px; height: 20px; border-radius: 6px; border: 1px solid #e2e8f0;
+    width: 20px; height: 20px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.08);
     background: #ffffff; color: #94a3b8; font-size: 12px; pointer-events: none;
   }
   .pages-toggle-strip:hover .pages-toggle-btn { background: var(--accent); color: white; border-color: var(--accent); }
@@ -4592,7 +4605,7 @@ function App() {
     <div className="app">
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.3.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.4.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
