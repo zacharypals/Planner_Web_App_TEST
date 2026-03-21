@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head><title>Signing in…</title></head>
+<body>
+<p style="font-family:sans-serif;padding:20px;color:#555">Signing in, please wait…</p>
+<script>
+  // Google redirects here with ?code=... (auth code flow)
+  // or with #access_token=... (legacy implicit flow fallback)
+  const query = {};
+  window.location.search.substring(1).split('&').forEach(p => {
+    const [k, v] = p.split('=');
+    if (k) query[decodeURIComponent(k)] = decodeURIComponent(v || '');
+  });
+  const hash = {};
+  window.location.hash.substring(1).split('&').forEach(p => {
+    const [k, v] = p.split('=');
+    if (k) hash[decodeURIComponent(k)] = decodeURIComponent(v || '');
+  });
+
+  const params = { ...hash, ...query }; // query wins (code flow)
+  const target = window.opener || (window.parent !== window ? window.parent : null);
+
+  if (target) {
+    target.postMessage(params, 'https://zacharypals.github.io');
+    if (window.opener) window.close();
+  } else {
+    document.body.innerHTML = '<p style="font-family:sans-serif;padding:20px;color:#c00">Sign-in failed. Please close this window and try again.</p>';
+  }
+</script>
+</body>
+</html>

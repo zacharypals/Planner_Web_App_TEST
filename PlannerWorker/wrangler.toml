@@ -1,0 +1,8 @@
+name = "planner-auth"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+workers_dev = true
+
+[[kv_namespaces]]
+binding = "TOKENS"
+id = "9c077a5d9040423ab3e7882bfe0b6ea5"
