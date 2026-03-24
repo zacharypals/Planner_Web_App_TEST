@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.1.0 -->
+<!-- LP Planner v3.2.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5434,7 +5434,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.1.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.2.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5636,18 +5636,26 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   function deleteGoal(id) { setFitnessGoals(gs => gs.filter(g => g.id!==id)); }
 
   // Compute progress for a goal
-  function goalProgress(goal) {
-    const now = new Date(); now.setHours(0,0,0,0);
-    let startDk, endDk;
+  function goalProgressFull(goal, refDate) {
+    // refDate: Date used as "now" for period calculation (defaults to today)
+    const now = refDate || new Date(); if (!refDate) now.setHours(0,0,0,0);
+    let startDk, endDk, totalDays, elapsedDays;
     if (goal.period === 'week') {
       const ws = getWeekStart(now);
       startDk = fmt(ws); endDk = fmt(addDays(ws,6));
+      totalDays = 7;
+      elapsedDays = Math.min(7, Math.floor((now - ws)/86400000)+1);
     } else if (goal.period === 'month') {
       const y=now.getFullYear(), m=now.getMonth();
-      startDk = fmt(new Date(y,m,1)); endDk = fmt(new Date(y,m+1,0));
+      const first = new Date(y,m,1); const last = new Date(y,m+1,0);
+      startDk = fmt(first); endDk = fmt(last);
+      totalDays = last.getDate();
+      elapsedDays = Math.min(totalDays, now.getDate());
     } else {
-      startDk = fmt(new Date(now.getFullYear(),0,1));
-      endDk = fmt(new Date(now.getFullYear(),11,31));
+      const first = new Date(now.getFullYear(),0,1); const last = new Date(now.getFullYear(),11,31);
+      startDk = fmt(first); endDk = fmt(last);
+      totalDays = 365 + (now.getFullYear()%4===0?1:0);
+      elapsedDays = Math.floor((now-first)/86400000)+1;
     }
     let total = 0;
     Object.entries(fitnessLog).forEach(([dk, workouts]) => {
@@ -5662,8 +5670,13 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
         });
       });
     });
-    return Math.round(total*10)/10;
+    const actual = Math.round(total*10)/10;
+    const periodPct = Math.round((elapsedDays/totalDays)*100);
+    const expectedAtPace = Math.round((elapsedDays/totalDays)*goal.target*10)/10;
+    const aheadBehind = actual - expectedAtPace;
+    return { actual, periodPct, expectedAtPace, aheadBehind, startDk, endDk };
   }
+  function goalProgress(goal) { return goalProgressFull(goal).actual; }
 
   // ── Stats helpers ──
   function exStats(workout, exId) {
@@ -5727,26 +5740,56 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                     <button onClick={()=>deleteExercise(dk,workout.id,ex.id)}
                       style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:'var(--ink-faint)',padding:'0 2px',opacity:0.5}}>✕</button>
                   </div>
-                  <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:2}}>
-                    <span className="set-num"></span>
-                    <span className="set-label" style={{width:52,textAlign:'center'}}>Reps</span>
-                    <span className="set-label" style={{width:52,textAlign:'center',marginLeft:18}}>Weight</span>
-                    <span className="set-label" style={{marginLeft:'auto',marginRight:2}}>Done</span>
-                  </div>
-                  {ex.sets.map((set,si) => (
-                    <div key={set.id} className={`set-row ${set.done?'done':''}`}>
-                      <span className="set-num">{si+1}</span>
-                      <input type="number" min="0" className="set-input" placeholder="—" value={set.reps}
-                        onChange={e=>updateSet(dk,workout.id,ex.id,set.id,{reps:e.target.value})} style={{opacity:set.done?0.6:1}}/>
-                      <span className="set-label">×</span>
-                      <input type="number" min="0" className="set-input" placeholder="—" value={set.weight}
-                        onChange={e=>updateSet(dk,workout.id,ex.id,set.id,{weight:e.target.value})} style={{opacity:set.done?0.6:1}}/>
-                      <span className="set-label">lbs</span>
-                      <div className={`set-check ${set.done?'done':''}`} onClick={()=>updateSet(dk,workout.id,ex.id,set.id,{done:!set.done})}/>
-                      <button onClick={()=>deleteSet(dk,workout.id,ex.id,set.id)}
-                        style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',opacity:0.35,marginLeft:2,lineHeight:1}}>✕</button>
-                    </div>
-                  ))}
+                  {(() => {
+                    const libEx = fitnessExercises.find(e=>e.id===ex.exerciseId);
+                    const isCardio = libEx?.category === 'Cardio';
+                    return (<>
+                      <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:2}}>
+                        <span className="set-num"></span>
+                        {isCardio ? (<>
+                          <span className="set-label" style={{width:60,textAlign:'center'}}>Dist (mi)</span>
+                          <span className="set-label" style={{width:60,textAlign:'center',marginLeft:6}}>Time (min)</span>
+                          <span className="set-label" style={{width:56,textAlign:'center',marginLeft:6}}>min/mi</span>
+                        </>) : (<>
+                          <span className="set-label" style={{width:52,textAlign:'center'}}>Reps</span>
+                          <span className="set-label" style={{width:52,textAlign:'center',marginLeft:18}}>Weight</span>
+                        </>)}
+                        <span className="set-label" style={{marginLeft:'auto',marginRight:2}}>Done</span>
+                      </div>
+                      {ex.sets.map((set,si) => {
+                        const dist = parseFloat(set.dist)||0;
+                        const time = parseFloat(set.time)||0;
+                        const pace = (dist>0 && time>0) ? (time/dist).toFixed(2) : null;
+                        return (
+                          <div key={set.id} className={`set-row ${set.done?'done':''}`}>
+                            <span className="set-num">{si+1}</span>
+                            {isCardio ? (<>
+                              <input type="number" min="0" step="0.01" className="set-input" placeholder="—" value={set.dist||''}
+                                onChange={e=>updateSet(dk,workout.id,ex.id,set.id,{dist:e.target.value})}
+                                style={{width:60,opacity:set.done?0.6:1}}/>
+                              <input type="number" min="0" step="0.1" className="set-input" placeholder="—" value={set.time||''}
+                                onChange={e=>updateSet(dk,workout.id,ex.id,set.id,{time:e.target.value})}
+                                style={{width:60,marginLeft:6,opacity:set.done?0.6:1}}/>
+                              <span className="set-label" style={{width:56,textAlign:'center',fontWeight:pace?700:400,
+                                color:pace?'var(--accent)':'var(--ink-faint)',fontSize:pace?11:9}}>
+                                {pace ? `${pace}` : '—'}
+                              </span>
+                            </>) : (<>
+                              <input type="number" min="0" className="set-input" placeholder="—" value={set.reps||''}
+                                onChange={e=>updateSet(dk,workout.id,ex.id,set.id,{reps:e.target.value})} style={{opacity:set.done?0.6:1}}/>
+                              <span className="set-label">×</span>
+                              <input type="number" min="0" className="set-input" placeholder="—" value={set.weight||''}
+                                onChange={e=>updateSet(dk,workout.id,ex.id,set.id,{weight:e.target.value})} style={{opacity:set.done?0.6:1}}/>
+                              <span className="set-label">lbs</span>
+                            </>)}
+                            <div className={`set-check ${set.done?'done':''}`} onClick={()=>updateSet(dk,workout.id,ex.id,set.id,{done:!set.done})}/>
+                            <button onClick={()=>deleteSet(dk,workout.id,ex.id,set.id)}
+                              style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',opacity:0.35,marginLeft:2,lineHeight:1}}>✕</button>
+                          </div>
+                        );
+                      })}
+                    </>);
+                  })()}
                 </div>
               );
             })}
@@ -5805,22 +5848,37 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           </div>
         )}
         {fitnessGoals.map(goal => {
-          const progress = goalProgress(goal);
-          const pct = Math.min(100, (progress/goal.target)*100);
+          const {actual, periodPct, expectedAtPace, aheadBehind} = goalProgressFull(goal);
+          const pct = Math.min(100, (actual/goal.target)*100);
           const done = pct >= 100;
           const exLabel = fitnessExercises.find(e=>e.id===goal.exerciseId)?.name || 'Unknown';
+          const ahead = aheadBehind >= 0;
           return (
             <div key={goal.id} className="fitness-goal-row">
               <div className="fitness-goal-label">
-                <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{exLabel}</span>
-                <button onClick={()=>deleteGoal(goal.id)}
-                  style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',flexShrink:0,opacity:0.5}}>✕</button>
+                <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11}}>{exLabel}</span>
+                <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+                  <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",
+                    color:ahead?'var(--accent)':'var(--red)',fontWeight:600}}>
+                    {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))}
+                  </span>
+                  <button onClick={()=>deleteGoal(goal.id)}
+                    style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 1px',opacity:0.5}}>✕</button>
+                </div>
               </div>
-              <div className="fitness-goal-bar-bg">
-                <div className={`fitness-goal-bar-fill ${done?'done':''}`} style={{width:`${pct}%`}}/>
+              {/* Dual bar: period elapsed (faint) behind actual progress */}
+              <div className="fitness-goal-bar-bg" style={{position:'relative'}}>
+                <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,
+                  background:'rgba(0,0,0,0.08)',borderRadius:3,zIndex:0}}/>
+                <div className={`fitness-goal-bar-fill ${done?'done':''}`}
+                  style={{width:`${Math.min(100,pct)}%`,position:'relative',zIndex:1}}/>
               </div>
               <div className="fitness-goal-meta">
-                {progress.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit} · {goal.period}
+                {actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}
+                <span style={{margin:'0 3px',opacity:0.5}}>·</span>
+                {periodPct}% thru {goal.period}
+                <span style={{margin:'0 3px',opacity:0.5}}>·</span>
+                pace {expectedAtPace.toLocaleString()}
                 {done && ' 🎉'}
               </div>
             </div>
@@ -5916,6 +5974,50 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           </div>
         )}
 
+        {/* ── WEEK GOAL PROGRESS ── */}
+        {fitView==='week' && fitnessGoals.filter(g=>g.period==='week').length > 0 && (
+          <div style={{background:'var(--paper)',borderRadius:'var(--radius-md)',border:'1px solid var(--border)',padding:'12px 16px',marginTop:4}}>
+            <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8}}>
+              Weekly Goals — {Math.round((weekDays.filter(d=>d<=today).length/7)*100)}% of week elapsed
+            </div>
+            {fitnessGoals.filter(g=>g.period==='week').map(goal => {
+              const {actual, periodPct, expectedAtPace, aheadBehind} = goalProgressFull(goal, today);
+              const pct = Math.min(100,(actual/goal.target)*100);
+              const done = pct>=100;
+              const ahead = aheadBehind>=0;
+              const exLabel = fitnessExercises.find(e=>e.id===goal.exerciseId)?.name||'Unknown';
+              return (
+                <div key={goal.id} style={{marginBottom:10}}>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                    <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,color:'var(--ink)'}}>{exLabel}</span>
+                    <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                      <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-light)'}}>{actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}</span>
+                      <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,
+                        color:ahead?'var(--accent)':'var(--red)'}}>
+                        {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs pace
+                      </span>
+                      {done && <span>🎉</span>}
+                    </div>
+                  </div>
+                  <div className="fitness-goal-bar-bg" style={{position:'relative',height:8,borderRadius:4}}>
+                    <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,
+                      background:'rgba(0,0,0,0.08)',borderRadius:4,zIndex:0}}/>
+                    <div className={`fitness-goal-bar-fill ${done?'done':''}`}
+                      style={{width:`${Math.min(100,pct)}%`,height:'100%',borderRadius:4,position:'relative',zIndex:1}}/>
+                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between',marginTop:2}}>
+                    <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>0</span>
+                    <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',fontStyle:'italic'}}>
+                      expected {expectedAtPace.toLocaleString()} at current pace
+                    </span>
+                    <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>{goal.target.toLocaleString()}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* ── MONTH VIEW ── */}
         {fitView==='month' && (
           <div>
@@ -5932,18 +6034,69 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                 const isToday = isSameDay(d, today);
                 const dayWorkouts = fitnessLog[dk] || [];
                 return (
+                  {(() => {
+                    const isPast = d < today && !isToday;
+                    return (
                   <div key={dk} className={`fitness-month-cell ${isToday?'today':''}`}
+                    style={{opacity: isPast ? 0.6 : 1, background: isPast && dayWorkouts.length===0 ? 'var(--cream)' : undefined}}
                     onClick={()=>{ setSelectedDate(d); setFitView('day'); }}>
                     <div className="fitness-month-cell-num">{i+1}</div>
                     <div style={{marginTop:3}}>
                       {dayWorkouts.map(w => (
-                        <span key={w.id} className="fitness-month-dot" title={w.name}/>
+                        <div key={w.id} className="fitness-week-workout-pill"
+                          style={{fontSize:9,padding:'1px 4px',marginBottom:1}}
+                          title={w.name}>
+                          {w.name}
+                        </div>
                       ))}
                     </div>
                   </div>
-                );
+                  );})()}
               })}
             </div>
+
+            {/* Month goal progress */}
+            {fitnessGoals.filter(g=>g.period==='month').length > 0 && (
+              <div style={{background:'var(--paper)',borderRadius:'var(--radius-md)',border:'1px solid var(--border)',padding:'12px 16px',marginTop:12}}>
+                <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8}}>
+                  Monthly Goals — {new Date(viewYear,viewMonth+1,0).getDate()>0 ? Math.round((Math.min(today.getDate(),new Date(viewYear,viewMonth+1,0).getDate())/new Date(viewYear,viewMonth+1,0).getDate())*100) : 0}% of month elapsed
+                </div>
+                {fitnessGoals.filter(g=>g.period==='month').map(goal => {
+                  const {actual, periodPct, expectedAtPace, aheadBehind} = goalProgressFull(goal, today);
+                  const pct = Math.min(100,(actual/goal.target)*100);
+                  const done = pct>=100;
+                  const ahead = aheadBehind>=0;
+                  const exLabel = fitnessExercises.find(e=>e.id===goal.exerciseId)?.name||'Unknown';
+                  return (
+                    <div key={goal.id} style={{marginBottom:10}}>
+                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+                        <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,color:'var(--ink)'}}>{exLabel}</span>
+                        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                          <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-light)'}}>{actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}</span>
+                          <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:ahead?'var(--accent)':'var(--red)'}}>
+                            {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs pace
+                          </span>
+                          {done && <span>🎉</span>}
+                        </div>
+                      </div>
+                      <div className="fitness-goal-bar-bg" style={{position:'relative',height:8,borderRadius:4}}>
+                        <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,
+                          background:'rgba(0,0,0,0.08)',borderRadius:4,zIndex:0}}/>
+                        <div className={`fitness-goal-bar-fill ${done?'done':''}`}
+                          style={{width:`${Math.min(100,pct)}%`,height:'100%',borderRadius:4,position:'relative',zIndex:1}}/>
+                      </div>
+                      <div style={{display:'flex',justifyContent:'space-between',marginTop:2}}>
+                        <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>0</span>
+                        <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',fontStyle:'italic'}}>
+                          expected {expectedAtPace.toLocaleString()} at current pace
+                        </span>
+                        <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>{goal.target.toLocaleString()}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
