@@ -6033,10 +6033,8 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                 const dk = fmt(d);
                 const isToday = isSameDay(d, today);
                 const dayWorkouts = fitnessLog[dk] || [];
+                const isPast = d < today && !isToday;
                 return (
-                  {(() => {
-                    const isPast = d < today && !isToday;
-                    return (
                   <div key={dk} className={`fitness-month-cell ${isToday?'today':''}`}
                     style={{opacity: isPast ? 0.6 : 1, background: isPast && dayWorkouts.length===0 ? 'var(--cream)' : undefined}}
                     onClick={()=>{ setSelectedDate(d); setFitView('day'); }}>
@@ -6051,7 +6049,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                       ))}
                     </div>
                   </div>
-                  );})()}
+                );
               })}
             </div>
 
