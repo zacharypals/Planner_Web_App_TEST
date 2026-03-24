@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.4.3 -->
+<!-- LP Planner v3.4.4 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3720,17 +3720,29 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                 </div>
                 {/* Link to fitness exercise */}
                 {fitnessExercises && fitnessExercises.length > 0 && (
-                  <div style={{display:'flex',alignItems:'center',gap:6}}>
-                    <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Link exercise:</span>
-                    <select
-                      value={goal.linkedExerciseId||''}
-                      onChange={e=>updateGoal(goal.id,{linkedExerciseId:e.target.value||undefined})}
-                      onClick={e=>e.stopPropagation()}
-                      style={{flex:1,fontSize:11,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
-                        borderRadius:4,padding:'3px 5px',background:'white',color:'var(--ink)',outline:'none'}}>
-                      <option value="">— None —</option>
-                      {fitnessExercises.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
-                    </select>
+                  <div style={{display:'flex',flexDirection:'column',gap:3}}>
+                    <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Link exercises (any qualifies):</span>
+                    <div style={{display:'flex',flexDirection:'column',gap:2,maxHeight:80,overflowY:'auto',
+                      border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'white'}}>
+                      {fitnessExercises.map(e => {
+                        const ids = goal.linkedExerciseIds || (goal.linkedExerciseId ? [goal.linkedExerciseId] : []);
+                        const checked = ids.includes(e.id);
+                        return (
+                          <label key={e.id} style={{display:'flex',alignItems:'center',gap:5,cursor:'pointer',
+                            fontSize:11,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}
+                            onClick={ev=>ev.stopPropagation()}>
+                            <input type="checkbox" checked={checked}
+                              onChange={ev=>{
+                                const cur = goal.linkedExerciseIds || (goal.linkedExerciseId ? [goal.linkedExerciseId] : []);
+                                const next = ev.target.checked ? [...cur, e.id] : cur.filter(x=>x!==e.id);
+                                updateGoal(goal.id, {linkedExerciseIds: next, linkedExerciseId: undefined});
+                              }}
+                              style={{margin:0,cursor:'pointer'}}/>
+                            {e.name}
+                          </label>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
@@ -4069,17 +4081,30 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                     </div>
                   )}
                   {onRename && fitnessExercises && fitnessExercises.length > 0 && (
-                    <div style={{display:'flex',alignItems:'center',gap:6}}>
-                      <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Link exercise:</span>
-                      <select
-                        value={g.linkedExerciseId||''}
-                        onChange={e=>{e.stopPropagation();onRename(g.id,{linkedExerciseId:e.target.value||undefined});}}
-                        onClick={e=>e.stopPropagation()}
-                        style={{flex:1,fontSize:11,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
-                          borderRadius:4,padding:'3px 5px',background:'white',color:'var(--ink)',outline:'none'}}>
-                        <option value="">— None —</option>
-                        {fitnessExercises.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
-                      </select>
+                    <div style={{display:'flex',flexDirection:'column',gap:3}}>
+                      <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Link exercises (any qualifies):</span>
+                      <div style={{display:'flex',flexDirection:'column',gap:2,maxHeight:80,overflowY:'auto',
+                        border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'white'}}>
+                        {fitnessExercises.map(e => {
+                          const ids = g.linkedExerciseIds || (g.linkedExerciseId ? [g.linkedExerciseId] : []);
+                          const checked = ids.includes(e.id);
+                          return (
+                            <label key={e.id} style={{display:'flex',alignItems:'center',gap:5,cursor:'pointer',
+                              fontSize:11,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}
+                              onClick={ev=>ev.stopPropagation()}>
+                              <input type="checkbox" checked={checked}
+                                onChange={ev=>{
+                                  ev.stopPropagation();
+                                  const cur = g.linkedExerciseIds || (g.linkedExerciseId ? [g.linkedExerciseId] : []);
+                                  const next = ev.target.checked ? [...cur, e.id] : cur.filter(x=>x!==e.id);
+                                  onRename(g.id, {linkedExerciseIds: next, linkedExerciseId: undefined});
+                                }}
+                                style={{margin:0,cursor:'pointer'}}/>
+                              {e.name}
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
                   {getQty && (
@@ -5247,7 +5272,10 @@ function App() {
 
   // Fitness → Habit sync (runs at App level so it fires on ALL pages, not just Habit page)
   useEffect(() => {
-    const linkedGoals = habitGoals.filter(g => g.linkedExerciseId);
+    // Support both old single linkedExerciseId and new linkedExerciseIds array
+    const linkedGoals = habitGoals.filter(g =>
+      g.linkedExerciseId || (g.linkedExerciseIds && g.linkedExerciseIds.length > 0)
+    );
     if (linkedGoals.length === 0) return;
 
     let newCompletions = null;
@@ -5260,13 +5288,17 @@ function App() {
         : raw;
 
       linkedGoals.forEach(habit => {
-        const libEx = fitnessExercises.find(e => e.id === habit.linkedExerciseId);
-        if (!libEx) return;
-        const isCardio = libEx.category === 'Cardio';
+        // Normalize to array, migrate old single-id field transparently
+        const linkedIds = (habit.linkedExerciseIds && habit.linkedExerciseIds.length > 0)
+          ? habit.linkedExerciseIds
+          : (habit.linkedExerciseId ? [habit.linkedExerciseId] : []);
+        if (linkedIds.length === 0) return;
 
         let total = 0;
         exList.forEach(ex => {
-          if (ex.exerciseId !== habit.linkedExerciseId) return;
+          if (!linkedIds.includes(ex.exerciseId)) return;
+          const libEx = fitnessExercises.find(e => e.id === ex.exerciseId);
+          const isCardio = libEx?.category === 'Cardio';
           ex.sets.filter(s => s.done).forEach(s => {
             total += isCardio ? (parseFloat(s.dist) || 0) : (parseFloat(s.reps) || 0);
           });
@@ -5515,7 +5547,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.4.3</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.4.4</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
