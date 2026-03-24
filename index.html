@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.4.1 -->
+<!-- LP Planner v3.4.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -3496,7 +3496,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
 // ─────────────────────────────────────────────
 // HABIT TRACKER
 // ─────────────────────────────────────────────
-function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completions, setCompletions, metrics, setMetrics, qty, setQty, notes, setNotes }) {
+function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completions, setCompletions, metrics, setMetrics, qty, setQty, notes, setNotes, fitnessLog, fitnessExercises }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDateRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_habitDate'));
@@ -3514,6 +3514,67 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
   const [expandedGoals, setExpandedGoals] = useState({}); // {goalId: bool} for sidebar
   const [dragGoalId, setDragGoalId] = useState(null);
   const [dragOverGoalId, setDragOverGoalId] = useState(null);
+
+  // ── Fitness → Habit sync ──────────────────────────────────────────────
+  // When fitnessLog changes, auto-check completions and update qty for linked habits
+  useEffect(() => {
+    if (!fitnessLog || !fitnessExercises) return;
+    const linkedGoals = goals.filter(g => g.linkedExerciseId);
+    if (linkedGoals.length === 0) return;
+
+    // Gather all date keys present in fitnessLog
+    const datesToCheck = Object.keys(fitnessLog);
+
+    let newCompletions = null;
+    let newQty = null;
+
+    datesToCheck.forEach(dk => {
+      const raw = fitnessLog[dk] || [];
+      // Support both old (workout-wrapped) and flat format
+      const exList = (raw[0] && Array.isArray(raw[0].exercises))
+        ? raw.flatMap(w => w.exercises || [])
+        : raw;
+
+      linkedGoals.forEach(habit => {
+        const libEx = fitnessExercises.find(e => e.id === habit.linkedExerciseId);
+        if (!libEx) return;
+        const isCardio = libEx.category === 'Cardio';
+
+        // Sum completed sets for this exercise this day
+        let total = 0;
+        exList.forEach(ex => {
+          if (ex.exerciseId !== habit.linkedExerciseId) return;
+          ex.sets.filter(s => s.done).forEach(s => {
+            total += isCardio
+              ? (parseFloat(s.dist) || 0)
+              : (parseFloat(s.reps) || 0);
+          });
+        });
+
+        if (total > 0) {
+          // Auto-complete this habit for this day
+          if (!newCompletions) newCompletions = {...completions};
+          const arr = newCompletions[dk] || [];
+          if (!arr.includes(habit.id)) {
+            newCompletions[dk] = [...arr, habit.id];
+          }
+          // Set qty to the fitness total
+          if (!newQty) newQty = {...qty};
+          const dayQty = {...(newQty[dk] || {})};
+          const existing = parseFloat(dayQty[habit.id]) || 0;
+          // Only update if fitness total differs (don't overwrite manual entries that are higher)
+          if (Math.abs(total - existing) > 0.001) {
+            dayQty[habit.id] = String(Math.round(total * 100) / 100);
+            newQty[dk] = dayQty;
+          }
+        }
+      });
+    });
+
+    if (newCompletions) setCompletions(newCompletions);
+    if (newQty) setQty(newQty);
+  }, [fitnessLog, goals]);
+  // ─────────────────────────────────────────────────────────────────────
 
   function isCompleted(goalId, dateKey) {
     return (completions[dateKey]||[]).includes(goalId);
@@ -3716,6 +3777,21 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                     ))}
                   </div>
                 </div>
+                {/* Link to fitness exercise */}
+                {fitnessExercises && fitnessExercises.length > 0 && (
+                  <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Link exercise:</span>
+                    <select
+                      value={goal.linkedExerciseId||''}
+                      onChange={e=>updateGoal(goal.id,{linkedExerciseId:e.target.value||undefined})}
+                      onClick={e=>e.stopPropagation()}
+                      style={{flex:1,fontSize:11,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
+                        borderRadius:4,padding:'3px 5px',background:'white',color:'var(--ink)',outline:'none'}}>
+                      <option value="">— None —</option>
+                      {fitnessExercises.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
                   <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Qty:</span>
                   <input type="number" min="0" step="1"
@@ -3807,7 +3883,8 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
             getMetric={getMetric} setMetric={setMetric}
             getQty={getQty} setGoalQty={setGoalQty}
             getNote={getNote} setGoalNote={setGoalNote}
-            countInView={countInView} calcStreak={calcStreak} />
+            countInView={countInView} calcStreak={calcStreak}
+            fitnessExercises={fitnessExercises} />
         </>}
         {view==='weekly' && <>
           <WeeklyHabitView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} qty={qty} notes={notes} onDayClick={setSelectedDate} />
@@ -3818,7 +3895,8 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
             getMetric={getMetric} setMetric={setMetric}
             getQty={getQty} setGoalQty={setGoalQty}
             getNote={getNote} setGoalNote={setGoalNote}
-            countInView={countInView} calcStreak={calcStreak} />
+            countInView={countInView} calcStreak={calcStreak}
+            fitnessExercises={fitnessExercises} />
         </>}
         {view==='yearly' && <>
           <YearlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />
@@ -3829,7 +3907,8 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
             getMetric={getMetric} setMetric={setMetric}
             getQty={getQty} setGoalQty={setGoalQty}
             getNote={getNote} setGoalNote={setGoalNote}
-            countInView={countInView} calcStreak={calcStreak} />
+            countInView={countInView} calcStreak={calcStreak}
+            fitnessExercises={fitnessExercises} />
         </>}
         {view==='daily' && <DailyView date={selectedDate} goals={displayGoals} completions={completions}
           onToggle={(gid)=>toggleCompletion(gid,fmt(selectedDate))} />}
@@ -3839,7 +3918,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
   );
 }
 
-function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, onRename, onReorder, onGoToMetrics, getMetric, setMetric, getQty, setGoalQty, getNote, setGoalNote, countInView, calcStreak }) {
+function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, onRename, onReorder, onGoToMetrics, getMetric, setMetric, getQty, setGoalQty, getNote, setGoalNote, countInView, calcStreak, fitnessExercises }) {
   const dk = fmt(date);
   const [confirmId, setConfirmId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -4046,6 +4125,20 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                           </button>
                         ))}
                       </div>
+                    </div>
+                  )}
+                  {onRename && fitnessExercises && fitnessExercises.length > 0 && (
+                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                      <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Link exercise:</span>
+                      <select
+                        value={g.linkedExerciseId||''}
+                        onChange={e=>{e.stopPropagation();onRename(g.id,{linkedExerciseId:e.target.value||undefined});}}
+                        onClick={e=>e.stopPropagation()}
+                        style={{flex:1,fontSize:11,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
+                          borderRadius:4,padding:'3px 5px',background:'white',color:'var(--ink)',outline:'none'}}>
+                        <option value="">— None —</option>
+                        {fitnessExercises.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+                      </select>
                     </div>
                   )}
                   {getQty && (
@@ -5434,7 +5527,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.4.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.4.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5511,6 +5604,7 @@ function App() {
         metrics={habitMetrics} setMetrics={setHabitMetrics}
         qty={habitQty} setQty={setHabitQty}
         notes={habitNotes} setNotes={setHabitNotes}
+        fitnessLog={fitnessLog} fitnessExercises={fitnessExercises}
         onGoToPlanner={()=>setPage('planner')}
         onGoToMetrics={()=>setPage('metrics')} />}
       {page==='metrics' && <MetricsView
