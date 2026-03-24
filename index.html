@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.3.0 -->
+<!-- LP Planner v3.4.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5434,7 +5434,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.3.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.4.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5560,7 +5560,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDate] = useState(today);
   const [fitView, setFitView] = useState('day');
-  const [showExPicker, setShowExPicker] = useState(null); // {dk} when open
+  const [showExPicker, setShowExPicker] = useState(null);
   const [showLibManager, setShowLibManager] = useState(false);
   const [showGoalManager, setShowGoalManager] = useState(false);
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
@@ -5573,176 +5573,299 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
   const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
 
-  // Migrate old workout-wrapped data to flat on first access
-  function getDayExercises(dk) {
-    const raw = fitnessLog[dk] || [];
-    if (raw.length === 0) return [];
-    // If first item has an `exercises` array, it's old format — flatten it
-    if (raw[0] && Array.isArray(raw[0].exercises)) {
-      return raw.flatMap(w => w.exercises || []);
-    }
-    return raw;
+  // ── Period helpers ──────────────────────────────────────────────────────
+  function periodStart(period, refDate) {
+    const d = refDate || today;
+    if (period==='week') return fmt(getWeekStart(d));
+    if (period==='month') return fmt(new Date(d.getFullYear(), d.getMonth(), 1));
+    return fmt(new Date(d.getFullYear(), 0, 1));
+  }
+  function periodEnd(period, refDate) {
+    const d = refDate || today;
+    if (period==='week') return fmt(addDays(getWeekStart(d),6));
+    if (period==='month') return fmt(new Date(d.getFullYear(), d.getMonth()+1, 0));
+    return fmt(new Date(d.getFullYear(), 11, 31));
+  }
+  function prevPeriodEnd(period, refDate) {
+    const d = refDate || today;
+    if (period==='week') return fmt(addDays(getWeekStart(d),-1));
+    if (period==='month') return fmt(new Date(d.getFullYear(), d.getMonth(), 0));
+    return fmt(new Date(d.getFullYear()-1, 11, 31));
   }
 
-  // ── Log helpers (flat: day → [exercise entries]) ──
+  // ── Goal versioning helpers ─────────────────────────────────────────────
+  // Get the active goal version for a given exercise+period on a reference date
+  function getActiveGoalVersion(exerciseId, period, refDate) {
+    const refDk = fmt(refDate || today);
+    return fitnessGoals.find(g =>
+      g.exerciseId === exerciseId &&
+      g.period === period &&
+      (!g.startDate || g.startDate <= refDk) &&
+      (!g.endDate || g.endDate >= refDk)
+    ) || null;
+  }
+
+  // Get all unique exercise+period combos across all goal versions
+  function getGoalFamilies() {
+    const seen = new Set();
+    const families = [];
+    fitnessGoals.forEach(g => {
+      const key = g.exerciseId + '|' + g.period;
+      if (!seen.has(key)) { seen.add(key); families.push({exerciseId:g.exerciseId, period:g.period}); }
+    });
+    return families;
+  }
+
+  // Auto-roll: for each family, if no version is active this period, create one from the latest version
+  function ensureAutoRoll(period, refDate) {
+    const pStart = periodStart(period, refDate);
+    const pEnd = periodEnd(period, refDate);
+    const families = getGoalFamilies().filter(f => f.period === period);
+    const toAdd = [];
+    families.forEach(({exerciseId, period:p}) => {
+      const active = fitnessGoals.find(g =>
+        g.exerciseId===exerciseId && g.period===p &&
+        (!g.startDate||g.startDate<=pEnd) && (!g.endDate||g.endDate>=pStart)
+      );
+      if (!active) {
+        // Find most recent version before this period
+        const prev = fitnessGoals
+          .filter(g => g.exerciseId===exerciseId && g.period===p && (!g.startDate||g.startDate<pStart))
+          .sort((a,b)=>(b.startDate||'0').localeCompare(a.startDate||'0'))[0];
+        if (prev) {
+          toAdd.push({
+            id: 'fg'+Date.now()+Math.random().toString(36).slice(2,6),
+            exerciseId, period:p, target:prev.target, unit:prev.unit,
+            startDate: pStart, endDate: null,
+          });
+        }
+      }
+    });
+    if (toAdd.length > 0) {
+      setFitnessGoals(gs => [...gs, ...toAdd]);
+    }
+  }
+
+  // Run auto-roll for current view's period on mount and when view/date changes
+  useEffect(() => {
+    if (fitView==='week') ensureAutoRoll('week', selectedDate);
+    else if (fitView==='month') ensureAutoRoll('month', selectedDate);
+    else if (fitView==='year') ensureAutoRoll('year', selectedDate);
+    // Day view shows week goals
+    else ensureAutoRoll('week', selectedDate);
+  }, [fitView, dateKey, fitnessGoals.length]);
+
+  // Get goals active during a given period range [startDk, endDk]
+  function getGoalsForPeriod(period, startDk, endDk) {
+    return fitnessGoals.filter(g =>
+      g.period === period &&
+      (!g.startDate || g.startDate <= endDk) &&
+      (!g.endDate || g.endDate >= startDk)
+    );
+  }
+
+  // ── Goal CRUD ────────────────────────────────────────────────────────────
+  function addGoalVersion(exerciseId, period, target, unit, startDk) {
+    if (!exerciseId || !target) return;
+    const newStart = startDk || periodStart(period);
+    // End any currently-active version at prevPeriodEnd
+    setFitnessGoals(gs => {
+      const updated = gs.map(g => {
+        if (g.exerciseId!==exerciseId || g.period!==period) return g;
+        const eDk = fmt(today);
+        const isActive = (!g.startDate||g.startDate<=eDk) && (!g.endDate||g.endDate>=eDk);
+        if (isActive && (!g.endDate || g.endDate > prevPeriodEnd(period))) {
+          return {...g, endDate: prevPeriodEnd(period)};
+        }
+        return g;
+      });
+      return [...updated, {
+        id:'fg'+Date.now(), exerciseId, period,
+        target:parseFloat(target), unit,
+        startDate: newStart, endDate: null,
+      }];
+    });
+  }
+
+  function editGoalInPlace(id, patch) {
+    setFitnessGoals(gs => gs.map(g => g.id===id ? {...g,...patch} : g));
+  }
+
+  function endGoal(id) {
+    setFitnessGoals(gs => gs.map(g => g.id===id ? {...g, endDate:prevPeriodEnd(g.period)} : g));
+  }
+
+  function deleteGoalVersion(id) {
+    setFitnessGoals(gs => gs.filter(g => g.id!==id));
+  }
+
+  // ── Log helpers (flat: day → [exercise entries]) ────────────────────────
+  function getDayExercises(dk) {
+    const raw = fitnessLog[dk] || [];
+    if (raw.length===0) return [];
+    if (raw[0] && Array.isArray(raw[0].exercises)) return raw.flatMap(w=>w.exercises||[]);
+    return raw;
+  }
   function setDayExs(dk, fn) {
     setFitnessLog(log => {
       const cur = getDayExercises(dk);
-      const next = typeof fn === 'function' ? fn(cur) : fn;
-      return { ...log, [dk]: next };
+      const next = typeof fn==='function' ? fn(cur) : fn;
+      return {...log, [dk]: next};
     });
   }
   function addExerciseToDay(dk, exerciseId) {
-    const libEx = fitnessExercises.find(e => e.id===exerciseId);
+    const libEx = fitnessExercises.find(e=>e.id===exerciseId);
     if (!libEx) return;
-    const newEx = { id:'ex'+Date.now(), exerciseId, sets:[{id:'s'+Date.now(), reps:'', weight:'', dist:'', time:'', done:false}] };
-    setDayExs(dk, exs => [...exs, newEx]);
-    if (fitView !== 'day') { setSelectedDate(new Date(dk+'T00:00:00')); setFitView('day'); }
+    const newEx = {id:'ex'+Date.now(), exerciseId, sets:[{id:'s'+Date.now(), reps:'', weight:'', dist:'', time:'', done:false}]};
+    setDayExs(dk, exs=>[...exs, newEx]);
+    if (fitView!=='day') { setSelectedDate(new Date(dk+'T00:00:00')); setFitView('day'); }
   }
-  function deleteExercise(dk, exId) { setDayExs(dk, exs => exs.filter(e => e.id!==exId)); }
+  function deleteExercise(dk, exId) { setDayExs(dk, exs=>exs.filter(e=>e.id!==exId)); }
   function updateSet(dk, exId, setId, patch) {
-    setDayExs(dk, exs => exs.map(e => e.id!==exId ? e : {
-      ...e, sets: e.sets.map(s => s.id!==setId ? s : {...s,...patch})
-    }));
+    setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:e.sets.map(s=>s.id!==setId?s:{...s,...patch})}));
   }
   function addSet(dk, exId) {
-    setDayExs(dk, exs => exs.map(e => e.id!==exId ? e : {
-      ...e, sets:[...e.sets, {id:'s'+Date.now(), reps:'', weight:'', dist:'', time:'', done:false}]
-    }));
+    setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:[...e.sets,{id:'s'+Date.now(),reps:'',weight:'',dist:'',time:'',done:false}]}));
   }
   function deleteSet(dk, exId, setId) {
-    setDayExs(dk, exs => exs.map(e => e.id!==exId ? e : {
-      ...e, sets:e.sets.filter(s=>s.id!==setId)
-    }));
+    setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:e.sets.filter(s=>s.id!==setId)}));
   }
 
-  // ── Library helpers ──
+  // ── Library helpers ──────────────────────────────────────────────────────
   function addExercise(name, category) {
     if (!name.trim()) return;
-    const id = 'e'+Date.now();
-    setFitnessExercises(es => [...es, {id, name:name.trim(), category:category||UNCATEGORIZED}]);
+    const id='e'+Date.now();
+    setFitnessExercises(es=>[...es,{id,name:name.trim(),category:category||UNCATEGORIZED}]);
     return id;
   }
-  function updateExercise(id, patch) { setFitnessExercises(es => es.map(e => e.id===id ? {...e,...patch} : e)); }
-  function deleteExercise_lib(id) { setFitnessExercises(es => es.filter(e => e.id!==id)); }
+  function updateExercise(id, patch) { setFitnessExercises(es=>es.map(e=>e.id===id?{...e,...patch}:e)); }
+  function deleteExercise_lib(id) { setFitnessExercises(es=>es.filter(e=>e.id!==id)); }
 
-  // ── Goals helpers ──
-  function addGoal(exerciseId, period, target, unit) {
-    if (!exerciseId || !target) return;
-    setFitnessGoals(gs => [...gs, {id:'fg'+Date.now(), exerciseId, period, target:parseFloat(target), unit}]);
-  }
-  function deleteGoal(id) { setFitnessGoals(gs => gs.filter(g => g.id!==id)); }
-
+  // ── Progress calculation ─────────────────────────────────────────────────
   function goalProgressFull(goal, refDate) {
-    const now = refDate || new Date(); if (!refDate) now.setHours(0,0,0,0);
+    const now = refDate||new Date(); if(!refDate) now.setHours(0,0,0,0);
     let startDk, endDk, totalDays, elapsedDays;
-    if (goal.period === 'week') {
-      const ws = getWeekStart(now);
-      startDk = fmt(ws); endDk = fmt(addDays(ws,6));
-      totalDays = 7; elapsedDays = Math.min(7, Math.floor((now-ws)/86400000)+1);
-    } else if (goal.period === 'month') {
-      const y=now.getFullYear(), m=now.getMonth();
-      const first=new Date(y,m,1), last=new Date(y,m+1,0);
+    if (goal.period==='week') {
+      const ws=getWeekStart(now);
+      startDk=fmt(ws); endDk=fmt(addDays(ws,6));
+      totalDays=7; elapsedDays=Math.min(7,Math.floor((now-ws)/86400000)+1);
+    } else if (goal.period==='month') {
+      const y=now.getFullYear(),m=now.getMonth();
+      const first=new Date(y,m,1),last=new Date(y,m+1,0);
       startDk=fmt(first); endDk=fmt(last);
-      totalDays=last.getDate(); elapsedDays=Math.min(totalDays, now.getDate());
+      totalDays=last.getDate(); elapsedDays=Math.min(totalDays,now.getDate());
     } else {
-      const first=new Date(now.getFullYear(),0,1), last=new Date(now.getFullYear(),11,31);
+      const first=new Date(now.getFullYear(),0,1),last=new Date(now.getFullYear(),11,31);
       startDk=fmt(first); endDk=fmt(last);
       totalDays=365+(now.getFullYear()%4===0?1:0);
       elapsedDays=Math.floor((now-first)/86400000)+1;
     }
-    let total = 0;
-    Object.entries(fitnessLog).forEach(([dk, raw]) => {
-      if (dk < startDk || dk > endDk) return;
-      // Support both old (workout-wrapped) and new (flat) format
-      const exList = (raw&&raw[0]&&Array.isArray(raw[0].exercises))
-        ? raw.flatMap(w => w.exercises||[])
-        : (raw||[]);
-      exList.forEach(ex => {
-        if (ex.exerciseId !== goal.exerciseId) return;
-        const doneSets = ex.sets.filter(s => s.done);
-        if (goal.unit==='sets') total += doneSets.length;
-        else if (goal.unit==='reps') total += doneSets.reduce((a,s)=>a+(parseFloat(s.reps)||0),0);
-        else if (goal.unit==='volume') total += doneSets.reduce((a,s)=>a+(parseFloat(s.reps)||0)*(parseFloat(s.weight)||0),0);
+    // Clamp to goal's own startDate/endDate
+    if (goal.startDate && goal.startDate>startDk) startDk=goal.startDate;
+    if (goal.endDate && goal.endDate<endDk) endDk=goal.endDate;
+    let total=0;
+    Object.entries(fitnessLog).forEach(([dk,raw])=>{
+      if (dk<startDk||dk>endDk) return;
+      const exList=(raw&&raw[0]&&Array.isArray(raw[0].exercises))?raw.flatMap(w=>w.exercises||[]):(raw||[]);
+      exList.forEach(ex=>{
+        if (ex.exerciseId!==goal.exerciseId) return;
+        const doneSets=ex.sets.filter(s=>s.done);
+        if (goal.unit==='sets') total+=doneSets.length;
+        else if (goal.unit==='reps') total+=doneSets.reduce((a,s)=>a+(parseFloat(s.reps)||0),0);
+        else if (goal.unit==='volume') total+=doneSets.reduce((a,s)=>a+(parseFloat(s.reps)||0)*(parseFloat(s.weight)||0),0);
       });
     });
-    const actual = Math.round(total*10)/10;
-    const periodPct = Math.round((elapsedDays/totalDays)*100);
-    const targetPace = Math.round((elapsedDays/totalDays)*goal.target*10)/10;
-    const expectedAtPace = elapsedDays>0 ? Math.round((actual/elapsedDays*totalDays)*10)/10 : 0;
-    const aheadBehind = actual - targetPace;
-    return { actual, periodPct, targetPace, expectedAtPace, aheadBehind, startDk, endDk };
+    const actual=Math.round(total*10)/10;
+    const periodPct=Math.round((elapsedDays/totalDays)*100);
+    const targetPace=Math.round((elapsedDays/totalDays)*goal.target*10)/10;
+    const expectedAtPace=elapsedDays>0?Math.round((actual/elapsedDays*totalDays)*10)/10:0;
+    const aheadBehind=actual-targetPace;
+    return {actual,periodPct,targetPace,expectedAtPace,aheadBehind,startDk,endDk};
   }
-  function goalProgress(goal) { return goalProgressFull(goal).actual; }
 
-  // ── Stats helpers ──
+  // ── Stats helpers ────────────────────────────────────────────────────────
   function exStats(ex) {
-    const doneSets = ex.sets.filter(s => s.done);
-    const hasWeight = doneSets.some(s => parseFloat(s.weight)>0);
-    const volume = doneSets.reduce((acc,s) => {
-      const r=parseFloat(s.reps)||0, w=parseFloat(s.weight)||0;
-      return acc + (w>0 ? r*w : r);
-    }, 0);
-    return {done:doneSets.length, total:ex.sets.length, volume:Math.round(volume), hasWeight};
+    const doneSets=ex.sets.filter(s=>s.done);
+    const hasWeight=doneSets.some(s=>parseFloat(s.weight)>0);
+    const volume=doneSets.reduce((acc,s)=>{const r=parseFloat(s.reps)||0,w=parseFloat(s.weight)||0;return acc+(w>0?r*w:r);},0);
+    return {done:doneSets.length,total:ex.sets.length,volume:Math.round(volume),hasWeight};
   }
   function exName(exerciseId) { return fitnessExercises.find(e=>e.id===exerciseId)?.name||'Unknown'; }
 
-  const categorized = FITNESS_CATEGORIES.reduce((acc,cat) => {
-    const items = fitnessExercises.filter(e=>(e.category||UNCATEGORIZED)===cat);
-    if (items.length) acc[cat]=items;
+  const categorized=FITNESS_CATEGORIES.reduce((acc,cat)=>{
+    const items=fitnessExercises.filter(e=>(e.category||UNCATEGORIZED)===cat);
+    if(items.length) acc[cat]=items;
     return acc;
-  }, {});
+  },{});
 
-  // ── Render one exercise block (shared by day view) ──
+  // ── Goal progress bar renderer (shared across views) ────────────────────
+  function renderGoalBar(goal, refDate, showDelete) {
+    const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal,refDate);
+    const pct=Math.min(100,(actual/goal.target)*100),done=pct>=100,ahead=aheadBehind>=0;
+    return (
+      <div key={goal.id} style={{marginBottom:12}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
+          <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,color:'var(--ink)'}}>{exName(goal.exerciseId)}</span>
+          <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-light)'}}>{actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}</span>
+            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:ahead?'var(--accent)':'var(--red)'}}>
+              {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs target
+            </span>
+            {done&&<span>🎉</span>}
+          </div>
+        </div>
+        <div className="fitness-goal-bar-bg" style={{position:'relative',height:8,borderRadius:4}}>
+          <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,background:'rgba(0,0,0,0.08)',borderRadius:4,zIndex:0}}/>
+          <div className={`fitness-goal-bar-fill ${done?'done':''}`} style={{width:`${Math.min(100,pct)}%`,height:'100%',borderRadius:4,position:'relative',zIndex:1}}/>
+        </div>
+        <div style={{display:'flex',justifyContent:'space-between',marginTop:3,gap:8}}>
+          <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
+            Should be at: <b style={{color:ahead?'var(--accent)':'var(--red)'}}>{targetPace.toLocaleString()}</b>
+          </span>
+          <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',fontStyle:'italic'}}>
+            On pace for: <b style={{color:'var(--ink)',fontStyle:'normal'}}>{expectedAtPace.toLocaleString()}</b> / {goal.target.toLocaleString()}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Exercise block renderer ──────────────────────────────────────────────
   function renderExerciseBlock(dk, ex) {
-    const stats = exStats(ex);
-    const libEx = fitnessExercises.find(e=>e.id===ex.exerciseId);
-    const isCardio = libEx?.category === 'Cardio';
+    const stats=exStats(ex);
+    const libEx=fitnessExercises.find(e=>e.id===ex.exerciseId);
+    const isCardio=libEx?.category==='Cardio';
     return (
       <div key={ex.id} className="workout-card">
-        {/* Exercise header */}
         <div className="workout-card-header">
-          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:'var(--accent)',flex:1}}>
-            {exName(ex.exerciseId)}
-          </span>
-          {stats.done>0 && (
-            <span className="fitness-stat-pill">
-              {stats.done}/{stats.total} sets{stats.volume>0 && ` · ${stats.volume.toLocaleString()} ${stats.hasWeight?'lbs':'reps'}`}
-            </span>
-          )}
+          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:'var(--accent)',flex:1}}>{exName(ex.exerciseId)}</span>
+          {stats.done>0&&<span className="fitness-stat-pill">{stats.done}/{stats.total} sets{stats.volume>0&&` · ${stats.volume.toLocaleString()} ${stats.hasWeight?'lbs':'reps'}`}</span>}
           <button onClick={()=>deleteExercise(dk,ex.id)}
             style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 2px',lineHeight:1,opacity:0.5}}>✕</button>
         </div>
-        {/* Set table */}
         <div className="exercise-block">
           <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:2}}>
             <span className="set-num"></span>
-            {isCardio ? (<>
-              <span className="set-label" style={{width:60,textAlign:'center'}}>Dist (mi)</span>
+            {isCardio?(<><span className="set-label" style={{width:60,textAlign:'center'}}>Dist (mi)</span>
               <span className="set-label" style={{width:60,textAlign:'center',marginLeft:6}}>Time (min)</span>
-              <span className="set-label" style={{width:56,textAlign:'center',marginLeft:6}}>min/mi</span>
-            </>) : (<>
-              <span className="set-label" style={{width:52,textAlign:'center'}}>Reps</span>
-              <span className="set-label" style={{width:52,textAlign:'center',marginLeft:18}}>Weight</span>
-            </>)}
+              <span className="set-label" style={{width:56,textAlign:'center',marginLeft:6}}>min/mi</span></>)
+            :(<><span className="set-label" style={{width:52,textAlign:'center'}}>Reps</span>
+              <span className="set-label" style={{width:52,textAlign:'center',marginLeft:18}}>Weight</span></>)}
             <span className="set-label" style={{marginLeft:'auto',marginRight:2}}>Done</span>
           </div>
-          {ex.sets.map((set,si) => {
-            const dist=parseFloat(set.dist)||0, time=parseFloat(set.time)||0;
-            const pace = (dist>0&&time>0) ? (time/dist).toFixed(2) : null;
+          {ex.sets.map((set,si)=>{
+            const dist=parseFloat(set.dist)||0,time=parseFloat(set.time)||0;
+            const pace=(dist>0&&time>0)?(time/dist).toFixed(2):null;
             return (
               <div key={set.id} className={`set-row ${set.done?'done':''}`}>
                 <span className="set-num">{si+1}</span>
-                {isCardio ? (<>
+                {isCardio?(<>
                   <input type="number" min="0" step="0.01" className="set-input" placeholder="—" value={set.dist||''}
                     onChange={e=>updateSet(dk,ex.id,set.id,{dist:e.target.value})} style={{width:60,opacity:set.done?0.6:1}}/>
                   <input type="number" min="0" step="0.1" className="set-input" placeholder="—" value={set.time||''}
                     onChange={e=>updateSet(dk,ex.id,set.id,{time:e.target.value})} style={{width:60,marginLeft:6,opacity:set.done?0.6:1}}/>
-                  <span className="set-label" style={{width:56,textAlign:'center',fontWeight:pace?700:400,
-                    color:pace?'var(--accent)':'var(--ink-faint)',fontSize:pace?11:9}}>
-                    {pace||'—'}
-                  </span>
-                </>) : (<>
+                  <span className="set-label" style={{width:56,textAlign:'center',fontWeight:pace?700:400,color:pace?'var(--accent)':'var(--ink-faint)',fontSize:pace?11:9}}>{pace||'—'}</span>
+                </>):(<>
                   <input type="number" min="0" className="set-input" placeholder="—" value={set.reps||''}
                     onChange={e=>updateSet(dk,ex.id,set.id,{reps:e.target.value})} style={{opacity:set.done?0.6:1}}/>
                   <span className="set-label">×</span>
@@ -5758,8 +5881,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           })}
           <div style={{paddingTop:6}}>
             <button onClick={()=>addSet(dk,ex.id)}
-              style={{background:'none',border:'1px solid var(--border)',borderRadius:4,cursor:'pointer',
-                fontSize:10,color:'var(--ink-light)',padding:'2px 8px',fontFamily:"'DM Sans',sans-serif"}}>
+              style={{background:'none',border:'1px solid var(--border)',borderRadius:4,cursor:'pointer',fontSize:10,color:'var(--ink-light)',padding:'2px 8px',fontFamily:"'DM Sans',sans-serif"}}>
               + Set
             </button>
           </div>
@@ -5776,64 +5898,64 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           <button className="nav-arrow" onClick={()=>{
             if(fitView==='day') setSelectedDate(d=>addDays(d,-1));
             else if(fitView==='week') setSelectedDate(d=>addDays(d,-7));
-            else setSelectedDate(d=>new Date(d.getFullYear(),d.getMonth()-1,1));
+            else if(fitView==='month') setSelectedDate(d=>new Date(d.getFullYear(),d.getMonth()-1,1));
+            else setSelectedDate(d=>new Date(d.getFullYear()-1,d.getMonth(),d.getDate()));
           }}>‹</button>
           <div style={{textAlign:'center'}}>
             <div className="fitness-day-label" style={{fontSize:12}}>
-              {fitView==='day'
-                ? `${DAYS[selectedDate.getDay()].slice(0,3)}, ${MONTHS[selectedDate.getMonth()].slice(0,3)} ${selectedDate.getDate()}`
-                : fitView==='week'
-                  ? `${MONTHS[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()} – ${MONTHS[addDays(weekStart,6).getMonth()].slice(0,3)} ${addDays(weekStart,6).getDate()}`
-                  : `${MONTHS[viewMonth]} ${viewYear}`}
+              {fitView==='day'?`${DAYS[selectedDate.getDay()].slice(0,3)}, ${MONTHS[selectedDate.getMonth()].slice(0,3)} ${selectedDate.getDate()}`
+               :fitView==='week'?`${MONTHS[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()} – ${MONTHS[addDays(weekStart,6).getMonth()].slice(0,3)} ${addDays(weekStart,6).getDate()}`
+               :fitView==='month'?`${MONTHS[viewMonth]} ${viewYear}`
+               :String(viewYear)}
             </div>
             <div className="fitness-day-sub">{viewYear}</div>
           </div>
           <button className="nav-arrow" onClick={()=>{
             if(fitView==='day') setSelectedDate(d=>addDays(d,1));
             else if(fitView==='week') setSelectedDate(d=>addDays(d,7));
-            else setSelectedDate(d=>new Date(d.getFullYear(),d.getMonth()+1,1));
+            else if(fitView==='month') setSelectedDate(d=>new Date(d.getFullYear(),d.getMonth()+1,1));
+            else setSelectedDate(d=>new Date(d.getFullYear()+1,d.getMonth(),d.getDate()));
           }}>›</button>
         </div>
 
-        {/* Goals */}
+        {/* Goals sidebar */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:goalsCollapsed?0:6}}>
-          <div style={{display:'flex',alignItems:'center',gap:4,cursor:'pointer'}}
-            onClick={()=>setGoalsCollapsed(c=>!c)}>
+          <div style={{display:'flex',alignItems:'center',gap:4,cursor:'pointer'}} onClick={()=>setGoalsCollapsed(c=>!c)}>
             <span style={{fontSize:9,color:'var(--ink-faint)'}}>{goalsCollapsed?'▸':'▾'}</span>
             <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Goals</span>
-            {goalsCollapsed && fitnessGoals.length>0 && (
-              <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--accent)',fontWeight:600}}>({fitnessGoals.length})</span>
-            )}
+            {goalsCollapsed&&fitnessGoals.length>0&&<span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--accent)',fontWeight:600}}>({fitnessGoals.length})</span>}
           </div>
           <button className="add-btn" onClick={()=>setShowGoalManager(true)}>+</button>
         </div>
-        {!goalsCollapsed && (
-          <div style={{marginBottom:8}}>
-            {fitnessGoals.length===0 && (
-              <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'2px 6px',marginBottom:6}}>No goals yet — tap + to add</div>
-            )}
-            {(() => {
-              const PERIOD_ORDER = {week:0,month:1,year:2};
-              const groups = {};
-              fitnessGoals.forEach(g => {
-                const name = fitnessExercises.find(e=>e.id===g.exerciseId)?.name||'Unknown';
-                if (!groups[name]) groups[name]=[];
-                groups[name].push(g);
-              });
-              Object.values(groups).forEach(arr=>arr.sort((a,b)=>(PERIOD_ORDER[a.period]??3)-(PERIOD_ORDER[b.period]??3)));
-              return Object.keys(groups).sort().map(name => (
+        {!goalsCollapsed&&(()=>{
+          // Show goals active during the current view period
+          const pStart = fitView==='year'?periodStart('year',selectedDate):fitView==='month'?periodStart('month',selectedDate):periodStart('week',selectedDate);
+          const pEnd = fitView==='year'?periodEnd('year',selectedDate):fitView==='month'?periodEnd('month',selectedDate):periodEnd('week',selectedDate);
+          const relevantPeriod = fitView==='year'?'year':fitView==='month'?'month':'week';
+          const activeGoals = fitnessGoals.filter(g=>
+            g.period===relevantPeriod &&
+            (!g.startDate||g.startDate<=pEnd) &&
+            (!g.endDate||g.endDate>=pStart)
+          );
+          const PERIOD_ORDER={week:0,month:1,year:2};
+          const groups={};
+          activeGoals.forEach(g=>{
+            const name=fitnessExercises.find(e=>e.id===g.exerciseId)?.name||'Unknown';
+            if(!groups[name]) groups[name]=[];
+            groups[name].push(g);
+          });
+          Object.values(groups).forEach(arr=>arr.sort((a,b)=>(PERIOD_ORDER[a.period]??3)-(PERIOD_ORDER[b.period]??3)));
+          return (
+            <div style={{marginBottom:8}}>
+              {activeGoals.length===0&&<div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'2px 6px',marginBottom:6}}>No goals for this period — tap + to add</div>}
+              {Object.keys(groups).sort().map(name=>(
                 <div key={name} style={{marginBottom:10}}>
-                  <div style={{fontSize:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700,color:'var(--ink)',
-                    marginBottom:4,paddingBottom:2,borderBottom:'1px solid var(--border)'}}>
-                    {name}
-                  </div>
-                  {groups[name].map(goal => {
-                    const {actual,periodPct,targetPace,expectedAtPace,aheadBehind} = goalProgressFull(goal);
-                    const pct=Math.min(100,(actual/goal.target)*100);
-                    const done=pct>=100, ahead=aheadBehind>=0;
+                  <div style={{fontSize:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700,color:'var(--ink)',marginBottom:4,paddingBottom:2,borderBottom:'1px solid var(--border)'}}>{name}</div>
+                  {groups[name].map(goal=>{
+                    const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal);
+                    const pct=Math.min(100,(actual/goal.target)*100),done=pct>=100,ahead=aheadBehind>=0;
                     return (
-                      <div key={goal.id} style={{marginBottom:6,padding:'6px 8px',background:'white',
-                        borderRadius:'var(--radius-sm)',border:'1px solid var(--border)',boxShadow:'0 1px 2px var(--shadow)'}}>
+                      <div key={goal.id} style={{marginBottom:6,padding:'6px 8px',background:'white',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)',boxShadow:'0 1px 2px var(--shadow)'}}>
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
                           <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700,
                             background:goal.period==='week'?'var(--blue-light)':goal.period==='month'?'var(--accent-light)':'var(--gold-light)',
@@ -5843,8 +5965,8 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                             <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:ahead?'var(--accent)':'var(--red)',fontWeight:700}}>
                               {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs target
                             </span>
-                            <button onClick={()=>deleteGoal(goal.id)}
-                              style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 1px',opacity:0.5,lineHeight:1}}>✕</button>
+                            <button onClick={()=>setShowGoalManager(true)}
+                              style={{background:'none',border:'none',cursor:'pointer',fontSize:10,color:'var(--ink-faint)',padding:'0 2px',lineHeight:1}} title="Edit goals">✏️</button>
                           </div>
                         </div>
                         <div className="fitness-goal-bar-bg" style={{position:'relative',marginBottom:4}}>
@@ -5862,21 +5984,21 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                     );
                   })}
                 </div>
-              ));
-            })()}
-          </div>
-        )}
+              ))}
+            </div>
+          );
+        })()}
 
         <div style={{borderTop:'1px solid var(--border)',marginTop:8,paddingTop:8}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
             <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Exercise Library</span>
             <button className="add-btn" onClick={()=>setShowLibManager(true)}>⚙</button>
           </div>
-          {fitnessExercises.length===0 && <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px 6px'}}>No exercises yet — click ⚙</div>}
-          {Object.entries(categorized).map(([cat,items]) => (
+          {fitnessExercises.length===0&&<div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px 6px'}}>No exercises yet — click ⚙</div>}
+          {Object.entries(categorized).map(([cat,items])=>(
             <div key={cat}>
               <div className="ex-lib-cat">{cat}</div>
-              {items.map(ex => (
+              {items.map(ex=>(
                 <div key={ex.id} className="ex-lib-item">
                   <span style={{fontSize:11,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ex.name}</span>
                 </div>
@@ -5891,130 +6013,94 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
         <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
           <div style={{flex:1,minWidth:0}}>
             <div className="fitness-day-label">
-              {fitView==='day'
-                ? `${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()].slice(0,3)} ${selectedDate.getDate()}, ${viewYear}`
-                : fitView==='week'
-                  ? `Week of ${MONTHS[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()}`
-                  : `${MONTHS[viewMonth]} ${viewYear}`}
+              {fitView==='day'?`${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()].slice(0,3)} ${selectedDate.getDate()}, ${viewYear}`
+               :fitView==='week'?`Week of ${MONTHS[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()}`
+               :fitView==='month'?`${MONTHS[viewMonth]} ${viewYear}`
+               :String(viewYear)}
             </div>
           </div>
           <div className="fitness-view-tabs">
-            {['day','week','month'].map(v => (
+            {['day','week','month','year'].map(v=>(
               <button key={v} className={`fitness-view-tab ${fitView===v?'active':''}`} onClick={()=>setFitView(v)}>
                 {v.charAt(0).toUpperCase()+v.slice(1)}
               </button>
             ))}
           </div>
-          {fitView==='day' && (
+          {fitView==='day'&&(
             <button onClick={()=>setShowExPicker({dk:dateKey})}
-              style={{background:'var(--accent)',color:'white',border:'none',borderRadius:'var(--radius-md)',
-                padding:'7px 16px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:"'DM Sans',sans-serif",flexShrink:0}}>
+              style={{background:'var(--accent)',color:'white',border:'none',borderRadius:'var(--radius-md)',padding:'7px 16px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:"'DM Sans',sans-serif",flexShrink:0}}>
               + Exercise
             </button>
           )}
         </div>
 
         {/* DAY VIEW */}
-        {fitView==='day' && (()=>{
-          const exs = getDayExercises(dateKey);
+        {fitView==='day'&&(()=>{
+          const exs=getDayExercises(dateKey);
           return (
             <div style={{display:'flex',flexDirection:'column',gap:12}}>
-              {exs.length===0 && (
-                <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)',fontSize:13,fontStyle:'italic'}}>
-                  No exercises logged for this day.<br/><span style={{fontSize:11}}>Tap "+ Exercise" to start.</span>
-                </div>
-              )}
-              {exs.map(ex => renderExerciseBlock(dateKey, ex))}
+              {exs.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)',fontSize:13,fontStyle:'italic'}}>No exercises logged.<br/><span style={{fontSize:11}}>Tap "+ Exercise" to start.</span></div>}
+              {exs.map(ex=>renderExerciseBlock(dateKey,ex))}
             </div>
           );
         })()}
 
         {/* WEEK VIEW */}
-        {fitView==='week' && (
+        {fitView==='week'&&(<>
           <div className="fitness-week-grid">
-            {weekDays.map(d => {
-              const dk=fmt(d), isToday=isSameDay(d,today);
-              const dayExs = getDayExercises(dk);
+            {weekDays.map(d=>{
+              const dk=fmt(d),isToday=isSameDay(d,today);
+              const dayExs=getDayExercises(dk);
               return (
-                <div key={dk} className={`fitness-week-col ${isToday?'today':''}`}
-                  onClick={()=>{ setSelectedDate(d); setFitView('day'); }}>
+                <div key={dk} className={`fitness-week-col ${isToday?'today':''}`} onClick={()=>{setSelectedDate(d);setFitView('day');}}>
                   <div className="fitness-week-col-hdr">
                     <div className="fitness-week-col-day">{DAYS[d.getDay()].slice(0,3)}</div>
                     <div className="fitness-week-col-date">{d.getDate()}</div>
                   </div>
                   <div className="fitness-week-col-body">
-                    {dayExs.map(ex => (
-                      <div key={ex.id} className="fitness-week-workout-pill" title={exName(ex.exerciseId)}>
-                        {exName(ex.exerciseId)}
-                      </div>
-                    ))}
-                    {dayExs.length===0 && <div style={{fontSize:9,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px 0',textAlign:'center'}}>Rest</div>}
-                    <button className="fitness-week-add" onClick={e=>{e.stopPropagation();setShowExPicker({dk});}} title="Add exercise">+ Add</button>
+                    {dayExs.map(ex=><div key={ex.id} className="fitness-week-workout-pill" title={exName(ex.exerciseId)}>{exName(ex.exerciseId)}</div>)}
+                    {dayExs.length===0&&<div style={{fontSize:9,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px 0',textAlign:'center'}}>Rest</div>}
+                    <button className="fitness-week-add" onClick={e=>{e.stopPropagation();setShowExPicker({dk});}}>+ Add</button>
                   </div>
                 </div>
               );
             })}
           </div>
-        )}
-
-        {/* WEEK GOALS */}
-        {fitView==='week' && fitnessGoals.filter(g=>g.period==='week').length>0 && (
-          <div style={{background:'var(--paper)',borderRadius:'var(--radius-md)',border:'1px solid var(--border)',padding:'12px 16px',marginTop:4}}>
-            <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8}}>
-              Weekly Goals — {Math.round((weekDays.filter(d=>d<=today).length/7)*100)}% of week elapsed
-            </div>
-            {fitnessGoals.filter(g=>g.period==='week').map(goal => {
-              const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal,today);
-              const pct=Math.min(100,(actual/goal.target)*100), done=pct>=100, ahead=aheadBehind>=0;
-              return (
-                <div key={goal.id} style={{marginBottom:12}}>
-                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
-                    <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,color:'var(--ink)'}}>{exName(goal.exerciseId)}</span>
-                    <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                      <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-light)'}}>{actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}</span>
-                      <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:ahead?'var(--accent)':'var(--red)'}}>
-                        {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs target
-                      </span>
-                      {done&&<span>🎉</span>}
-                    </div>
-                  </div>
-                  <div className="fitness-goal-bar-bg" style={{position:'relative',height:8,borderRadius:4}}>
-                    <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,background:'rgba(0,0,0,0.08)',borderRadius:4,zIndex:0}}/>
-                    <div className={`fitness-goal-bar-fill ${done?'done':''}`} style={{width:`${Math.min(100,pct)}%`,height:'100%',borderRadius:4,position:'relative',zIndex:1}}/>
-                  </div>
-                  <div style={{display:'flex',justifyContent:'space-between',marginTop:3,gap:8}}>
-                    <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>Should be at: <b style={{color:ahead?'var(--accent)':'var(--red)'}}>{targetPace.toLocaleString()}</b></span>
-                    <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',fontStyle:'italic'}}>On pace for: <b style={{color:'var(--ink)',fontStyle:'normal'}}>{expectedAtPace.toLocaleString()}</b> / {goal.target.toLocaleString()}</span>
-                  </div>
+          {(()=>{
+            const pStart=periodStart('week',selectedDate),pEnd=periodEnd('week',selectedDate);
+            const wGoals=getGoalsForPeriod('week',pStart,pEnd);
+            if(!wGoals.length) return null;
+            return (
+              <div style={{background:'var(--paper)',borderRadius:'var(--radius-md)',border:'1px solid var(--border)',padding:'12px 16px',marginTop:4}}>
+                <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8}}>
+                  Weekly Goals — {Math.round((weekDays.filter(d=>d<=today).length/7)*100)}% of week elapsed
                 </div>
-              );
-            })}
-          </div>
-        )}
+                {wGoals.map(goal=>renderGoalBar(goal,today,false))}
+              </div>
+            );
+          })()}
+        </>)}
 
         {/* MONTH VIEW */}
-        {fitView==='month' && (
+        {fitView==='month'&&(<>
           <div>
             <div className="fitness-month-grid" style={{marginBottom:4}}>
               {DAYS.map(d=><div key={d} className="fitness-month-day-hdr">{d.slice(0,1)}</div>)}
             </div>
             <div className="fitness-month-grid">
-              {Array.from({length:firstDayOfMonth},(_,i)=>(
-                <div key={'empty'+i} className="fitness-month-cell empty"/>
-              ))}
+              {Array.from({length:firstDayOfMonth},(_,i)=><div key={'e'+i} className="fitness-month-cell empty"/>)}
               {Array.from({length:daysInMonth},(_,i)=>{
-                const d=new Date(viewYear,viewMonth,i+1), dk=fmt(d);
-                const isToday=isSameDay(d,today), isPast=d<today&&!isToday;
+                const d=new Date(viewYear,viewMonth,i+1),dk=fmt(d);
+                const isToday=isSameDay(d,today),isPast=d<today&&!isToday;
                 const dayExs=getDayExercises(dk);
                 return (
                   <div key={dk} className={`fitness-month-cell ${isToday?'today':''}`}
-                    style={{opacity:isPast?0.6:1, background:isPast&&dayExs.length===0?'var(--cream)':undefined}}
-                    onClick={()=>{ setSelectedDate(d); setFitView('day'); }}>
+                    style={{opacity:isPast?0.6:1,background:isPast&&dayExs.length===0?'var(--cream)':undefined}}
+                    onClick={()=>{setSelectedDate(d);setFitView('day');}}>
                     <div className="fitness-month-cell-num">{i+1}</div>
                     <div style={{marginTop:3}}>
                       {dayExs.map(ex=>(
-                        <div key={ex.id} className="fitness-week-workout-pill"
-                          style={{fontSize:9,padding:'1px 4px',marginBottom:1}} title={exName(ex.exerciseId)}>
+                        <div key={ex.id} className="fitness-week-workout-pill" style={{fontSize:9,padding:'1px 4px',marginBottom:1}} title={exName(ex.exerciseId)}>
                           {exName(ex.exerciseId)}
                         </div>
                       ))}
@@ -6023,105 +6109,317 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                 );
               })}
             </div>
-
-            {/* Month goals */}
-            {fitnessGoals.filter(g=>g.period==='month').length>0 && (
+          </div>
+          {(()=>{
+            const pStart=periodStart('month',selectedDate),pEnd=periodEnd('month',selectedDate);
+            const mGoals=getGoalsForPeriod('month',pStart,pEnd);
+            if(!mGoals.length) return null;
+            return (
               <div style={{background:'var(--paper)',borderRadius:'var(--radius-md)',border:'1px solid var(--border)',padding:'12px 16px',marginTop:12}}>
                 <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8}}>
                   Monthly Goals — {Math.round(Math.min(today.getDate(),daysInMonth)/daysInMonth*100)}% of month elapsed
                 </div>
-                {fitnessGoals.filter(g=>g.period==='month').map(goal=>{
-                  const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal,today);
-                  const pct=Math.min(100,(actual/goal.target)*100), done=pct>=100, ahead=aheadBehind>=0;
-                  return (
-                    <div key={goal.id} style={{marginBottom:12}}>
-                      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
-                        <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,color:'var(--ink)'}}>{exName(goal.exerciseId)}</span>
-                        <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                          <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-light)'}}>{actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}</span>
-                          <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:ahead?'var(--accent)':'var(--red)'}}>
-                            {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs target
-                          </span>
-                          {done&&<span>🎉</span>}
+                {mGoals.map(goal=>renderGoalBar(goal,today,false))}
+              </div>
+            );
+          })()}
+        </>)}
+
+        {/* YEAR VIEW */}
+        {fitView==='year'&&(()=>{
+          const pStart=periodStart('year',selectedDate),pEnd=periodEnd('year',selectedDate);
+          const yGoals=getGoalsForPeriod('year',pStart,pEnd);
+          const dayOfYear=Math.floor((today-new Date(viewYear,0,1))/86400000)+1;
+          const totalDaysInYear=365+(viewYear%4===0?1:0);
+          const yearPct=Math.round((dayOfYear/totalDaysInYear)*100);
+          return (
+            <div style={{display:'flex',flexDirection:'column',gap:16}}>
+              <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>{viewYear} · {yearPct}% elapsed · {dayOfYear} of {totalDaysInYear} days</div>
+              {yGoals.length===0&&(
+                <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)',fontSize:13,fontStyle:'italic'}}>
+                  No yearly goals set.<br/><span style={{fontSize:11}}>Click + in the sidebar to add one.</span>
+                </div>
+              )}
+              {yGoals.map(goal=>{
+                const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal,today);
+                const pct=Math.min(100,(actual/goal.target)*100),done=pct>=100,ahead=aheadBehind>=0;
+                // Build monthly breakdown
+                const monthlyData=Array.from({length:12},(_,mi)=>{
+                  const mStart=fmt(new Date(viewYear,mi,1)),mEnd=fmt(new Date(viewYear,mi+1,0));
+                  let mTotal=0;
+                  Object.entries(fitnessLog).forEach(([dk,raw])=>{
+                    if(dk<mStart||dk>mEnd) return;
+                    const exList=(raw&&raw[0]&&Array.isArray(raw[0].exercises))?raw.flatMap(w=>w.exercises||[]):(raw||[]);
+                    exList.forEach(ex=>{
+                      if(ex.exerciseId!==goal.exerciseId) return;
+                      ex.sets.filter(s=>s.done).forEach(s=>{
+                        if(goal.unit==='sets') mTotal+=1;
+                        else if(goal.unit==='reps') mTotal+=parseFloat(s.reps)||0;
+                        else mTotal+=(parseFloat(s.reps)||0)*(parseFloat(s.weight)||0);
+                      });
+                    });
+                  });
+                  return Math.round(mTotal);
+                });
+                const maxMonth=Math.max(...monthlyData,1);
+                const monthlyTarget=Math.round(goal.target/12);
+                return (
+                  <div key={goal.id} style={{background:'var(--paper)',borderRadius:'var(--radius-lg)',border:'1px solid var(--border)',padding:'16px',boxShadow:'0 1px 4px var(--shadow)'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:12}}>
+                      <div>
+                        <div style={{fontSize:15,fontFamily:"'DM Sans',sans-serif",fontWeight:700,color:'var(--ink)'}}>{exName(goal.exerciseId)}</div>
+                        <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',marginTop:2}}>
+                          Goal: {goal.target.toLocaleString()} {goal.unit} in {viewYear}
                         </div>
                       </div>
-                      <div className="fitness-goal-bar-bg" style={{position:'relative',height:8,borderRadius:4}}>
-                        <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,background:'rgba(0,0,0,0.08)',borderRadius:4,zIndex:0}}/>
-                        <div className={`fitness-goal-bar-fill ${done?'done':''}`} style={{width:`${Math.min(100,pct)}%`,height:'100%',borderRadius:4,position:'relative',zIndex:1}}/>
-                      </div>
-                      <div style={{display:'flex',justifyContent:'space-between',marginTop:3,gap:8}}>
-                        <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>Should be at: <b style={{color:ahead?'var(--accent)':'var(--red)'}}>{targetPace.toLocaleString()}</b></span>
-                        <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',fontStyle:'italic'}}>On pace for: <b style={{color:'var(--ink)',fontStyle:'normal'}}>{expectedAtPace.toLocaleString()}</b> / {goal.target.toLocaleString()}</span>
+                      <div style={{textAlign:'right'}}>
+                        <div style={{fontSize:20,fontFamily:"'Playfair Display',serif",fontWeight:700,color:done?'var(--gold)':ahead?'var(--accent)':'var(--red)'}}>
+                          {Math.round(pct)}%
+                        </div>
+                        <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
+                          {actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}
+                        </div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+                    {/* Overall progress bar */}
+                    <div className="fitness-goal-bar-bg" style={{position:'relative',height:10,borderRadius:5,marginBottom:4}}>
+                      <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,background:'rgba(0,0,0,0.08)',borderRadius:5,zIndex:0}}/>
+                      <div className={`fitness-goal-bar-fill ${done?'done':''}`} style={{width:`${Math.min(100,pct)}%`,height:'100%',borderRadius:5,position:'relative',zIndex:1}}/>
+                    </div>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:16,fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
+                      <span>Should be at: <b style={{color:ahead?'var(--accent)':'var(--red)'}}>{targetPace.toLocaleString()}</b></span>
+                      <span>On pace for: <b style={{color:'var(--ink)'}}>{expectedAtPace.toLocaleString()}</b></span>
+                    </div>
+                    {/* Monthly bar chart */}
+                    <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.05em'}}>Monthly breakdown</div>
+                    <div style={{display:'flex',gap:3,alignItems:'flex-end',height:60}}>
+                      {monthlyData.map((val,mi)=>{
+                        const barH=Math.max(2,Math.round((val/maxMonth)*56));
+                        const isFuture=new Date(viewYear,mi+1,0)>today;
+                        const isCurrentMonth=mi===today.getMonth()&&viewYear===today.getFullYear();
+                        return (
+                          <div key={mi} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:2}}>
+                            <div style={{fontSize:8,fontFamily:"'DM Mono',monospace",color:val>monthlyTarget?'var(--accent)':'var(--ink-faint)',fontWeight:val>0?700:400,lineHeight:1}}>
+                              {val>0?val:''}
+                            </div>
+                            <div style={{width:'100%',height:barH,
+                              background:isFuture?'var(--cream)':isCurrentMonth?'var(--accent)':val>=monthlyTarget?'var(--teal)':'var(--blue)',
+                              borderRadius:'2px 2px 0 0',position:'relative'}}>
+                              {/* Target line */}
+                              {monthlyTarget>0&&(
+                                <div style={{position:'absolute',bottom:`${Math.round((monthlyTarget/maxMonth)*56)-barH}px`,left:0,right:0,height:1,background:'rgba(196,150,14,0.6)',}}/>
+                              )}
+                            </div>
+                            <div style={{fontSize:7,fontFamily:"'DM Mono',monospace",color:isCurrentMonth?'var(--accent)':'var(--ink-faint)',fontWeight:isCurrentMonth?700:400}}>
+                              {MONTHS[mi].slice(0,1)}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{fontSize:8,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',marginTop:4,display:'flex',alignItems:'center',gap:6}}>
+                      <span style={{display:'inline-flex',alignItems:'center',gap:2}}><span style={{width:8,height:8,background:'var(--teal)',borderRadius:1,display:'inline-block'}}/>≥monthly target</span>
+                      <span style={{display:'inline-flex',alignItems:'center',gap:2}}><span style={{width:8,height:8,background:'var(--blue)',borderRadius:1,display:'inline-block'}}/>below target</span>
+                      <span style={{display:'inline-flex',alignItems:'center',gap:2}}><span style={{width:8,height:1,background:'rgba(196,150,14,0.6)',display:'inline-block'}}/>monthly target</span>
+                    </div>
+                    {goal.endDate&&<div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',marginTop:8}}>Ends: {goal.endDate}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
-      {/* EXERCISE PICKER MODAL */}
-      {showExPicker && (
-        <ExercisePicker
-          exercises={fitnessExercises}
-          onAdd={exerciseId => { addExerciseToDay(showExPicker.dk, exerciseId); setShowExPicker(null); }}
-          onAddNew={(name,category) => {
-            const id = addExercise(name, category);
-            if (id) setTimeout(()=>{ addExerciseToDay(showExPicker.dk, id); setShowExPicker(null); }, 50);
-          }}
-          onClose={()=>setShowExPicker(null)}
-        />
-      )}
-      {showLibManager && <ExerciseLibraryManager exercises={fitnessExercises} onAdd={addExercise} onUpdate={updateExercise} onDelete={deleteExercise_lib} onClose={()=>setShowLibManager(false)} />}
-      {showGoalManager && <GoalManager goals={fitnessGoals} exercises={fitnessExercises} onAdd={addGoal} onDelete={deleteGoal} onClose={()=>setShowGoalManager(false)} />}
+      {showExPicker&&<ExercisePicker exercises={fitnessExercises}
+        onAdd={exerciseId=>{addExerciseToDay(showExPicker.dk,exerciseId);setShowExPicker(null);}}
+        onAddNew={(name,category)=>{const id=addExercise(name,category);if(id)setTimeout(()=>{addExerciseToDay(showExPicker.dk,id);setShowExPicker(null);},50);}}
+        onClose={()=>setShowExPicker(null)}/>}
+      {showLibManager&&<ExerciseLibraryManager exercises={fitnessExercises} onAdd={addExercise} onUpdate={updateExercise} onDelete={deleteExercise_lib} onClose={()=>setShowLibManager(false)}/>}
+      {showGoalManager&&<GoalManager goals={fitnessGoals} exercises={fitnessExercises}
+        onAddVersion={addGoalVersion} onEdit={editGoalInPlace} onEnd={endGoal} onDelete={deleteGoalVersion}
+        periodStart={periodStart} periodEnd={periodEnd} prevPeriodEnd={prevPeriodEnd}
+        onClose={()=>setShowGoalManager(false)}/>}
     </div>
   );
 }
 
+
+
 // ─────────────────────────────────────────────
 // GOAL MANAGER — add/remove fitness goals
 // ─────────────────────────────────────────────
-function GoalManager({ goals, exercises, onAdd, onDelete, onClose }) {
-  const [exId, setExId] = useState(exercises[0]?.id || '');
-  const [period, setPeriod] = useState('month');
+function GoalManager({ goals, exercises, onAddVersion, onEdit, onEnd, onDelete, periodStart, periodEnd, prevPeriodEnd, onClose }) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const [exId, setExId] = useState(exercises[0]?.id||'');
+  const [period, setPeriod] = useState('week');
   const [target, setTarget] = useState('');
   const [unit, setUnit] = useState('reps');
+  const [editingId, setEditingId] = useState(null);
+  const [editTarget, setEditTarget] = useState('');
+  const [editUnit, setEditUnit] = useState('reps');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [confirmEdit, setConfirmEdit] = useState(null); // id awaiting retroactive edit confirm
+  const [confirmDelete, setConfirmDelete] = useState(null);
+
+  // Group by exercise+period, show only current/recent versions
+  const families = [];
+  const seen = new Set();
+  goals.forEach(g => {
+    const key = g.exerciseId+'|'+g.period;
+    if (!seen.has(key)) { seen.add(key); families.push(key); }
+  });
+
+  function startEdit(g) {
+    setEditingId(g.id);
+    setEditTarget(String(g.target));
+    setEditUnit(g.unit);
+    setEditEndDate(g.endDate||'');
+  }
+
+  function saveEdit(g) {
+    const newTarget = parseFloat(editTarget);
+    if (!newTarget) return;
+    const targetChanged = newTarget !== g.target || editUnit !== g.unit;
+    if (targetChanged) {
+      setConfirmEdit(g.id); // show confirmation before applying
+    } else {
+      onEdit(g.id, {endDate: editEndDate||null, unit:editUnit});
+      setEditingId(null);
+    }
+  }
+
+  function confirmEditApply(id) {
+    onEdit(id, {target:parseFloat(editTarget), unit:editUnit, endDate:editEndDate||null});
+    setEditingId(null);
+    setConfirmEdit(null);
+  }
 
   return (
     <div className="fitness-picker-overlay" onClick={onClose}>
-      <div className="fitness-picker-modal" style={{width:340,maxHeight:500}} onClick={e=>e.stopPropagation()}>
+      <div className="fitness-picker-modal" style={{width:380,maxHeight:560}} onClick={e=>e.stopPropagation()}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
           padding:'14px 16px 10px',borderBottom:'1px solid var(--border)',flexShrink:0}}>
           <span style={{fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,color:'var(--ink)'}}>Fitness Goals</span>
           <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',fontSize:16,color:'var(--ink-faint)',lineHeight:1}}>✕</button>
         </div>
 
-        {/* Existing goals */}
+        {/* Confirm retroactive edit warning */}
+        {confirmEdit && (
+          <div style={{margin:'8px 12px',padding:'10px 12px',background:'#fef3cd',border:'1px solid #f6c23e',borderRadius:'var(--radius-sm)'}}>
+            <div style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,color:'#856404',marginBottom:6}}>
+              ⚠️ Retroactive edit
+            </div>
+            <div style={{fontSize:11,fontFamily:"'DM Sans',sans-serif",color:'#856404',marginBottom:8}}>
+              Changing the target will retroactively affect how all past weeks/months are measured. Use "New Version" instead to only change future periods.
+            </div>
+            <div style={{display:'flex',gap:8}}>
+              <button onClick={()=>confirmEditApply(confirmEdit)}
+                style={{background:'#856404',color:'white',border:'none',borderRadius:4,padding:'4px 12px',cursor:'pointer',fontSize:11,fontWeight:600}}>
+                Edit retroactively
+              </button>
+              <button onClick={()=>setConfirmEdit(null)}
+                style={{background:'none',border:'1px solid #856404',color:'#856404',borderRadius:4,padding:'4px 12px',cursor:'pointer',fontSize:11}}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Existing goal versions */}
         <div style={{flex:1,overflowY:'auto',padding:'8px 12px'}}>
-          {goals.length===0 && <div style={{fontSize:12,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px'}}>No goals yet</div>}
-          {goals.map(g => {
-            const exName = exercises.find(e=>e.id===g.exerciseId)?.name||'Unknown';
+          {goals.length===0&&<div style={{fontSize:12,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px'}}>No goals yet</div>}
+          {families.map(key => {
+            const [eId, per] = key.split('|');
+            const exLabel = exercises.find(e=>e.id===eId)?.name||'Unknown';
+            const versions = goals.filter(g=>g.exerciseId===eId&&g.period===per)
+              .sort((a,b)=>(b.startDate||'0').localeCompare(a.startDate||'0'));
             return (
-              <div key={g.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 4px',borderRadius:6,
-                borderBottom:'1px solid var(--border)'}}
-                onMouseEnter={e=>e.currentTarget.style.background='var(--cream)'}
-                onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,color:'var(--ink)'}}>{exName}</div>
-                  <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
-                    {g.target.toLocaleString()} {g.unit} / {g.period}
-                  </div>
+              <div key={key} style={{marginBottom:10}}>
+                <div style={{fontSize:11,fontFamily:"'DM Sans',sans-serif",fontWeight:700,color:'var(--ink)',
+                  borderBottom:'1px solid var(--border)',paddingBottom:3,marginBottom:4,display:'flex',justifyContent:'space-between'}}>
+                  <span>{exLabel}</span>
+                  <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'capitalize'}}>{per}</span>
                 </div>
-                <button onClick={()=>onDelete(g.id)}
-                  style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 4px',opacity:0.6}}>✕</button>
+                {versions.map(g => {
+                  const isActive = (!g.startDate||g.startDate<=fmt(today))&&(!g.endDate||g.endDate>=fmt(today));
+                  const isEditing = editingId===g.id;
+                  return (
+                    <div key={g.id} style={{padding:'6px 8px',marginBottom:4,background:isActive?'var(--accent-light)':g.endDate?'var(--cream)':'white',
+                      borderRadius:'var(--radius-sm)',border:`1px solid ${isActive?'var(--accent)':'var(--border)'}`}}>
+                      {isEditing ? (
+                        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                            <input type="number" value={editTarget} onChange={e=>setEditTarget(e.target.value)}
+                              style={{width:70,fontSize:12,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',outline:'none'}}/>
+                            <select value={editUnit} onChange={e=>setEditUnit(e.target.value)}
+                              style={{flex:1,fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',background:'white',outline:'none'}}>
+                              <option value="reps">Reps</option>
+                              <option value="sets">Sets</option>
+                              <option value="volume">Volume (lbs)</option>
+                            </select>
+                          </div>
+                          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+                            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',flexShrink:0}}>End date:</span>
+                            <input type="date" value={editEndDate} onChange={e=>setEditEndDate(e.target.value)}
+                              style={{flex:1,fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',outline:'none'}}/>
+                          </div>
+                          <div style={{display:'flex',gap:6}}>
+                            <button onClick={()=>saveEdit(g)}
+                              style={{background:'var(--accent)',color:'white',border:'none',borderRadius:4,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:600}}>Save</button>
+                            <button onClick={()=>setEditingId(null)}
+                              style={{background:'none',border:'1px solid var(--border)',borderRadius:4,padding:'3px 8px',cursor:'pointer',fontSize:11}}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{display:'flex',alignItems:'center',gap:6}}>
+                          <div style={{flex:1}}>
+                            <div style={{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:600,color:'var(--ink)'}}>
+                              {g.target.toLocaleString()} {g.unit}
+                            </div>
+                            <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
+                              {g.startDate||'∞'} → {g.endDate||'ongoing'}
+                              {isActive&&<span style={{marginLeft:6,color:'var(--accent)',fontWeight:700}}>● active</span>}
+                            </div>
+                          </div>
+                          <button onClick={()=>startEdit(g)} title="Edit in place"
+                            style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:'var(--ink-faint)',padding:'0 3px',lineHeight:1}}>✏️</button>
+                          {isActive&&(
+                            <button onClick={()=>onEnd(g.id)} title="End after this period"
+                              style={{background:'none',border:'1px solid var(--border)',borderRadius:4,cursor:'pointer',fontSize:10,color:'var(--ink-faint)',padding:'2px 5px',lineHeight:1}}>
+                              End
+                            </button>
+                          )}
+                          <button onClick={()=>{if(confirmDelete===g.id){onDelete(g.id);setConfirmDelete(null);}else setConfirmDelete(g.id);}}
+                            onMouseLeave={()=>setConfirmDelete(null)}
+                            style={{background:confirmDelete===g.id?'var(--red)':'none',color:confirmDelete===g.id?'white':'var(--ink-faint)',
+                              border:'none',borderRadius:confirmDelete===g.id?4:0,cursor:'pointer',fontSize:confirmDelete===g.id?10:13,
+                              padding:confirmDelete===g.id?'2px 5px':'0 2px',fontFamily:"'DM Sans',sans-serif"}}>
+                            {confirmDelete===g.id?'Delete?':'✕'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {/* New version button for existing families */}
+                {isActive(eId,per)&&(
+                  <button onClick={()=>{
+                    const latest=versions[0];
+                    if(latest){onAddVersion(eId,per,latest.target,latest.unit);}
+                  }}
+                  style={{background:'none',border:'1px dashed var(--border)',borderRadius:4,cursor:'pointer',
+                    fontSize:10,color:'var(--ink-light)',padding:'3px 8px',width:'100%',fontFamily:"'DM Sans',sans-serif",marginTop:2}}
+                  title={`Start a new version from next ${per}`}>
+                    + New version (from next {per})
+                  </button>
+                )}
               </div>
             );
           })}
         </div>
 
-        {/* Add new goal */}
+        {/* Add brand new goal */}
         <div style={{padding:'10px 12px 12px',borderTop:'1px solid var(--border)',flexShrink:0}}>
           <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:8,textTransform:'uppercase',letterSpacing:'0.05em'}}>New goal:</div>
           {exercises.length===0 ? (
@@ -6129,21 +6427,18 @@ function GoalManager({ goals, exercises, onAdd, onDelete, onClose }) {
           ) : (
             <div style={{display:'flex',flexDirection:'column',gap:7}}>
               <select value={exId} onChange={e=>setExId(e.target.value)}
-                style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
-                  borderRadius:'var(--radius-sm)',padding:'5px 8px',background:'white',color:'var(--ink)',outline:'none'}}>
+                style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 8px',background:'white',color:'var(--ink)',outline:'none'}}>
                 {exercises.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
               <div style={{display:'flex',gap:6}}>
                 <select value={period} onChange={e=>setPeriod(e.target.value)}
-                  style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
-                    borderRadius:'var(--radius-sm)',padding:'5px 6px',background:'white',color:'var(--ink)',outline:'none'}}>
+                  style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 6px',background:'white',color:'var(--ink)',outline:'none'}}>
                   <option value="week">Per Week</option>
                   <option value="month">Per Month</option>
                   <option value="year">Per Year</option>
                 </select>
                 <select value={unit} onChange={e=>setUnit(e.target.value)}
-                  style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
-                    borderRadius:'var(--radius-sm)',padding:'5px 6px',background:'white',color:'var(--ink)',outline:'none'}}>
+                  style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 6px',background:'white',color:'var(--ink)',outline:'none'}}>
                   <option value="reps">Reps</option>
                   <option value="sets">Sets</option>
                   <option value="volume">Volume (lbs)</option>
@@ -6152,14 +6447,12 @@ function GoalManager({ goals, exercises, onAdd, onDelete, onClose }) {
               <div style={{display:'flex',gap:6}}>
                 <input type="number" min="1" value={target} onChange={e=>setTarget(e.target.value)}
                   placeholder="Target amount"
-                  style={{flex:1,fontSize:12,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',
-                    borderRadius:'var(--radius-sm)',padding:'5px 8px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
-                />
-                <button onClick={()=>{ if(exId&&target){onAdd(exId,period,target,unit);setTarget('');} }}
+                  style={{flex:1,fontSize:12,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 8px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}/>
+                <button onClick={()=>{if(exId&&target){onAddVersion(exId,period,target,unit);setTarget('');}}}
                   disabled={!exId||!target}
-                  style={{background:exId&&target?'var(--accent)':'var(--border)',border:'none',
-                    borderRadius:'var(--radius-sm)',padding:'5px 16px',cursor:exId&&target?'pointer':'default',
-                    fontSize:12,fontWeight:600,color:exId&&target?'white':'var(--ink-faint)'}}>
+                  style={{background:exId&&target?'var(--accent)':'var(--border)',border:'none',borderRadius:'var(--radius-sm)',
+                    padding:'5px 16px',cursor:exId&&target?'pointer':'default',fontSize:12,fontWeight:600,
+                    color:exId&&target?'white':'var(--ink-faint)'}}>
                   Add
                 </button>
               </div>
@@ -6169,11 +6462,14 @@ function GoalManager({ goals, exercises, onAdd, onDelete, onClose }) {
       </div>
     </div>
   );
+
+  function isActive(exerciseId, period) {
+    const dk=fmt(today);
+    return goals.some(g=>g.exerciseId===exerciseId&&g.period===period&&(!g.startDate||g.startDate<=dk)&&(!g.endDate||g.endDate>=dk));
+  }
 }
 
-// ─────────────────────────────────────────────
-// EXERCISE PICKER — add exercise to a workout
-// ─────────────────────────────────────────────
+
 function ExercisePicker({ exercises, onAdd, onAddNew, onClose }) {
   const [search, setSearch] = useState('');
   const [newName, setNewName] = useState('');
