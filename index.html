@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.2.1 -->
+<!-- LP Planner v3.2.2 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5434,7 +5434,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.2.1</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.2.2</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5673,9 +5673,10 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     });
     const actual = Math.round(total*10)/10;
     const periodPct = Math.round((elapsedDays/totalDays)*100);
-    const expectedAtPace = Math.round((elapsedDays/totalDays)*goal.target*10)/10;
-    const aheadBehind = actual - expectedAtPace;
-    return { actual, periodPct, expectedAtPace, aheadBehind, startDk, endDk };
+    const targetPace = Math.round((elapsedDays/totalDays)*goal.target*10)/10; // where you SHOULD be
+    const expectedAtPace = Math.round((actual/elapsedDays*totalDays)*10)/10;  // where you'll END UP at current rate
+    const aheadBehind = actual - targetPace;
+    return { actual, periodPct, targetPace, expectedAtPace, aheadBehind, startDk, endDk };
   }
   function goalProgress(goal) { return goalProgressFull(goal).actual; }
 
@@ -5880,31 +5881,44 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                     const done = pct >= 100;
                     const ahead = aheadBehind >= 0;
                     return (
-                      <div key={goal.id} className="fitness-goal-row" style={{marginBottom:8}}>
-                        <div className="fitness-goal-label">
-                          <span style={{fontSize:10,color:'var(--ink-light)',fontFamily:"'DM Mono',monospace",textTransform:'capitalize'}}>{goal.period}</span>
-                          <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+                      <div key={goal.id} style={{
+                        marginBottom:6, padding:'6px 8px',
+                        background:'white', borderRadius:'var(--radius-sm)',
+                        border:'1px solid var(--border)',
+                        boxShadow:'0 1px 2px var(--shadow)',
+                      }}>
+                        {/* Period badge + ahead/behind + delete */}
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
+                          <span style={{
+                            fontSize:9,fontFamily:"'DM Mono',monospace",textTransform:'uppercase',
+                            letterSpacing:'0.05em',fontWeight:700,
+                            background:goal.period==='week'?'var(--blue-light)':goal.period==='month'?'var(--accent-light)':'var(--gold-light)',
+                            color:goal.period==='week'?'var(--blue)':goal.period==='month'?'var(--accent)':'var(--gold)',
+                            padding:'1px 5px',borderRadius:3,
+                          }}>{goal.period}</span>
+                          <div style={{display:'flex',alignItems:'center',gap:4}}>
                             <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",
-                              color:ahead?'var(--accent)':'var(--red)',fontWeight:600}}>
-                              {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))}
+                              color:ahead?'var(--accent)':'var(--red)',fontWeight:700}}>
+                              {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs target
                             </span>
                             <button onClick={()=>deleteGoal(goal.id)}
-                              style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 1px',opacity:0.5}}>✕</button>
+                              style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 1px',opacity:0.5,lineHeight:1}}>✕</button>
                           </div>
                         </div>
-                        <div className="fitness-goal-bar-bg" style={{position:'relative'}}>
+                        {/* Progress bar */}
+                        <div className="fitness-goal-bar-bg" style={{position:'relative',marginBottom:4}}>
                           <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,
                             background:'rgba(0,0,0,0.08)',borderRadius:3,zIndex:0}}/>
                           <div className={`fitness-goal-bar-fill ${done?'done':''}`}
                             style={{width:`${Math.min(100,pct)}%`,position:'relative',zIndex:1}}/>
                         </div>
-                        <div className="fitness-goal-meta">
-                          {actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}
-                          <span style={{margin:'0 3px',opacity:0.5}}>·</span>
-                          {periodPct}% thru {goal.period}
-                          <span style={{margin:'0 3px',opacity:0.5}}>·</span>
-                          pace {expectedAtPace.toLocaleString()}
-                          {done && ' 🎉'}
+                        {/* Metrics */}
+                        <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',lineHeight:1.6}}>
+                          <div>{actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit} · {periodPct}% thru {goal.period}{done&&' 🎉'}</div>
+                          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                            <span style={{color:'var(--ink-light)'}}>should be: <b style={{color:ahead?'var(--accent)':'var(--red)'}}>{targetPace.toLocaleString()}</b></span>
+                            <span>on pace for: <b style={{color:'var(--ink)'}}>{expectedAtPace.toLocaleString()}</b></span>
+                          </div>
                         </div>
                       </div>
                     );
@@ -6011,20 +6025,20 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
               Weekly Goals — {Math.round((weekDays.filter(d=>d<=today).length/7)*100)}% of week elapsed
             </div>
             {fitnessGoals.filter(g=>g.period==='week').map(goal => {
-              const {actual, periodPct, expectedAtPace, aheadBehind} = goalProgressFull(goal, today);
+              const {actual, periodPct, targetPace, expectedAtPace, aheadBehind} = goalProgressFull(goal, today);
               const pct = Math.min(100,(actual/goal.target)*100);
               const done = pct>=100;
               const ahead = aheadBehind>=0;
               const exLabel = fitnessExercises.find(e=>e.id===goal.exerciseId)?.name||'Unknown';
               return (
-                <div key={goal.id} style={{marginBottom:10}}>
+                <div key={goal.id} style={{marginBottom:12}}>
                   <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
                     <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,color:'var(--ink)'}}>{exLabel}</span>
                     <div style={{display:'flex',gap:8,alignItems:'center'}}>
                       <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-light)'}}>{actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}</span>
                       <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,
                         color:ahead?'var(--accent)':'var(--red)'}}>
-                        {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs pace
+                        {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs target
                       </span>
                       {done && <span>🎉</span>}
                     </div>
@@ -6035,12 +6049,13 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                     <div className={`fitness-goal-bar-fill ${done?'done':''}`}
                       style={{width:`${Math.min(100,pct)}%`,height:'100%',borderRadius:4,position:'relative',zIndex:1}}/>
                   </div>
-                  <div style={{display:'flex',justifyContent:'space-between',marginTop:2}}>
-                    <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>0</span>
-                    <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',fontStyle:'italic'}}>
-                      expected {expectedAtPace.toLocaleString()} at current pace
+                  <div style={{display:'flex',justifyContent:'space-between',marginTop:3,gap:8}}>
+                    <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
+                      Should be at: <b style={{color:ahead?'var(--accent)':'var(--red)'}}>{targetPace.toLocaleString()}</b>
                     </span>
-                    <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>{goal.target.toLocaleString()}</span>
+                    <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',fontStyle:'italic'}}>
+                      On pace for: <b style={{color:'var(--ink)',fontStyle:'normal'}}>{expectedAtPace.toLocaleString()}</b> / {goal.target.toLocaleString()}
+                    </span>
                   </div>
                 </div>
               );
@@ -6090,19 +6105,19 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                   Monthly Goals — {new Date(viewYear,viewMonth+1,0).getDate()>0 ? Math.round((Math.min(today.getDate(),new Date(viewYear,viewMonth+1,0).getDate())/new Date(viewYear,viewMonth+1,0).getDate())*100) : 0}% of month elapsed
                 </div>
                 {fitnessGoals.filter(g=>g.period==='month').map(goal => {
-                  const {actual, periodPct, expectedAtPace, aheadBehind} = goalProgressFull(goal, today);
+                  const {actual, periodPct, targetPace, expectedAtPace, aheadBehind} = goalProgressFull(goal, today);
                   const pct = Math.min(100,(actual/goal.target)*100);
                   const done = pct>=100;
                   const ahead = aheadBehind>=0;
                   const exLabel = fitnessExercises.find(e=>e.id===goal.exerciseId)?.name||'Unknown';
                   return (
-                    <div key={goal.id} style={{marginBottom:10}}>
+                    <div key={goal.id} style={{marginBottom:12}}>
                       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
                         <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,color:'var(--ink)'}}>{exLabel}</span>
                         <div style={{display:'flex',gap:8,alignItems:'center'}}>
                           <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-light)'}}>{actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}</span>
                           <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:ahead?'var(--accent)':'var(--red)'}}>
-                            {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs pace
+                            {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs target
                           </span>
                           {done && <span>🎉</span>}
                         </div>
@@ -6113,12 +6128,13 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                         <div className={`fitness-goal-bar-fill ${done?'done':''}`}
                           style={{width:`${Math.min(100,pct)}%`,height:'100%',borderRadius:4,position:'relative',zIndex:1}}/>
                       </div>
-                      <div style={{display:'flex',justifyContent:'space-between',marginTop:2}}>
-                        <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>0</span>
-                        <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',fontStyle:'italic'}}>
-                          expected {expectedAtPace.toLocaleString()} at current pace
+                      <div style={{display:'flex',justifyContent:'space-between',marginTop:3,gap:8}}>
+                        <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
+                          Should be at: <b style={{color:ahead?'var(--accent)':'var(--red)'}}>{targetPace.toLocaleString()}</b>
                         </span>
-                        <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>{goal.target.toLocaleString()}</span>
+                        <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',fontStyle:'italic'}}>
+                          On pace for: <b style={{color:'var(--ink)',fontStyle:'normal'}}>{expectedAtPace.toLocaleString()}</b> / {goal.target.toLocaleString()}
+                        </span>
                       </div>
                     </div>
                   );
