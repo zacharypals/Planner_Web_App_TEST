@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v2.5.0 -->
+<!-- LP Planner v3.0.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -257,14 +257,15 @@
     grid-template-rows: auto 1fr;
     min-width: 900px;
     min-height: 100%;
+    column-gap: 2px;
   }
   .cal-header-cell {
     padding: 10px 8px; text-align: center;
-    border-right: 1px solid rgba(255,255,255,0.06);
     font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
     text-transform: uppercase;
     background: linear-gradient(180deg, #2d6b4a 0%, #256042 100%);
     position: sticky; top: 0; z-index: 10;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
   }
   .cal-header-cell .day-name { color: rgba(255,255,255,0.6); }
   .cal-header-cell .day-date { color: rgba(255,255,255,0.95); font-family: 'Playfair Display', serif; font-size: 18px; margin-top: 2px; }
@@ -302,6 +303,183 @@
   .day-note-textarea:focus { background: rgba(0,0,0,0.06); }
   .day-note-textarea::placeholder { color: var(--ink-faint); font-style: italic; }
 
+  /* ── DAILY HABITS IN PLANNER ── */
+  .habit-task-section {
+    border-bottom: 1px solid rgba(0,0,0,0.07);
+    margin-bottom: 5px;
+  }
+  .habit-task-label {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 9px; font-family: 'DM Mono', monospace; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--accent);
+    padding: 4px 6px; cursor: pointer; user-select: none;
+    background: var(--accent-light); border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    font-weight: 600; transition: background 0.1s;
+  }
+  .habit-task-label:hover { background: #d0edda; }
+  .habit-task-row {
+    background: white;
+    border-bottom: 1px solid rgba(0,0,0,0.04);
+    transition: background 0.1s;
+  }
+  .habit-task-row:last-child { border-bottom: none; border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+  .habit-task-check {
+    width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; transition: all 0.12s;
+  }
+  .habit-task-check:active { transform: scale(0.9); }
+  /* ── SCHEDULE SELECTOR (habit checklist) ── */
+  .habit-schedule-selector {
+    display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  }
+  .habit-schedule-btn {
+    font-size: 10px; font-family: 'DM Sans', sans-serif; font-weight: 500;
+    border: 1px solid var(--border); border-radius: 20px;
+    padding: 2px 8px; cursor: pointer; background: white; color: var(--ink-light);
+    transition: all 0.12s; white-space: nowrap;
+  }
+  .habit-schedule-btn.active {
+    background: var(--accent); border-color: var(--accent); color: white; font-weight: 600;
+  }
+  .habit-schedule-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
+
+  /* ── PEOPLE PICKER MODAL ── */
+  .people-picker-overlay {
+    position: fixed; inset: 0; z-index: 500;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 80px; background: rgba(0,0,0,0.25);
+    backdrop-filter: blur(2px);
+  }
+  .people-picker-modal {
+    background: var(--paper); border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px var(--shadow-lg);
+    width: 300px; max-height: 440px; display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── FITNESS TAB ── */
+  .fitness-layout { display: flex; flex: 1; overflow: hidden; height: 100%; }
+  .fitness-sidebar {
+    width: 220px; flex-shrink: 0; display: flex; flex-direction: column;
+    background: var(--paper); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 16px 12px;
+  }
+  .fitness-main {
+    flex: 1; overflow-y: auto; padding: 20px 24px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .fitness-day-nav {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .fitness-day-label {
+    font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 600;
+    color: var(--ink); text-align: center; flex: 1;
+  }
+  .fitness-day-sub {
+    font-size: 10px; font-family: 'DM Mono', monospace; color: var(--ink-faint);
+    text-align: center; margin-top: 1px;
+  }
+  /* Workout card */
+  .workout-card {
+    background: var(--paper); border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 4px var(--shadow);
+    overflow: hidden;
+  }
+  .workout-card-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; background: var(--accent-light);
+    border-bottom: 1px solid var(--border);
+  }
+  .workout-name-input {
+    flex: 1; background: transparent; border: none; outline: none;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    color: var(--accent);
+  }
+  /* Exercise block */
+  .exercise-block {
+    border-bottom: 1px solid var(--border);
+    padding: 10px 14px;
+  }
+  .exercise-block:last-child { border-bottom: none; }
+  .exercise-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  }
+  .exercise-name {
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 700;
+    color: var(--ink); flex: 1;
+  }
+  .exercise-meta {
+    font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-faint);
+    white-space: nowrap;
+  }
+  /* Set rows */
+  .set-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 0; border-bottom: 1px solid rgba(0,0,0,0.04);
+  }
+  .set-row:last-child { border-bottom: none; }
+  .set-row.done { opacity: 0.55; }
+  .set-num {
+    font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-faint);
+    width: 18px; flex-shrink: 0; text-align: right;
+  }
+  .set-input {
+    width: 52px; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 600;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 3px 5px; text-align: center; background: white; color: var(--ink);
+    outline: none;
+  }
+  .set-input:focus { border-color: var(--accent); }
+  .set-label {
+    font-family: 'DM Mono', monospace; font-size: 9px; color: var(--ink-faint);
+    flex-shrink: 0;
+  }
+  .set-check {
+    width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; transition: all 0.12s; margin-left: auto;
+  }
+  .set-check.done { background: var(--accent); border-color: var(--accent); }
+  .set-check.done::after { content: '✓'; color: white; font-size: 9px; }
+  /* Exercise library in sidebar */
+  .ex-lib-item {
+    display: flex; align-items: center; gap: 6px;
+    padding: 5px 6px; border-radius: var(--radius-sm);
+    cursor: default; transition: background 0.1s; font-size: 12px;
+    font-family: 'DM Sans', sans-serif; color: var(--ink);
+  }
+  .ex-lib-item:hover { background: var(--cream); }
+  .ex-lib-cat {
+    font-size: 9px; font-family: 'DM Mono', monospace; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 6px 2px;
+  }
+  /* Fitness picker modal */
+  .fitness-picker-overlay {
+    position: fixed; inset: 0; z-index: 500;
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 80px; background: rgba(0,0,0,0.25); backdrop-filter: blur(2px);
+  }
+  .fitness-picker-modal {
+    background: var(--paper); border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px var(--shadow-lg);
+    width: 320px; max-height: 460px; display: flex; flex-direction: column; overflow: hidden;
+  }
+  /* Fitness completed stats pill */
+  .fitness-stat-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: var(--accent-light); border-radius: 20px;
+    padding: 2px 8px; font-size: 10px; font-family: 'DM Mono', monospace;
+    color: var(--accent); font-weight: 600;
+  }
+  /* Mobile fitness */
+  @media (max-width: 767px) {
+    .fitness-sidebar { display: none; }
+    .fitness-main { padding: 12px 14px; }
+  }
+
   /* TASK CARDS */
   .task-card {
     border-radius: var(--radius-md); margin-bottom: 8px;
@@ -311,7 +489,7 @@
   }
   .task-card:hover { box-shadow: 0 4px 12px var(--shadow-md), 0 0 0 1px rgba(0,0,0,0.03); }
   .task-card-header {
-    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    display: flex; align-items: center; gap: 5px; padding: 7px 8px;
     font-size: 12px; font-weight: 500;
   }
   .task-check {
@@ -322,7 +500,7 @@
   .task-check.done::after { content: '✓'; font-size: 9px; }
   .task-title-input {
     flex: 1; background: transparent; border: none; outline: none;
-    font-size: 12px; font-weight: 500; font-family: 'DM Sans', sans-serif;
+    font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif;
     cursor: text;
   }
   .task-expand-btn {
@@ -375,7 +553,7 @@
   /* TASK COLOR PICKER */
   .task-type-btn {
     background: none; border: none; cursor: pointer;
-    font-size: 14px; padding: 0 2px; flex-shrink: 0;
+    font-size: 14px; padding: 0; flex-shrink: 0;
     transition: all 0.15s; color: var(--ink-faint); line-height: 1;
     opacity: 0.5;
   }
@@ -1847,7 +2025,7 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
   );
 }
 
-function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor }) {
+function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
@@ -1897,6 +2075,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     return next;
   });
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [showPeoplePicker, setShowPeoplePicker] = useState(false);
   const pendingTaskFocus = useRef(null); // {id, dayKey} — task to focus after render
   const taskTitleRefs = useRef({}); // id -> input ref (desktop)
   const taskTitleRefsMobile = useRef({}); // id -> input ref (mobile)
@@ -2055,17 +2234,20 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const weekDays = Array.from({length:7}, (_,i)=>addDays(weekStart,i));
   const weekLabel = `${fmtDisplay(weekDays[0])} – ${fmtDisplay(weekDays[6])}`;
 
-  // People checklist
-  function addPerson(afterId, newId) {
-    const newItem = {id: newId || Date.now().toString(), name:'', done:false};
-    setWD(w=>{
-      const list = w.people||[];
-      if (!afterId) return {...w, people:[...list, newItem]};
-      const idx = list.findIndex(p=>p.id===afterId);
-      const next = [...list];
-      next.splice(idx+1, 0, newItem);
-      return {...w, people:next};
-    });
+  // People to Connect With — new directory-backed model
+  // Each week entry: { id, personId?, name?(legacy), days:[], note:'' }
+  function handleAddPeople(selectedIds, newNames) {
+    const now = Date.now();
+    // Create new directory entries for new names
+    const newDirEntries = newNames.map((name,i) => ({id:'p'+(now+i), name}));
+    if (newDirEntries.length) setPeopleDirectory(d => [...(d||[]), ...newDirEntries]);
+    // Build week entries for both selected existing + new
+    const allEntries = [
+      ...selectedIds.map((personId,i) => ({id:(now+1000+i).toString(), personId, days:[], note:''})),
+      ...newDirEntries.map((dir,i) => ({id:(now+2000+i).toString(), personId:dir.id, days:[], note:''})),
+    ];
+    setWD(w => ({...w, people:[...(w.people||[]), ...allEntries]}));
+    setShowPeoplePicker(false);
   }
   function updatePerson(id,patch) { setWD(w=>({...w, people:(w.people||[]).map(p=>p.id===id?{...p,...patch}:p)})); }
   function deletePerson(id) { setWD(w=>({...w, people:(w.people||[]).filter(p=>p.id!==id)})); }
@@ -2127,19 +2309,26 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   }
 
   function moveTaskBetweenDays(fromDayKey, toDayKey, taskId, targetId) {
-    const task = getTasks(fromDayKey).find(t => t.id === taskId);
-    if (!task) return;
+    // Capture task reference for calendar sync (needs to happen outside updater)
+    const taskForSync = getTasks(fromDayKey).find(t => t.id === taskId);
     setWD(w => {
       const allTasks = w.tasks || {};
-      const srcTasks = (allTasks[fromDayKey] || []).filter(t => t.id !== taskId);
-      const dstTasks = [...(allTasks[toDayKey] || [])];
+      const srcList = allTasks[fromDayKey] || [];
+      // Find task from FRESH state — if already moved (double-fire guard), bail out
+      const task = srcList.find(t => t.id === taskId);
+      if (!task) return w;
+      const srcTasks = srcList.filter(t => t.id !== taskId);
+      const dstList = allTasks[toDayKey] || [];
+      // If task somehow already in destination, bail out (idempotency guard)
+      if (dstList.some(t => t.id === taskId)) return w;
+      const dstTasks = [...dstList];
       const insertAt = targetId ? dstTasks.findIndex(t => t.id === targetId) : dstTasks.length;
       dstTasks.splice(insertAt === -1 ? dstTasks.length : insertAt, 0, task);
       return { ...w, tasks: { ...allTasks, [fromDayKey]: srcTasks, [toDayKey]: dstTasks } };
     });
     // Sync date change to Google Calendar
-    if (task.isEvent && task.gcalId && getToken()) {
-      updateEventInCalendar(task.gcalId, task, toDayKey)
+    if (taskForSync?.isEvent && taskForSync?.gcalId && getToken()) {
+      updateEventInCalendar(taskForSync.gcalId, taskForSync, toDayKey)
         .catch(e => console.error('Calendar move failed:', e));
     }
   }
@@ -2231,16 +2420,24 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       <div className="sidebar-section">
         <div className="checklist-header">
           <div className="sidebar-section-title">People to Connect With</div>
-          <button className="add-btn" onClick={()=>addPerson(null)}>+</button>
+          <button className="add-btn" onClick={()=>setShowPeoplePicker(true)} title="Add person">+</button>
         </div>
-        <SortableChecklist
+        <PeopleChecklist
           items={wd.people||[]}
+          weekDays={weekDays}
           onUpdate={updatePerson}
-          onAdd={addPerson}
           onDelete={deletePerson}
           onReorder={reorderPeople}
-          placeholder="Name…"
+          directory={peopleDirectory||[]}
+          onRenameDirectory={(personId, newName) =>
+            setPeopleDirectory(d => d.map(p => p.id===personId ? {...p, name:newName} : p))
+          }
         />
+        {(wd.people||[]).length === 0 && (
+          <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'2px 4px'}}>
+            Press + to add people
+          </div>
+        )}
       </div>
       <div className="sidebar-section">
         <div className="sidebar-section-title">Be-Word of the Week</div>
@@ -2296,6 +2493,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                       }
                       setDragging(null); setDragOver(null);
                     }}>
+                    <DailyHabitsSection dayKey={dk}
+                      habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
+                      habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />
                     {tasks.map(task=>(
                       <TaskCard key={task.id} task={task}
                         onUpdate={p=>updateTask(dk,task.id,p)}
@@ -2322,6 +2522,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                         isDragOver={dragOver?.dayKey===dk && dragOver?.id===task.id}
                         onDragStart={()=>setDragging({dayKey:dk, id:task.id})}
                         onDragOver={()=>setDragOver({dayKey:dk, id:task.id})}
+                        onDragEnd={()=>{ setDragging(null); setDragOver(null); }}
                         onDrop={()=>{
                           if(dragging) {
                             if(dragging.dayKey === dk) reorderTasks(dk, dragging.id, task.id);
@@ -2378,6 +2579,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           })}>›</button>
         </div>
         <div className="mobile-day-tasks" ref={mobileTasksContainerRef}>
+          <DailyHabitsSection dayKey={mobileDayKey}
+            habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
+            habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />
           {mobileDayTasks.map(task=>(
             <div key={task.id} data-task-id={task.id}
               style={{
@@ -2477,10 +2681,282 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         </>
       )}
 
+      {/* PEOPLE PICKER MODAL */}
+      {showPeoplePicker && (
+        <PeoplePicker
+          directory={peopleDirectory||[]}
+          existingPersonIds={new Set((wd.people||[]).map(p=>p.personId).filter(Boolean))}
+          onAdd={handleAddPeople}
+          onClose={()=>setShowPeoplePicker(false)}
+        />
+      )}
+
     </div>
   );
 }
 
+// ─────────────────────────────────────────────
+// PEOPLE CHECKLIST — replaces SortableChecklist for "People to Connect With"
+// Each entry: { id, personId, name(fallback), days:[], note }
+// ─────────────────────────────────────────────
+function PeopleChecklist({ items, weekDays, onUpdate, onDelete, onReorder, directory, onRenameDirectory }) {
+  const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+  const [expandedIds, setExpandedIds] = useState({});
+  const [confirmId, setConfirmId] = useState(null);
+
+  function getPersonName(item) {
+    if (item.personId && directory) {
+      const dir = directory.find(p => p.id === item.personId);
+      if (dir) return dir.name;
+    }
+    return item.name || '';
+  }
+
+  function isDone(item) {
+    return Array.isArray(item.days) ? item.days.length > 0 : !!item.done;
+  }
+
+  function getDays(item) {
+    return Array.isArray(item.days) ? item.days : [];
+  }
+
+  function handleCheckToggle(item) {
+    // Checked → clear all days. Unchecked → add today's day index.
+    if (isDone(item)) {
+      onUpdate(item.id, { days: [], done: false });
+    } else {
+      const todayIdx = new Date().getDay();
+      onUpdate(item.id, { days: [todayIdx], done: true });
+    }
+  }
+
+  function toggleDay(item, dayIdx) {
+    const days = getDays(item);
+    const next = days.includes(dayIdx)
+      ? days.filter(d => d !== dayIdx)
+      : [...days, dayIdx].sort((a,b) => a-b);
+    onUpdate(item.id, { days: next, done: next.length > 0 });
+  }
+
+  function handleDelete(e, id) {
+    e.stopPropagation();
+    if (confirmId === id) { onDelete(id); setConfirmId(null); }
+    else setConfirmId(id);
+  }
+
+  if (!items || items.length === 0) return null;
+
+  return (
+    <div>
+      {items.map(item => {
+        const done = isDone(item);
+        const days = getDays(item);
+        const isExpanded = !!expandedIds[item.id];
+        const confirming = confirmId === item.id;
+        const name = getPersonName(item);
+        return (
+          <div key={item.id}
+            className={`checklist-item ${done?'checked':''} ${dragOverId===item.id?'drag-over':''} ${dragId===item.id?'dragging':''}`}
+            style={{flexDirection:'column', alignItems:'stretch', padding:0, gap:0, marginBottom:2}}
+            draggable
+            onDragStart={e=>{ setDragId(item.id); e.dataTransfer.effectAllowed='move'; }}
+            onDragOver={e=>{ e.preventDefault(); if(item.id!==dragId) setDragOverId(item.id); }}
+            onDrop={e=>{ e.preventDefault(); if(dragId&&dragId!==item.id) onReorder(dragId,item.id); setDragId(null); setDragOverId(null); }}
+            onDragEnd={()=>{ setDragId(null); setDragOverId(null); }}
+            onMouseLeave={()=>setConfirmId(null)}>
+            {/* Main row */}
+            <div style={{display:'flex', alignItems:'center', gap:6, padding:'5px 6px'}}>
+              <span className="checklist-drag-handle" style={{opacity:0.4, marginTop:0}}>⣿</span>
+              <div className={`check-box ${done?'checked':''}`}
+                onClick={()=>handleCheckToggle(item)} />
+              <span style={{
+                flex:1, fontSize:12.5, fontFamily:"'DM Sans',sans-serif",
+                color: done ? 'var(--ink-faint)' : 'var(--ink)',
+                textDecoration: done ? 'line-through' : 'none',
+                minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+              }}>
+                {name || <span style={{color:'var(--ink-faint)',fontStyle:'italic'}}>Unnamed</span>}
+              </span>
+              {days.length > 0 && (
+                <span title="Days connected this week"
+                  style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--accent)',flexShrink:0,fontWeight:700}}>
+                  {days.length}×
+                </span>
+              )}
+              <button
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:10,color:'var(--ink-faint)',padding:'0 2px',flexShrink:0,lineHeight:1}}
+                onClick={e=>{e.stopPropagation();setExpandedIds(ex=>({...ex,[item.id]:!ex[item.id]}));}}>
+                {isExpanded ? '▲' : '▼'}
+              </button>
+              <button className="delete-item-btn"
+                style={{opacity:confirming?1:undefined,color:confirming?'var(--red)':undefined,fontSize:confirming?11:14}}
+                onClick={e=>handleDelete(e,item.id)}>
+                {confirming ? 'Delete?' : '✕'}
+              </button>
+            </div>
+            {/* Expanded: name edit + day-dots + note */}
+            {isExpanded && (
+              <div style={{padding:'5px 10px 9px', borderTop:'1px solid var(--border)'}}
+                onClick={e=>e.stopPropagation()}>
+                {onRenameDirectory && item.personId && (
+                  <div style={{marginBottom:8}}>
+                    <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:3,textTransform:'uppercase',letterSpacing:'0.05em'}}>Name:</div>
+                    <input
+                      style={{width:'100%',fontSize:12.5,fontFamily:"'DM Sans',sans-serif",
+                        border:'1px solid var(--border)',borderRadius:4,padding:'3px 7px',
+                        outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+                      value={name}
+                      onChange={e=>onRenameDirectory(item.personId, e.target.value)}
+                      onClick={e=>e.stopPropagation()}
+                    />
+                  </div>
+                )}
+                <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:5,textTransform:'uppercase',letterSpacing:'0.05em'}}>Days connected:</div>
+                <div style={{display:'flex',gap:3,marginBottom:8}}>
+                  {['S','M','T','W','T','F','S'].map((d,i) => {
+                    const active = days.includes(i);
+                    return (
+                      <button key={i}
+                        className={`task-repeat-day-btn ${active?'active':''}`}
+                        style={{width:22,height:22,fontSize:9}}
+                        onClick={()=>toggleDay(item, i)}>
+                        {d}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:3,textTransform:'uppercase',letterSpacing:'0.05em'}}>Note:</div>
+                <textarea rows={2}
+                  style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",
+                    border:'1px solid var(--border)',borderRadius:4,padding:'4px 6px',
+                    resize:'vertical',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+                  placeholder="How did you connect?"
+                  value={item.note||''}
+                  onChange={e=>onUpdate(item.id,{note:e.target.value})}
+                />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// PEOPLE PICKER — modal for adding people to the week
+// ─────────────────────────────────────────────
+function PeoplePicker({ directory, existingPersonIds, onAdd, onClose }) {
+  const [search, setSearch] = useState('');
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [newName, setNewName] = useState('');
+  const searchRef = useRef();
+
+  useEffect(() => { setTimeout(() => searchRef.current?.focus(), 50); }, []);
+
+  const available = (directory || []).filter(p =>
+    !existingPersonIds.has(p.id) &&
+    p.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  function toggleSelect(id) {
+    setSelectedIds(s => {
+      const next = new Set(s);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function handleAdd() {
+    const newNames = newName.trim()
+      ? newName.split(',').map(n => n.trim()).filter(Boolean)
+      : [];
+    if (selectedIds.size === 0 && newNames.length === 0) return;
+    onAdd(Array.from(selectedIds), newNames);
+  }
+
+  const hasSelection = selectedIds.size > 0 || newName.trim().length > 0;
+
+  return (
+    <div className="people-picker-overlay" onClick={onClose}>
+      <div className="people-picker-modal" onClick={e=>e.stopPropagation()}>
+        {/* Header */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+          padding:'14px 16px 10px',borderBottom:'1px solid var(--border)',flexShrink:0}}>
+          <span style={{fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,color:'var(--ink)'}}>Add People</span>
+          <button onClick={onClose}
+            style={{background:'none',border:'none',cursor:'pointer',fontSize:16,color:'var(--ink-faint)',lineHeight:1,padding:'0 2px'}}>✕</button>
+        </div>
+        {/* Search existing */}
+        <div style={{padding:'8px 12px 4px',flexShrink:0}}>
+          <input ref={searchRef}
+            value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="Search previous people…"
+            style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",
+              border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
+              padding:'5px 9px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+          />
+        </div>
+        {/* Directory list */}
+        <div style={{flex:1,overflowY:'auto',padding:'4px 8px'}}>
+          {directory.length > 0 && available.length === 0 && (
+            <div style={{fontSize:12,color:'var(--ink-faint)',fontStyle:'italic',padding:'8px 4px'}}>No matches</div>
+          )}
+          {directory.length === 0 && (
+            <div style={{fontSize:12,color:'var(--ink-faint)',fontStyle:'italic',padding:'8px 4px'}}>No previous people yet — add new below</div>
+          )}
+          {available.map(p => (
+            <div key={p.id}
+              style={{display:'flex',alignItems:'center',gap:8,padding:'6px 6px',borderRadius:6,cursor:'pointer',transition:'background 0.1s'}}
+              onClick={()=>toggleSelect(p.id)}
+              onMouseEnter={e=>e.currentTarget.style.background='var(--cream)'}
+              onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+              <div style={{
+                width:15,height:15,border:'1.5px solid',flexShrink:0,borderRadius:3,
+                borderColor: selectedIds.has(p.id) ? 'var(--accent)' : 'var(--border)',
+                background: selectedIds.has(p.id) ? 'var(--accent)' : 'white',
+                display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.12s',
+              }}>
+                {selectedIds.has(p.id) && <span style={{color:'white',fontSize:9,lineHeight:1}}>✓</span>}
+              </div>
+              <span style={{fontSize:13,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}>{p.name}</span>
+            </div>
+          ))}
+        </div>
+        {/* New person input */}
+        <div style={{padding:'8px 12px 6px',borderTop:'1px solid var(--border)',flexShrink:0}}>
+          <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:4,textTransform:'uppercase',letterSpacing:'0.05em'}}>+ New person:</div>
+          <input value={newName} onChange={e=>setNewName(e.target.value)}
+            onKeyDown={e=>{ if(e.key==='Enter' && hasSelection) handleAdd(); if(e.key==='Escape') onClose(); }}
+            placeholder="Name (comma-separate for multiple)"
+            style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",
+              border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
+              padding:'5px 9px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+          />
+        </div>
+        {/* Footer */}
+        <div style={{padding:'6px 12px 12px',display:'flex',gap:8,justifyContent:'flex-end',flexShrink:0}}>
+          <button onClick={onClose}
+            style={{background:'none',border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
+              padding:'5px 14px',cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)'}}>
+            Cancel
+          </button>
+          <button onClick={handleAdd} disabled={!hasSelection}
+            style={{
+              background: hasSelection ? 'var(--accent)' : 'var(--border)',
+              border:'none', borderRadius:'var(--radius-sm)', padding:'5px 16px',
+              cursor: hasSelection ? 'pointer' : 'default', fontSize:12, fontWeight:600,
+              fontFamily:"'DM Sans',sans-serif",
+              color: hasSelection ? 'white' : 'var(--ink-faint)', transition:'all 0.15s',
+            }}>
+            Add{selectedIds.size > 0 ? ` (${selectedIds.size})` : ''}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 function DayNote({ dayKey, note, onChange }) {
   const [expanded, setExpanded] = useState(!!note);
   const taRef = useRef();
@@ -2520,6 +2996,100 @@ function DayNote({ dayKey, note, onChange }) {
   );
 }
 
+// ─────────────────────────────────────────────
+// DAILY HABITS SECTION (shown in WeeklyPlanner day columns)
+// ─────────────────────────────────────────────
+function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes }) {
+  const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily');
+  const [collapsed, setCollapsed] = React.useState(true);
+  const [expandedIds, setExpandedIds] = React.useState({});
+
+  if (dailyHabits.length === 0) return null;
+
+  function toggleHabit(goalId) {
+    setHabitCompletions(c => {
+      const arr = c[dayKey] || [];
+      const has = arr.includes(goalId);
+      return { ...c, [dayKey]: has ? arr.filter(x => x !== goalId) : [...arr, goalId] };
+    });
+  }
+  function getQty(goalId) { return (habitQty[dayKey] || {})[goalId] || ''; }
+  function setQtyVal(goalId, val) {
+    setHabitQty(q => ({ ...q, [dayKey]: { ...(q[dayKey] || {}), [goalId]: val } }));
+  }
+  function getNoteVal(goalId) { return (habitNotes[dayKey] || {})[goalId] || ''; }
+  function setNoteVal(goalId, val) {
+    setHabitNotes(n => ({ ...n, [dayKey]: { ...(n[dayKey] || {}), [goalId]: val } }));
+  }
+
+  const completedCount = dailyHabits.filter(g => (habitCompletions[dayKey] || []).includes(g.id)).length;
+
+  return (
+    <div className="habit-task-section">
+      <div className="habit-task-label" onClick={() => setCollapsed(c => !c)}>
+        <span style={{fontSize:8}}>{collapsed ? '▸' : '▾'}</span>
+        <span>Habits</span>
+        <span style={{marginLeft:'auto', fontSize:9, fontWeight:700, opacity:0.8}}>
+          {completedCount}/{dailyHabits.length}
+        </span>
+      </div>
+      {!collapsed && dailyHabits.map(g => {
+        const done = (habitCompletions[dayKey] || []).includes(g.id);
+        const isExpanded = !!expandedIds[g.id];
+        return (
+          <div key={g.id} className="habit-task-row" style={{borderLeft:`3px solid ${g.color}`}}>
+            <div style={{display:'flex', alignItems:'center', gap:5, padding:'4px 6px'}}>
+              <div className="habit-task-check"
+                style={{background: done ? g.color : 'transparent', borderColor: g.color}}
+                onClick={e => { e.stopPropagation(); toggleHabit(g.id); }}>
+                {done && <span style={{color:'white', fontSize:9, lineHeight:1}}>✓</span>}
+              </div>
+              <span style={{flex:1, fontSize:11.5, fontFamily:"'DM Sans',sans-serif", fontWeight:500,
+                color: done ? g.color : 'var(--ink)', textDecoration: done ? 'line-through' : 'none',
+                opacity: done ? 0.7 : 1}}>
+                {g.name}
+              </span>
+              <button
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:9,color:'var(--ink-faint)',padding:'0 2px',flexShrink:0,lineHeight:1}}
+                onClick={e => { e.stopPropagation(); setExpandedIds(ex => ({...ex, [g.id]: !ex[g.id]})); }}>
+                {isExpanded ? '▲' : '▼'}
+              </button>
+            </div>
+            {isExpanded && (
+              <div style={{padding:'3px 10px 7px', display:'flex', flexDirection:'column', gap:5, borderTop:'1px solid var(--border)'}}
+                onClick={e => e.stopPropagation()}>
+                <div style={{display:'flex', alignItems:'center', gap:6}}>
+                  <span style={{fontSize:9, color:'var(--ink-faint)', fontFamily:"'DM Mono',monospace", flexShrink:0}}>Qty:</span>
+                  <input type="number" min="0" step="1" inputMode="numeric"
+                    value={getQty(g.id)}
+                    onChange={e => setQtyVal(g.id, e.target.value)}
+                    placeholder="—"
+                    style={{width:60, fontSize:11, fontFamily:"'DM Mono',monospace",
+                      border:'1px solid var(--border)', borderRadius:3, padding:'2px 4px',
+                      background:'white', color:'var(--ink)', outline:'none'}}
+                  />
+                </div>
+                <div style={{display:'flex', flexDirection:'column', gap:2}}>
+                  <span style={{fontSize:9, color:'var(--ink-faint)', fontFamily:"'DM Mono',monospace"}}>Notes:</span>
+                  <textarea rows={2}
+                    style={{width:'100%', fontSize:11, fontFamily:"'DM Sans',sans-serif",
+                      border:'1px solid var(--border)', borderRadius:3, padding:'3px 5px',
+                      resize:'vertical', outline:'none', background:'white', color:'var(--ink)',
+                      boxSizing:'border-box'}}
+                    placeholder="Notes for today…"
+                    value={getNoteVal(g.id)}
+                    onChange={e => setNoteVal(g.id, e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 const TASK_COLORS = [
   '#d4edda', // sage green
   '#f8d7da', // blush pink
@@ -2548,7 +3118,7 @@ const EVENT_COLORS = [
   '#ffe4e6', // blush
   '#ecfdf5', // aqua mist
 ];
-function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
+function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
   const textareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
   const [mobileConfirming, setMobileConfirming] = useState(false);
@@ -2606,7 +3176,8 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
       draggable
       onDragStart={onDragStart}
       onDragOver={e=>{e.preventDefault();onDragOver();}}
-      onDrop={e=>{e.preventDefault();onDrop();}}
+      onDragEnd={onDragEnd}
+      onDrop={e=>{e.preventDefault();e.stopPropagation();onDrop();}}
       onMouseLeave={handleMouseLeave}
       onTouchStart={onReschedule ? handleCardTouchStart : undefined}
       onTouchEnd={onReschedule ? handleCardTouchEnd : undefined}
@@ -2980,7 +3551,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
         <div className="date-nav">
           <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,-1))}>‹</button>
           <span className="date-nav-label">
-            {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}, {selectedDate.getFullYear()}
+            {DAYS[selectedDate.getDay()].slice(0,3)}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}, {selectedDate.getFullYear()}
           </span>
           <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,1))}>›</button>
         </div>
@@ -3019,7 +3590,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
 
         <div className="checklist-header" style={{marginBottom:8}}>
           <div>
-            <div className="sidebar-section-title">Goals</div>
+            <div className="sidebar-section-title">Habits</div>
             <div style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginTop:1}}>click row to filter</div>
           </div>
           <button className="add-btn" onClick={addGoal}>+</button>
@@ -3072,6 +3643,18 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
             {isExpanded && (
               <div style={{padding:'4px 8px 8px 8px',display:'flex',flexDirection:'column',gap:6,borderTop:'1px solid var(--border)'}}
                 onClick={e=>e.stopPropagation()}>
+                {/* Schedule */}
+                <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                  <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Schedule:</span>
+                  <div className="habit-schedule-selector">
+                    {[['none','—'],['daily','Daily'],['xweek','x/Week'],['quota','Quota']].map(([val,label])=>(
+                      <button key={val} className={`habit-schedule-btn ${(goal.schedule||'none')===val?'active':''}`}
+                        onClick={e=>{e.stopPropagation();updateGoal(goal.id,{schedule:val==='none'?undefined:val});}}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
                   <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Qty:</span>
                   <input type="number" min="0" step="1"
@@ -3390,6 +3973,20 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
               {isExpanded && (
                 <div style={{padding:'4px 12px 10px',display:'flex',flexDirection:'column',gap:6,borderTop:'1px solid var(--border)'}}
                   onClick={e=>e.stopPropagation()}>
+                  {/* Schedule */}
+                  {onRename && (
+                    <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                      <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Schedule:</span>
+                      <div className="habit-schedule-selector">
+                        {[['none','—'],['daily','Daily'],['xweek','x/Week'],['quota','Quota']].map(([val,label])=>(
+                          <button key={val} className={`habit-schedule-btn ${(g.schedule||'none')===val?'active':''}`}
+                            onClick={e=>{e.stopPropagation();onRename(g.id,{schedule:val==='none'?undefined:val});}}>
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   {getQty && (
                     <div style={{display:'flex',alignItems:'center',gap:8}}>
                       <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Qty:</span>
@@ -3430,7 +4027,7 @@ function HabitNavArrows({view, date, onChange}) {
         const ws=getWeekStart(date);
         return `${fmtDisplay(ws)} – ${fmtDisplay(addDays(ws,6))}`;
       })()
-    : `${MONTHS[date.getMonth()].slice(0,3)} ${date.getDate()}, ${date.getFullYear()}`;
+    : `${DAYS[date.getDay()].slice(0,3)}, ${MONTHS[date.getMonth()].slice(0,3)} ${date.getDate()}, ${date.getFullYear()}`;
 
   function prev() {
     if(view==='daily') onChange(d=>addDays(d,-1));
@@ -3700,6 +4297,8 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
   const [eventForm, setEventForm] = useState({title:'', time:'', date:'', details:''});
   const [dragInfo, setDragInfo] = useState(null); // {eventId, fromDayKey}
   const [dragOverDay, setDragOverDay] = useState(null);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   function handleDragStart(ev, eventId, fromDayKey) {
     setDragInfo({eventId, fromDayKey});
@@ -3903,56 +4502,69 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
 
   const monthEvents = getAllMonthEvents();
 
+  const sidebarContent = (
+    <>
+      {/* Month Nav */}
+      <div className="week-nav">
+        <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()-1, 1))}>‹</button>
+        <span className="week-nav-label">{MONTHS[month]} {year}</span>
+        <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()+1, 1))}>›</button>
+      </div>
+
+      <a className="sidebar-link daily" href="https://penzu.com">✍️ Daily Pages</a>
+
+      {/* Monthly Goals */}
+      <div className="sidebar-section">
+        <div className="checklist-header">
+          <div className="sidebar-section-title">Monthly Goals:</div>
+          <button className="add-btn" onClick={addMonthGoal}>+</button>
+        </div>
+        {getMonthGoals().map(g=>(
+          <div key={g.id} className={`checklist-item ${g.done?'checked':''}`}>
+            <div className={`check-box ${g.done?'checked':''}`} onClick={()=>updateMonthGoal(g.id,{done:!g.done})} />
+            <input className="checklist-input" placeholder="Goal…" value={g.name}
+              onChange={e=>updateMonthGoal(g.id,{name:e.target.value})} />
+            <button className="delete-item-btn" onClick={()=>deleteMonthGoal(g.id)}>✕</button>
+          </div>
+        ))}
+      </div>
+
+      {/* Events this month */}
+      <div className="sidebar-section" style={{flex:1}}>
+        <div className="sidebar-section-title">Events This Month</div>
+        {monthEvents.length === 0 && (
+          <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',marginTop:4}}>No events yet</div>
+        )}
+        {monthEvents.map(ev=>(
+          <div key={ev.id} className="month-event-item" onClick={()=>openEditEvent(ev)}>
+            <div className="month-event-date">
+              {MONTHS[ev.date.getMonth()].slice(0,3)} {ev.date.getDate()}
+              {ev.eventTime && <span className="month-event-time"> {ev.eventTime}</span>}
+            </div>
+            <div className="month-event-title">{ev.title||<em style={{opacity:0.5}}>Untitled</em>}</div>
+            <button className="delete-item-btn" style={{marginLeft:'auto',flexShrink:0,opacity:0.4,fontSize:13,color:'var(--red)'}}
+              onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.4}
+              onClick={e=>{
+                e.stopPropagation();
+                if(window.confirm(`Delete "${ev.title||'Untitled'}"?`)) deleteEvent(ev);
+              }}>✕</button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
   return (
     <div className="main-content">
-      {/* SIDEBAR */}
-      <div className="sidebar" style={{overflowY:'auto'}}>
-        {/* Month Nav */}
-        <div className="week-nav">
-          <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()-1, 1))}>‹</button>
-          <span className="week-nav-label">{MONTHS[month]} {year}</span>
-          <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()+1, 1))}>›</button>
+      {/* DESKTOP SIDEBAR (collapsible) */}
+      <div className={`sidebar-wrap ${sidebarCollapsed ? 'collapsed' : ''}`}>
+        <div className="sidebar" style={{overflowY:'auto'}}>
+          {sidebarContent}
         </div>
-
-        <a className="sidebar-link daily" href="https://penzu.com">✍️ Daily Pages</a>
-
-        {/* Monthly Goals */}
-        <div className="sidebar-section">
-          <div className="checklist-header">
-            <div className="sidebar-section-title">Monthly Goals:</div>
-            <button className="add-btn" onClick={addMonthGoal}>+</button>
-          </div>
-          {getMonthGoals().map(g=>(
-            <div key={g.id} className={`checklist-item ${g.done?'checked':''}`}>
-              <div className={`check-box ${g.done?'checked':''}`} onClick={()=>updateMonthGoal(g.id,{done:!g.done})} />
-              <input className="checklist-input" placeholder="Goal…" value={g.name}
-                onChange={e=>updateMonthGoal(g.id,{name:e.target.value})} />
-              <button className="delete-item-btn" onClick={()=>deleteMonthGoal(g.id)}>✕</button>
-            </div>
-          ))}
-        </div>
-
-        {/* Events this month */}
-        <div className="sidebar-section" style={{flex:1}}>
-          <div className="sidebar-section-title">Events This Month</div>
-          {monthEvents.length === 0 && (
-            <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',marginTop:4}}>No events yet</div>
-          )}
-          {monthEvents.map(ev=>(
-            <div key={ev.id} className="month-event-item" onClick={()=>openEditEvent(ev)}>
-              <div className="month-event-date">
-                {MONTHS[ev.date.getMonth()].slice(0,3)} {ev.date.getDate()}
-                {ev.eventTime && <span className="month-event-time"> {ev.eventTime}</span>}
-              </div>
-              <div className="month-event-title">{ev.title||<em style={{opacity:0.5}}>Untitled</em>}</div>
-              <button className="delete-item-btn" style={{marginLeft:'auto',flexShrink:0,opacity:0.4,fontSize:13,color:'var(--red)'}}
-                onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.4}
-                onClick={e=>{
-                  e.stopPropagation();
-                  if(window.confirm(`Delete "${ev.title||'Untitled'}"?`)) deleteEvent(ev);
-                }}>✕</button>
-            </div>
-          ))}
+        <div className="sidebar-toggle-strip" onClick={()=>setSidebarCollapsed(c=>!c)}
+          title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+          <div className="sidebar-toggle-btn">{sidebarCollapsed ? '›' : '‹'}</div>
+          <span className="sidebar-collapsed-label">Monthly</span>
         </div>
       </div>
 
@@ -4003,6 +4615,22 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
           </div>
         </div>
       </div>
+
+      {/* MOBILE: Bottom sheet overlay */}
+      <div className={`mobile-sheet-overlay ${sheetOpen?'open':''}`} onClick={()=>setSheetOpen(false)} />
+      <div className={`mobile-sheet ${sheetOpen?'open':''}`}>
+        <div className="mobile-sheet-handle" />
+        <div className="mobile-sheet-header">
+          <span className="mobile-sheet-title">{MONTHS[month]} {year}</span>
+          <button className="mobile-sheet-close" onClick={()=>setSheetOpen(false)}>✕</button>
+        </div>
+        <div className="mobile-sheet-body">
+          {sidebarContent}
+        </div>
+      </div>
+
+      {/* MOBILE: FAB to open sheet */}
+      <button className="mobile-fab" onClick={()=>setSheetOpen(o=>!o)} title="Monthly goals & events">☰</button>
 
       {/* EVENT MODAL */}
       {showEventModal && (
@@ -4120,6 +4748,19 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
     return vals.map(v => (v !== null && v >= lo && v <= hi) ? v : null);
   }
 
+  // For axis bounds only: strip outliers using standard 1.5×IQR so extreme values
+  // (e.g. fasting zeros) don't dominate the scale. Data points still plot, just off-screen.
+  function boundsVals(vals) {
+    const nums = vals.filter(v => v !== null);
+    if (nums.length < 4) return nums;
+    const sorted = [...nums].sort((a,b)=>a-b);
+    const q1 = sorted[Math.floor(sorted.length*0.25)];
+    const q3 = sorted[Math.floor(sorted.length*0.75)];
+    const iqr = q3 - q1;
+    const lo = q1 - 1.5*iqr, hi = q3 + 1.5*iqr;
+    return nums.filter(v => v >= lo && v <= hi);
+  }
+
   // 3-day simple moving average
   function sma3(vals) {
     return vals.map((_, i) => {
@@ -4128,12 +4769,14 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
     });
   }
 
-  // Compute smart Y-axis bounds: pad 10% around actual data range, floor at 0 for cals
+  // Compute tight Y-axis bounds: ~10% pad around the non-outlier data range
   function yBounds(vals, floorZero) {
-    const nums = vals.filter(v => v !== null);
+    const nums = boundsVals(vals);
     if (nums.length === 0) return floorZero ? {min:0, max:100} : {min:0, max:100};
     const lo = Math.min(...nums), hi = Math.max(...nums);
-    const pad = Math.max((hi - lo) * 0.5, floorZero ? hi*0.15 : Math.abs(hi)*0.1, 5);
+    const range = hi - lo;
+    // Pad: 12% of range, minimum 2 units so a flat line still shows context
+    const pad = Math.max(range * 0.12, 2);
     return {
       min: floorZero ? Math.max(0, Math.floor(lo - pad)) : Math.floor(lo - pad),
       max: Math.ceil(hi + pad)
@@ -4163,6 +4806,16 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
 
     const wBounds = yBounds(weightVals, false);
     const cBounds = yBounds(calsVals, true);
+
+    // Weight: floor the min so target is always visible (1 unit below target)
+    if (!isNaN(wTarget)) {
+      wBounds.min = Math.min(wBounds.min, Math.floor(wTarget - 1));
+    }
+    // Cals: ensure target line is always within the visible range
+    if (!isNaN(cTarget)) {
+      cBounds.min = Math.min(cBounds.min, Math.floor(cTarget * 0.95));
+      cBounds.max = Math.max(cBounds.max, Math.ceil(cTarget * 1.05));
+    }
 
     const commonOpts = {
       responsive: true,
@@ -4349,7 +5002,7 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
 // ─────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────
-const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData','weightTarget','calsTarget'];
+const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData','weightTarget','calsTarget','peopleDirectory','fitnessLog','fitnessExercises'];
 
 function App() {
   const [page, setPageRaw] = useState(() => sessionStorage.getItem('lp_page') || 'planner');
@@ -4371,6 +5024,9 @@ function App() {
   const [weightTarget, setWeightTarget] = useStorage('weightTarget', '');
   const [calsTarget, setCalsTarget] = useStorage('calsTarget', '');
   const [monthlyGoals, setMonthlyGoals] = useStorage('monthlyGoals', {});
+  const [peopleDirectory, setPeopleDirectory] = useStorage('peopleDirectory', []); // [{id, name}] — master list across weeks
+  const [fitnessLog, setFitnessLog] = useStorage('fitnessLog', {}); // {[dateKey]: [{id, name, exercises:[{id, exerciseId, sets:[{id,reps,weight,done}]}]}]}
+  const [fitnessExercises, setFitnessExercises] = useStorage('fitnessExercises', []); // [{id, name, category}] library
 
   // Auth state
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
@@ -4384,6 +5040,7 @@ function App() {
   const pullDeltaY = useRef(0);
   const pullActive = useRef(false);
   const saveTimerRef = useRef(null);
+  const pendingSaveRef = useRef(false); // true while a save is debounced but not yet flushed
 
   // Load all data from Drive after sign-in
   async function loadAllFromDrive() {
@@ -4409,6 +5066,9 @@ function App() {
       if (data.monthlyGoals) setMonthlyGoals(data.monthlyGoals);
       if (data.pagesData) setPagesData(data.pagesData);
       if (data.foldersData) setFoldersData(data.foldersData);
+      if (data.peopleDirectory) setPeopleDirectory(data.peopleDirectory);
+      if (data.fitnessLog) setFitnessLog(data.fitnessLog);
+      if (data.fitnessExercises) setFitnessExercises(data.fitnessExercises);
       setDriveFileId(fileId); // set last to arm the save effect
       setAuthError(false);
       setSaveStatus('saved');
@@ -4426,8 +5086,10 @@ function App() {
   const scheduleSave = useCallback((fid) => {
     if (!fid || _loadingFromDrive) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    pendingSaveRef.current = true;
     setSaveStatus('saving');
     saveTimerRef.current = setTimeout(async () => {
+      pendingSaveRef.current = false;
       const allData = {};
       ALL_STORAGE_KEYS.forEach(k => {
         try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
@@ -4441,11 +5103,9 @@ function App() {
         const msg = e?.message || 'Save failed';
         const is401 = msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('not authenticated');
         if (is401) {
-          // Token expired — attempt silent refresh then retry save
           setSaveStatus('saving');
           requestTokenSilent(
             async () => {
-              // Silent refresh succeeded — retry the save immediately
               try {
                 await saveToDrive(fid, allData);
                 setAuthError(false);
@@ -4453,30 +5113,40 @@ function App() {
                 setTimeout(() => setSaveStatus(''), 2000);
               } catch (e2) {
                 setSaveStatus('ERR:' + (e2?.message || 'Save failed'));
-                setTimeout(() => setSaveStatus(''), 8000);
+                // Don't auto-clear save errors — user must see them
               }
             },
             () => {
-              // Silent refresh failed — refresh token also expired, need full re-login
               clearToken();
               setAuthError(true);
               setSaveStatus('ERR:Session expired');
-              // Don't auto-clear this one — user needs to act
             }
           );
         } else {
           setSaveStatus('ERR:' + msg);
-          setTimeout(() => setSaveStatus(''), 8000);
+          // Don't auto-clear save errors — user must see them
         }
       }
     }, 2500);
   }, []);
 
+  // Flush any pending save immediately — used by beforeunload and visibilitychange
+  const flushSave = useCallback(async () => {
+    if (!pendingSaveRef.current || !driveFileId || _loadingFromDrive) return;
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    pendingSaveRef.current = false;
+    const allData = {};
+    ALL_STORAGE_KEYS.forEach(k => {
+      try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
+    });
+    try { await saveToDrive(driveFileId, allData); } catch {}
+  }, [driveFileId]);
+
   // Watch for localStorage changes and trigger Drive save
   useEffect(() => {
     if (!driveFileId) return;
     scheduleSave(driveFileId);
-  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, monthlyGoals, pagesData, foldersData, driveFileId]);
+  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, habitMetrics, habitQty, habitNotes, monthlyGoals, pagesData, foldersData, peopleDirectory, fitnessLog, fitnessExercises, driveFileId]);
 
   // On mount: restore session from localStorage token or silent Worker refresh
   useEffect(() => {
@@ -4511,6 +5181,31 @@ function App() {
     }
     tryRestoreSession();
   }, []);
+
+  // Flush pending saves when tab is closed, refreshed, or hidden (mobile home button etc.)
+  useEffect(() => {
+    function handleBeforeUnload(e) {
+      if (pendingSaveRef.current && driveFileId) {
+        // Attempt a synchronous-ish flush (best effort — browsers may not honor async here)
+        flushSave();
+        // Show browser's native "leave page?" dialog to give user a chance to wait
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Please wait a moment before closing.';
+        return e.returnValue;
+      }
+    }
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'hidden' && pendingSaveRef.current) {
+        flushSave();
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [flushSave, driveFileId]);
 
   function handleSignIn() {
     requestToken(
@@ -4597,15 +5292,86 @@ function App() {
   const errDetail = isErr ? saveStatus.slice(4) : '';
   const saveLabel = saveStatus === 'saving' ? '↑ Saving…'
     : saveStatus === 'saved' ? '✓ Saved'
-    : isErr ? `✗ ${errDetail}`
+    : isErr ? '✗ Save error'
     : '';
   const saveClass = isErr ? 'error' : saveStatus;
 
   return (
     <div className="app">
+      {/* ── PERSISTENT SAVE ERROR BANNER ── */}
+      {isErr && (
+        <div style={{
+          position:'fixed', top:0, left:0, right:0, zIndex:10000,
+          background:'#7f1d1d', color:'white', padding:'10px 16px',
+          fontFamily:"'DM Sans',sans-serif", fontSize:13,
+          display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
+          boxShadow:'0 2px 8px rgba(0,0,0,0.3)',
+        }}>
+          <span>⚠️ <strong>Save error — your changes are NOT being saved to Drive.</strong> {errDetail && <span style={{opacity:0.85}}>{errDetail}</span>}</span>
+          <div style={{display:'flex',gap:8,flexShrink:0}}>
+            <button onClick={()=>{ if(driveFileId) scheduleSave(driveFileId); setSaveStatus(''); }}
+              style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',borderRadius:6,
+                padding:'4px 12px',cursor:'pointer',fontWeight:600,fontSize:12,
+                fontFamily:"'DM Sans',sans-serif",color:'white',whiteSpace:'nowrap'}}>
+              Retry
+            </button>
+            <button onClick={()=>setSaveStatus('')}
+              style={{background:'none',border:'none',cursor:'pointer',fontSize:18,color:'rgba(255,255,255,0.7)',
+                lineHeight:1,padding:'0 4px'}}>✕</button>
+          </div>
+        </div>
+      )}
+      {/* ── AUTH SESSION EXPIRED BANNER ── */}
+      {authError && (
+        <div style={{
+          position:'fixed', top:isErr?44:0, left:0, right:0, zIndex:9999,
+          background:'#7f1d1d', color:'white', padding:'10px 16px',
+          fontFamily:"'DM Sans',sans-serif", fontSize:13,
+          display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
+          boxShadow:'0 2px 8px rgba(0,0,0,0.3)',
+        }}>
+          <span>⚠️ Your session has expired — changes are <strong>not saving</strong>. Please sign in again.</span>
+          <button onClick={()=>{
+            setAuthError(false);
+            requestToken(
+              async (data) => {
+                try {
+                  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${getToken()}` } });
+                  const user = await res.json();
+                  if (user.email) { setAuthUser({ name: user.name, email: user.email, picture: user.picture }); saveEmail(user.email); }
+                } catch {}
+                if (driveFileId) scheduleSave(driveFileId);
+              },
+              (err) => { setAuthError(true); setSaveStatus('ERR:Sign-in failed'); }
+            );
+          }} style={{
+            background:'white', color:'#7f1d1d', border:'none', borderRadius:6,
+            padding:'4px 12px', cursor:'pointer', fontWeight:600, fontSize:12,
+            fontFamily:"'DM Sans',sans-serif", whiteSpace:'nowrap', flexShrink:0,
+          }}>Sign in again</button>
+        </div>
+      )}
+      {/* ── NOT SIGNED IN BANNER (shown while editing Pages) ── */}
+      {!authUser && page === 'pages' && (
+        <div style={{
+          position:'fixed', top:0, left:0, right:0, zIndex:9998,
+          background:'#78350f', color:'white', padding:'8px 16px',
+          fontFamily:"'DM Sans',sans-serif", fontSize:12,
+          display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
+          boxShadow:'0 2px 8px rgba(0,0,0,0.3)',
+        }}>
+          <span>☁ Not signed in — your documents are only saved locally and will be <strong>lost if you clear your browser data.</strong></span>
+          <button onClick={handleSignIn}
+            style={{background:'white',color:'#78350f',border:'none',borderRadius:6,
+              padding:'3px 10px',cursor:'pointer',fontWeight:600,fontSize:12,
+              fontFamily:"'DM Sans',sans-serif",whiteSpace:'nowrap',flexShrink:0}}>
+            Sign in
+          </button>
+        </div>
+      )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v2.5.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.0.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -4613,41 +5379,10 @@ function App() {
           <button className={`nav-tab ${page==='monthly'?'active':''}`} onClick={()=>setPage('monthly')}>Monthly Calendar</button>
           <button className={`nav-tab ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>Habit Tracker</button>
           <button className={`nav-tab ${page==='pages'?'active':''}`} onClick={()=>setPage('pages')}>Pages</button>
+          <button className={`nav-tab ${page==='fitness'?'active':''}`} onClick={()=>setPage('fitness')}>Fitness</button>
         </div>
         <div className="auth-area">
           {saveLabel && <span className={`save-status ${saveClass || saveStatus}`}>{saveLabel}</span>}
-          {authError && (
-            <div style={{
-              position:'fixed', top:0, left:0, right:0, zIndex:9999,
-              background:'#7f1d1d', color:'white', padding:'10px 16px',
-              fontFamily:"'DM Sans',sans-serif", fontSize:13,
-              display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
-              boxShadow:'0 2px 8px rgba(0,0,0,0.3)',
-            }}>
-              <span>⚠️ Your session has expired. Recent unsaved changes may be lost. Please sign in again to continue saving.</span>
-              <button onClick={()=>{
-                setAuthError(false);
-                requestToken(
-                  async (data) => {
-                    try {
-                      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${getToken()}` } });
-                      const user = await res.json();
-                      if (user.email) {
-                        setAuthUser({ name: user.name, email: user.email, picture: user.picture });
-                        saveEmail(user.email);
-                      }
-                    } catch {}
-                    if (driveFileId) scheduleSave(driveFileId);
-                  },
-                  (err) => { setAuthError(true); setSaveStatus('ERR:Sign-in failed'); }
-                );
-              }} style={{
-                background:'white', color:'#7f1d1d', border:'none', borderRadius:6,
-                padding:'4px 12px', cursor:'pointer', fontWeight:600, fontSize:12,
-                fontFamily:"'DM Sans',sans-serif", whiteSpace:'nowrap', flexShrink:0,
-              }}>Sign in again</button>
-            </div>
-          )}
           {authUser ? (
             <>
               <button className="auth-btn sync" onClick={handleSyncCalendar} disabled={syncing} title="Pull new events from Google Calendar">
@@ -4705,7 +5440,7 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
@@ -4721,6 +5456,7 @@ function App() {
         calsTarget={calsTarget} setCalsTarget={setCalsTarget}
         onBack={()=>setPage('habit')} />}
       {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} foldersData={foldersData} setFoldersData={setFoldersData} weekData={weekData} setWeekData={setWeekData} selectedId={selectedPagesId} setSelectedId={setSelectedPagesId} />}
+      {page==='fitness' && <FitnessView fitnessLog={fitnessLog} setFitnessLog={setFitnessLog} fitnessExercises={fitnessExercises} setFitnessExercises={setFitnessExercises} />}
       </div>
 
       {/* Mobile bottom nav — only visible on phones via CSS */}
@@ -4737,6 +5473,9 @@ function App() {
         <button className={`mobile-bottom-nav-btn ${page==='pages'?'active':''}`} onClick={()=>setPage('pages')}>
           <span className="icon">📝</span>Pages
         </button>
+        <button className={`mobile-bottom-nav-btn ${page==='fitness'?'active':''}`} onClick={()=>setPage('fitness')}>
+          <span className="icon">💪</span>Fitness
+        </button>
         {authUser && (
           <button className="mobile-bottom-nav-btn" onClick={handleSyncCalendar} disabled={syncing}>
             <span className="icon">{syncing?'↻':'↓'}</span>Sync
@@ -4747,6 +5486,516 @@ function App() {
   );
 }
 
+
+// ─────────────────────────────────────────────
+// FITNESS VIEW
+// ─────────────────────────────────────────────
+const FITNESS_CATEGORIES = ['Strength','Cardio','Mobility','Sport','Other'];
+const UNCATEGORIZED = 'Other';
+
+function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessExercises }) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const [selectedDate, setSelectedDate] = useState(today);
+  const [showExPicker, setShowExPicker] = useState(null); // {workoutId} when open
+  const [showLibManager, setShowLibManager] = useState(false);
+  const [libSearch, setLibSearch] = useState('');
+
+  const dateKey = fmt(selectedDate);
+  const workouts = fitnessLog[dateKey] || [];
+
+  // ── Log helpers ──────────────────────────────
+  function setDayWorkouts(fn) {
+    setFitnessLog(log => {
+      const cur = log[dateKey] || [];
+      const next = typeof fn === 'function' ? fn(cur) : fn;
+      return { ...log, [dateKey]: next };
+    });
+  }
+
+  function addWorkout() {
+    const id = 'w' + Date.now();
+    setDayWorkouts(ws => [...ws, { id, name: 'Workout', exercises: [] }]);
+  }
+
+  function updateWorkout(wid, patch) {
+    setDayWorkouts(ws => ws.map(w => w.id === wid ? { ...w, ...patch } : w));
+  }
+
+  function deleteWorkout(wid) {
+    setDayWorkouts(ws => ws.filter(w => w.id !== wid));
+  }
+
+  function addExerciseToWorkout(wid, exerciseId) {
+    const ex = fitnessExercises.find(e => e.id === exerciseId);
+    if (!ex) return;
+    const newEx = { id: 'ex' + Date.now(), exerciseId, sets: [{ id: 's' + Date.now(), reps: '', weight: '', done: false }] };
+    setDayWorkouts(ws => ws.map(w => w.id === wid ? { ...w, exercises: [...w.exercises, newEx] } : w));
+  }
+
+  function deleteExercise(wid, exId) {
+    setDayWorkouts(ws => ws.map(w => w.id === wid ? { ...w, exercises: w.exercises.filter(e => e.id !== exId) } : w));
+  }
+
+  function updateSet(wid, exId, setId, patch) {
+    setDayWorkouts(ws => ws.map(w => w.id !== wid ? w : {
+      ...w, exercises: w.exercises.map(e => e.id !== exId ? e : {
+        ...e, sets: e.sets.map(s => s.id !== setId ? s : { ...s, ...patch })
+      })
+    }));
+  }
+
+  function addSet(wid, exId) {
+    setDayWorkouts(ws => ws.map(w => w.id !== wid ? w : {
+      ...w, exercises: w.exercises.map(e => e.id !== exId ? e : {
+        ...e, sets: [...e.sets, { id: 's' + Date.now(), reps: '', weight: '', done: false }]
+      })
+    }));
+  }
+
+  function deleteSet(wid, exId, setId) {
+    setDayWorkouts(ws => ws.map(w => w.id !== wid ? w : {
+      ...w, exercises: w.exercises.map(e => e.id !== exId ? e : {
+        ...e, sets: e.sets.filter(s => s.id !== setId)
+      })
+    }));
+  }
+
+  // ── Exercise library helpers ──────────────────
+  function addExercise(name, category) {
+    if (!name.trim()) return;
+    const id = 'e' + Date.now();
+    setFitnessExercises(es => [...es, { id, name: name.trim(), category: category || UNCATEGORIZED }]);
+    return id;
+  }
+
+  function updateExercise(id, patch) {
+    setFitnessExercises(es => es.map(e => e.id === id ? { ...e, ...patch } : e));
+  }
+
+  function deleteExercise_lib(id) {
+    setFitnessExercises(es => es.filter(e => e.id !== id));
+  }
+
+  // ── Stats helpers ────────────────────────────
+  function exStats(workout, exId) {
+    const ex = workout.exercises.find(e => e.id === exId);
+    if (!ex) return { done: 0, total: ex?.sets.length || 0, volume: 0 };
+    const doneSets = ex.sets.filter(s => s.done);
+    const volume = doneSets.reduce((acc, s) => {
+      const r = parseFloat(s.reps) || 0;
+      const w = parseFloat(s.weight) || 0;
+      return acc + (w > 0 ? r * w : r);
+    }, 0);
+    return { done: doneSets.length, total: ex.sets.length, volume: Math.round(volume) };
+  }
+
+  function exName(exerciseId) {
+    return fitnessExercises.find(e => e.id === exerciseId)?.name || 'Unknown';
+  }
+
+  // ── Grouped library for sidebar ──────────────
+  const categorized = FITNESS_CATEGORIES.reduce((acc, cat) => {
+    const items = fitnessExercises.filter(e => (e.category || UNCATEGORIZED) === cat);
+    if (items.length) acc[cat] = items;
+    return acc;
+  }, {});
+
+  // ── Render ───────────────────────────────────
+  return (
+    <div className="fitness-layout">
+
+      {/* ── DESKTOP SIDEBAR ── */}
+      <div className="fitness-sidebar">
+        <div className="fitness-day-nav" style={{marginBottom:16}}>
+          <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,-1))}>‹</button>
+          <div>
+            <div className="fitness-day-label" style={{fontSize:13}}>
+              {DAYS[selectedDate.getDay()].slice(0,3)}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}
+            </div>
+            <div className="fitness-day-sub">{selectedDate.getFullYear()}</div>
+          </div>
+          <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,1))}>›</button>
+        </div>
+
+        {/* Library header */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+          <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Exercise Library</span>
+          <button className="add-btn" onClick={()=>setShowLibManager(true)} title="Manage library">⚙</button>
+        </div>
+
+        {fitnessExercises.length === 0 && (
+          <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px 6px'}}>
+            No exercises yet — click ⚙ to add
+          </div>
+        )}
+        {Object.entries(categorized).map(([cat, items]) => (
+          <div key={cat}>
+            <div className="ex-lib-cat">{cat}</div>
+            {items.map(ex => (
+              <div key={ex.id} className="ex-lib-item">
+                <span style={{fontSize:11,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ex.name}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* ── MAIN LOG AREA ── */}
+      <div className="fitness-main">
+
+        {/* Mobile date nav */}
+        <div className="fitness-day-nav" style={{display:'none'}} id="fitness-mobile-nav">
+          <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,-1))}>‹</button>
+          <div>
+            <div className="fitness-day-label">
+              {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}, {selectedDate.getFullYear()}
+            </div>
+          </div>
+          <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,1))}>›</button>
+        </div>
+
+        {/* Mobile-only date + add row */}
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{flex:1}}>
+            <div className="fitness-day-label">
+              {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}, {selectedDate.getFullYear()}
+            </div>
+          </div>
+          <button onClick={addWorkout}
+            style={{background:'var(--accent)',color:'white',border:'none',borderRadius:'var(--radius-md)',
+              padding:'7px 16px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:"'DM Sans',sans-serif",
+              flexShrink:0}}>
+            + Workout
+          </button>
+        </div>
+
+        {workouts.length === 0 && (
+          <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)',fontSize:13,fontStyle:'italic'}}>
+            No workouts logged for this day.<br/>
+            <span style={{fontSize:11}}>Tap "+ Workout" to start.</span>
+          </div>
+        )}
+
+        {workouts.map(workout => (
+          <div key={workout.id} className="workout-card">
+            {/* Workout header */}
+            <div className="workout-card-header">
+              <input className="workout-name-input"
+                value={workout.name}
+                onChange={e=>updateWorkout(workout.id,{name:e.target.value})}
+                placeholder="Workout name…"
+              />
+              <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--accent)',opacity:0.7}}>
+                {workout.exercises.reduce((a,ex)=>a+ex.sets.filter(s=>s.done).length,0)}/
+                {workout.exercises.reduce((a,ex)=>a+ex.sets.length,0)} sets
+              </span>
+              <button onClick={()=>deleteWorkout(workout.id)}
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',
+                  padding:'0 2px',lineHeight:1,opacity:0.5}}
+                title="Delete workout">✕</button>
+            </div>
+
+            {/* Exercises */}
+            {workout.exercises.map(ex => {
+              const stats = exStats(workout, ex.id);
+              const name = exName(ex.exerciseId);
+              return (
+                <div key={ex.id} className="exercise-block">
+                  <div className="exercise-header">
+                    <span className="exercise-name">{name}</span>
+                    {stats.done > 0 && (
+                      <span className="fitness-stat-pill">
+                        {stats.done}/{stats.total} sets
+                        {stats.volume > 0 && ` · ${stats.volume.toLocaleString()} ${stats.done > 0 && ex.sets.find(s=>s.done && parseFloat(s.weight)>0) ? 'lbs' : 'reps'}`}
+                      </span>
+                    )}
+                    <button onClick={()=>addSet(workout.id, ex.id)}
+                      style={{background:'none',border:'1px solid var(--border)',borderRadius:4,cursor:'pointer',
+                        fontSize:10,color:'var(--ink-light)',padding:'2px 6px',fontFamily:"'DM Sans',sans-serif"}}>
+                      + Set
+                    </button>
+                    <button onClick={()=>deleteExercise(workout.id, ex.id)}
+                      style={{background:'none',border:'none',cursor:'pointer',fontSize:12,
+                        color:'var(--ink-faint)',padding:'0 2px',opacity:0.5}}>✕</button>
+                  </div>
+
+                  {/* Set column headers */}
+                  <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',
+                    borderBottom:'1px solid var(--border)',marginBottom:2}}>
+                    <span className="set-num"></span>
+                    <span className="set-label" style={{width:52,textAlign:'center'}}>Reps</span>
+                    <span className="set-label" style={{width:52,textAlign:'center',marginLeft:18}}>Weight</span>
+                    <span className="set-label" style={{marginLeft:'auto',marginRight:2}}>Done</span>
+                  </div>
+
+                  {/* Set rows */}
+                  {ex.sets.map((set, si) => (
+                    <div key={set.id} className={`set-row ${set.done?'done':''}`}>
+                      <span className="set-num">{si+1}</span>
+                      <input type="number" min="0" className="set-input" placeholder="—"
+                        value={set.reps}
+                        onChange={e=>updateSet(workout.id,ex.id,set.id,{reps:e.target.value})}
+                        style={{opacity:set.done?0.6:1}}
+                      />
+                      <span className="set-label">×</span>
+                      <input type="number" min="0" className="set-input" placeholder="—"
+                        value={set.weight}
+                        onChange={e=>updateSet(workout.id,ex.id,set.id,{weight:e.target.value})}
+                        style={{opacity:set.done?0.6:1}}
+                      />
+                      <span className="set-label">lbs</span>
+                      <div className={`set-check ${set.done?'done':''}`}
+                        onClick={()=>updateSet(workout.id,ex.id,set.id,{done:!set.done})} />
+                      <button onClick={()=>deleteSet(workout.id,ex.id,set.id)}
+                        style={{background:'none',border:'none',cursor:'pointer',fontSize:11,
+                          color:'var(--ink-faint)',padding:'0 2px',opacity:0.35,marginLeft:2,lineHeight:1}}
+                        title="Remove set">✕</button>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+
+            {/* Add exercise button */}
+            <div style={{padding:'8px 14px'}}>
+              <button onClick={()=>setShowExPicker({workoutId:workout.id})}
+                style={{background:'none',border:'1px dashed var(--border)',borderRadius:'var(--radius-sm)',
+                  cursor:'pointer',fontSize:11,color:'var(--ink-light)',padding:'5px 12px',width:'100%',
+                  fontFamily:"'DM Sans',sans-serif",transition:'all 0.1s'}}
+                onMouseEnter={e=>e.currentTarget.style.borderColor='var(--accent)'}
+                onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border)'}>
+                + Add Exercise
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── EXERCISE PICKER MODAL ── */}
+      {showExPicker && (
+        <ExercisePicker
+          exercises={fitnessExercises}
+          onAdd={(exerciseId) => {
+            addExerciseToWorkout(showExPicker.workoutId, exerciseId);
+            setShowExPicker(null);
+          }}
+          onAddNew={(name, category) => {
+            const id = addExercise(name, category);
+            if (id) {
+              setTimeout(() => {
+                addExerciseToWorkout(showExPicker.workoutId, id);
+                setShowExPicker(null);
+              }, 50);
+            }
+          }}
+          onClose={()=>setShowExPicker(null)}
+        />
+      )}
+
+      {/* ── LIBRARY MANAGER MODAL ── */}
+      {showLibManager && (
+        <ExerciseLibraryManager
+          exercises={fitnessExercises}
+          onAdd={addExercise}
+          onUpdate={updateExercise}
+          onDelete={deleteExercise_lib}
+          onClose={()=>setShowLibManager(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// EXERCISE PICKER — add exercise to a workout
+// ─────────────────────────────────────────────
+function ExercisePicker({ exercises, onAdd, onAddNew, onClose }) {
+  const [search, setSearch] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newCat, setNewCat] = useState('Strength');
+  const searchRef = useRef();
+  useEffect(() => { setTimeout(() => searchRef.current?.focus(), 50); }, []);
+
+  const filtered = exercises.filter(e =>
+    e.name.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const grouped = FITNESS_CATEGORIES.reduce((acc, cat) => {
+    const items = filtered.filter(e => (e.category || 'Other') === cat);
+    if (items.length) acc[cat] = items;
+    return acc;
+  }, {});
+
+  return (
+    <div className="fitness-picker-overlay" onClick={onClose}>
+      <div className="fitness-picker-modal" onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+          padding:'14px 16px 10px',borderBottom:'1px solid var(--border)',flexShrink:0}}>
+          <span style={{fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,color:'var(--ink)'}}>Add Exercise</span>
+          <button onClick={onClose}
+            style={{background:'none',border:'none',cursor:'pointer',fontSize:16,color:'var(--ink-faint)',lineHeight:1,padding:'0 2px'}}>✕</button>
+        </div>
+        <div style={{padding:'8px 12px 4px',flexShrink:0}}>
+          <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)}
+            placeholder="Search exercises…"
+            style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",
+              border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
+              padding:'5px 9px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+          />
+        </div>
+        <div style={{flex:1,overflowY:'auto',padding:'4px 8px'}}>
+          {exercises.length === 0 && (
+            <div style={{fontSize:12,color:'var(--ink-faint)',fontStyle:'italic',padding:'8px 4px'}}>
+              No exercises in library yet — add one below
+            </div>
+          )}
+          {Object.entries(grouped).map(([cat, items]) => (
+            <div key={cat}>
+              <div className="ex-lib-cat">{cat}</div>
+              {items.map(ex => (
+                <div key={ex.id}
+                  style={{display:'flex',alignItems:'center',padding:'7px 6px',borderRadius:6,cursor:'pointer',transition:'background 0.1s'}}
+                  onClick={()=>onAdd(ex.id)}
+                  onMouseEnter={e=>e.currentTarget.style.background='var(--cream)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  <span style={{fontSize:13,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)',flex:1}}>{ex.name}</span>
+                  <span style={{fontSize:10,color:'var(--accent)',fontFamily:"'DM Mono',monospace"}}>+ Add</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        {/* New exercise */}
+        <div style={{padding:'8px 12px 6px',borderTop:'1px solid var(--border)',flexShrink:0}}>
+          <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:4,textTransform:'uppercase',letterSpacing:'0.05em'}}>+ New exercise:</div>
+          <div style={{display:'flex',gap:6}}>
+            <input value={newName} onChange={e=>setNewName(e.target.value)}
+              onKeyDown={e=>{ if(e.key==='Enter' && newName.trim()) onAddNew(newName.trim(), newCat); if(e.key==='Escape') onClose(); }}
+              placeholder="Exercise name"
+              style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",
+                border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
+                padding:'5px 8px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+            />
+            <select value={newCat} onChange={e=>setNewCat(e.target.value)}
+              style={{fontSize:11,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
+                borderRadius:'var(--radius-sm)',padding:'4px 6px',background:'white',color:'var(--ink)',outline:'none'}}>
+              {FITNESS_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{padding:'6px 12px 12px',display:'flex',justifyContent:'flex-end',flexShrink:0}}>
+          <button onClick={()=>{ if(newName.trim()) onAddNew(newName.trim(), newCat); }}
+            disabled={!newName.trim()}
+            style={{background:newName.trim()?'var(--accent)':'var(--border)',border:'none',
+              borderRadius:'var(--radius-sm)',padding:'5px 16px',cursor:newName.trim()?'pointer':'default',
+              fontSize:12,fontWeight:600,fontFamily:"'DM Sans',sans-serif",
+              color:newName.trim()?'white':'var(--ink-faint)',transition:'all 0.15s'}}>
+            Add New
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// EXERCISE LIBRARY MANAGER
+// ─────────────────────────────────────────────
+function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose }) {
+  const [newName, setNewName] = useState('');
+  const [newCat, setNewCat] = useState('Strength');
+  const [editId, setEditId] = useState(null);
+  const [confirmId, setConfirmId] = useState(null);
+
+  const grouped = FITNESS_CATEGORIES.reduce((acc, cat) => {
+    const items = exercises.filter(e => (e.category || 'Other') === cat);
+    if (items.length) acc[cat] = items;
+    return acc;
+  }, {});
+
+  return (
+    <div className="fitness-picker-overlay" onClick={onClose}>
+      <div className="fitness-picker-modal" style={{width:360,maxHeight:520}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+          padding:'14px 16px 10px',borderBottom:'1px solid var(--border)',flexShrink:0}}>
+          <span style={{fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,color:'var(--ink)'}}>Exercise Library</span>
+          <button onClick={onClose}
+            style={{background:'none',border:'none',cursor:'pointer',fontSize:16,color:'var(--ink-faint)',lineHeight:1}}>✕</button>
+        </div>
+        <div style={{flex:1,overflowY:'auto',padding:'8px 12px'}}>
+          {exercises.length === 0 && (
+            <div style={{fontSize:12,color:'var(--ink-faint)',fontStyle:'italic',padding:'8px 4px'}}>No exercises yet</div>
+          )}
+          {Object.entries(grouped).map(([cat, items]) => (
+            <div key={cat} style={{marginBottom:8}}>
+              <div className="ex-lib-cat">{cat}</div>
+              {items.map(ex => (
+                <div key={ex.id} style={{display:'flex',alignItems:'center',gap:6,padding:'5px 4px',borderRadius:6}}
+                  onMouseEnter={e=>e.currentTarget.style.background='var(--cream)'}
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  {editId === ex.id ? (
+                    <>
+                      <input autoFocus value={ex.name}
+                        onChange={e=>onUpdate(ex.id,{name:e.target.value})}
+                        onBlur={()=>setEditId(null)}
+                        onKeyDown={e=>{ if(e.key==='Enter'||e.key==='Escape') setEditId(null); }}
+                        style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--accent)',
+                          borderRadius:4,padding:'3px 6px',outline:'none',background:'white',color:'var(--ink)'}}
+                      />
+                      <select value={ex.category||'Other'} onChange={e=>onUpdate(ex.id,{category:e.target.value})}
+                        style={{fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',
+                          background:'white',color:'var(--ink)',outline:'none'}}>
+                        {FITNESS_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <span style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}>{ex.name}</span>
+                      <button onClick={()=>setEditId(ex.id)}
+                        style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:'var(--ink-faint)',padding:'0 3px'}}>✏️</button>
+                      <button onClick={()=>{ if(confirmId===ex.id){onDelete(ex.id);setConfirmId(null);}else setConfirmId(ex.id); }}
+                        onMouseLeave={()=>setConfirmId(null)}
+                        style={{background:confirmId===ex.id?'var(--red)':'none',color:confirmId===ex.id?'white':'var(--ink-faint)',
+                          border:'none',cursor:'pointer',fontSize:confirmId===ex.id?10:13,
+                          borderRadius:confirmId===ex.id?4:0,padding:confirmId===ex.id?'2px 5px':'0 2px',
+                          fontFamily:"'DM Sans',sans-serif"}}>
+                        {confirmId===ex.id?'Delete?':'✕'}
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        {/* Add new */}
+        <div style={{padding:'8px 12px 12px',borderTop:'1px solid var(--border)',flexShrink:0}}>
+          <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:4,textTransform:'uppercase',letterSpacing:'0.05em'}}>Add exercise:</div>
+          <div style={{display:'flex',gap:6}}>
+            <input value={newName} onChange={e=>setNewName(e.target.value)}
+              onKeyDown={e=>{ if(e.key==='Enter'&&newName.trim()){onAdd(newName.trim(),newCat);setNewName('');} }}
+              placeholder="Name"
+              style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
+                borderRadius:'var(--radius-sm)',padding:'5px 8px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+            />
+            <select value={newCat} onChange={e=>setNewCat(e.target.value)}
+              style={{fontSize:11,border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
+                padding:'4px 6px',background:'white',color:'var(--ink)',outline:'none'}}>
+              {FITNESS_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
+            </select>
+            <button onClick={()=>{ if(newName.trim()){onAdd(newName.trim(),newCat);setNewName('');} }}
+              disabled={!newName.trim()}
+              style={{background:newName.trim()?'var(--accent)':'var(--border)',border:'none',
+                borderRadius:'var(--radius-sm)',padding:'5px 12px',cursor:newName.trim()?'pointer':'default',
+                fontSize:12,fontWeight:600,color:newName.trim()?'white':'var(--ink-faint)'}}>
+              Add
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────
 // PAGES VIEW
@@ -4994,8 +6243,23 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       sel.removeAllRanges();
       sel.addRange(r);
     } else {
-      // Add new checklist item right after this one
+      // Split the li at cursor: text after cursor moves to new li
+      const range = sel.getRangeAt(0);
+      const afterRange = document.createRange();
+      afterRange.setStart(range.startContainer, range.startOffset);
+      afterRange.setEnd(li, li.childNodes.length);
+      const afterFragment = afterRange.extractContents();
+      // Collect only text (strip any checkbox inputs swept up by extractContents)
+      let afterText = '';
+      const tw = document.createTreeWalker(afterFragment, NodeFilter.SHOW_TEXT, null);
+      while (tw.nextNode()) afterText += tw.currentNode.textContent;
+
       const newLi = makeChkLi();
+      if (newLi.lastChild && newLi.lastChild.nodeType === 3) {
+        newLi.lastChild.textContent = afterText;
+      } else {
+        newLi.appendChild(document.createTextNode(afterText));
+      }
       li.parentNode.insertBefore(newLi, li.nextSibling);
       const textNode = newLi.lastChild;
       const r = document.createRange();
@@ -5010,21 +6274,32 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   function handleBodyKeyDown(e) {
     const sel = window.getSelection();
 
-    // Space shortcut: typing Space when block contains only "-" → bullet list
+    // Space shortcut: "- " at start of line → bullet list, "1. " → numbered list
+    // Works even if there's text after the cursor — that text becomes the list item content
     if (e.key === ' ' && sel && sel.rangeCount > 0 && bodyRef.current) {
       const range = sel.getRangeAt(0);
       const node = range.startContainer;
       const block = node.nodeType === 3 ? node.parentElement : node;
       const blockEl = block?.closest('p,div,h1,h2,h3') || block;
       if (blockEl && !blockEl.closest('ul,ol,blockquote') && bodyRef.current.contains(blockEl)) {
-        if ((blockEl.textContent || '').trim() === '-') {
+        // Get text from the very start of the block up to the cursor
+        const preRange = document.createRange();
+        preRange.setStart(blockEl, 0);
+        preRange.setEnd(range.startContainer, range.startOffset);
+        const textBeforeCursor = preRange.toString();
+
+        let listCmd = null;
+        if (textBeforeCursor === '-') listCmd = 'insertUnorderedList';
+        else if (textBeforeCursor === '1.') listCmd = 'insertOrderedList';
+
+        if (listCmd) {
           e.preventDefault();
-          const r = document.createRange();
-          r.selectNodeContents(blockEl);
+          // Select just the prefix ("-" or "1.") and delete it, leaving rest of text intact
           sel.removeAllRanges();
-          sel.addRange(r);
+          sel.addRange(preRange);
           document.execCommand('delete');
-          document.execCommand('insertUnorderedList');
+          // Now convert the block (with remaining text) into a list item
+          document.execCommand(listCmd);
           setTimeout(() => onBodyInput(), 0);
           return;
         }
@@ -5634,20 +6909,38 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                   }
                   const li = e.target.closest('li.pages-chk-li');
                   if(li){
-                    // Prevent browser from placing cursor (it defaults to before the checkbox)
+                    // If clicking directly on a text node, let the browser place the cursor naturally
+                    if(e.target.nodeType === 3 || e.target.closest('span,b,i,u,strong,em')){
+                      return;
+                    }
+                    // Clicking on the li itself or its label area (not on text):
+                    // check if the click is past the end of the text content
+                    const range = document.caretRangeFromPoint
+                      ? document.caretRangeFromPoint(e.clientX, e.clientY)
+                      : null;
+                    // If browser can place a caret at the click point inside this li, let it
+                    if(range && li.contains(range.startContainer) && range.startContainer.nodeType === 3){
+                      return; // browser will place cursor correctly between characters
+                    }
+                    // Otherwise (click is in whitespace past end of text, or on the li padding):
+                    // prevent the default and move cursor to end of text
                     e.preventDefault();
                     bodyRef.current?.focus();
-                    // Place cursor at end of the text content in this li
-                    const textNodes = Array.from(li.childNodes).filter(n => n.nodeType === 3);
-                    const lastText = textNodes[textNodes.length - 1];
+                    const walker = document.createTreeWalker(li, NodeFilter.SHOW_TEXT, null);
+                    let lastText = null;
+                    while(walker.nextNode()) lastText = walker.currentNode;
+                    const r = document.createRange();
                     if(lastText){
-                      const r = document.createRange();
                       r.setStart(lastText, lastText.length);
-                      r.collapse(true);
-                      const s = window.getSelection();
-                      s.removeAllRanges();
-                      s.addRange(r);
+                    } else {
+                      // Empty li — place after the checkbox
+                      r.selectNodeContents(li);
+                      r.collapse(false);
                     }
+                    r.collapse(true);
+                    const s = window.getSelection();
+                    s.removeAllRanges();
+                    s.addRange(r);
                   }
                 }}
                 onTouchStart={e=>{ bodyRef._touchStartX = e.touches[0].clientX; bodyRef._touchStartY = e.touches[0].clientY; }}
