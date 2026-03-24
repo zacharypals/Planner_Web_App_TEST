@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.4.0 -->
+<!-- LP Planner v3.4.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5434,7 +5434,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.4.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.4.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5952,7 +5952,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                 <div key={name} style={{marginBottom:10}}>
                   <div style={{fontSize:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700,color:'var(--ink)',marginBottom:4,paddingBottom:2,borderBottom:'1px solid var(--border)'}}>{name}</div>
                   {groups[name].map(goal=>{
-                    const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal);
+                    const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal, selectedDate);
                     const pct=Math.min(100,(actual/goal.target)*100),done=pct>=100,ahead=aheadBehind>=0;
                     return (
                       <div key={goal.id} style={{marginBottom:6,padding:'6px 8px',background:'white',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)',boxShadow:'0 1px 2px var(--shadow)'}}>
