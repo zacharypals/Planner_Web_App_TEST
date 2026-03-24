@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.2.0 -->
+<!-- LP Planner v3.2.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5434,7 +5434,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.2.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.2.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5563,6 +5563,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const [showExPicker, setShowExPicker] = useState(null);
   const [showLibManager, setShowLibManager] = useState(false);
   const [showGoalManager, setShowGoalManager] = useState(false);
+  const [goalsCollapsed, setGoalsCollapsed] = useState(false);
 
   const dateKey = fmt(selectedDate);
   const weekStart = getWeekStart(selectedDate);
@@ -5838,52 +5839,81 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
         </div>
 
         {/* Goals section */}
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
-          <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Goals</span>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:goalsCollapsed?0:6}}>
+          <div style={{display:'flex',alignItems:'center',gap:4,cursor:'pointer'}}
+            onClick={()=>setGoalsCollapsed(c=>!c)}>
+            <span style={{fontSize:9,color:'var(--ink-faint)'}}>{goalsCollapsed?'▸':'▾'}</span>
+            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Goals</span>
+            {goalsCollapsed && fitnessGoals.length > 0 && (
+              <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--accent)',fontWeight:600}}>({fitnessGoals.length})</span>
+            )}
+          </div>
           <button className="add-btn" onClick={()=>setShowGoalManager(true)} title="Manage goals">+</button>
         </div>
-        {fitnessGoals.length===0 && (
-          <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'2px 6px',marginBottom:10}}>
-            No goals yet — tap + to add
+        {!goalsCollapsed && (
+          <div style={{marginBottom:8}}>
+            {fitnessGoals.length===0 && (
+              <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'2px 6px',marginBottom:6}}>
+                No goals yet — tap + to add
+              </div>
+            )}
+            {(() => {
+              // Group goals by exercise, sorted by exercise name, then period within each group
+              const PERIOD_ORDER = {week:0, month:1, year:2};
+              const groups = {};
+              fitnessGoals.forEach(g => {
+                const exName = fitnessExercises.find(e=>e.id===g.exerciseId)?.name || 'Unknown';
+                if (!groups[exName]) groups[exName] = [];
+                groups[exName].push(g);
+              });
+              Object.values(groups).forEach(arr => arr.sort((a,b)=>(PERIOD_ORDER[a.period]??3)-(PERIOD_ORDER[b.period]??3)));
+              const sortedNames = Object.keys(groups).sort();
+              return sortedNames.map(exName => (
+                <div key={exName} style={{marginBottom:10}}>
+                  <div style={{fontSize:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700,color:'var(--ink)',
+                    marginBottom:4,paddingBottom:2,borderBottom:'1px solid var(--border)'}}>
+                    {exName}
+                  </div>
+                  {groups[exName].map(goal => {
+                    const {actual, periodPct, expectedAtPace, aheadBehind} = goalProgressFull(goal);
+                    const pct = Math.min(100, (actual/goal.target)*100);
+                    const done = pct >= 100;
+                    const ahead = aheadBehind >= 0;
+                    return (
+                      <div key={goal.id} className="fitness-goal-row" style={{marginBottom:8}}>
+                        <div className="fitness-goal-label">
+                          <span style={{fontSize:10,color:'var(--ink-light)',fontFamily:"'DM Mono',monospace",textTransform:'capitalize'}}>{goal.period}</span>
+                          <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+                            <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",
+                              color:ahead?'var(--accent)':'var(--red)',fontWeight:600}}>
+                              {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))}
+                            </span>
+                            <button onClick={()=>deleteGoal(goal.id)}
+                              style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 1px',opacity:0.5}}>✕</button>
+                          </div>
+                        </div>
+                        <div className="fitness-goal-bar-bg" style={{position:'relative'}}>
+                          <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,
+                            background:'rgba(0,0,0,0.08)',borderRadius:3,zIndex:0}}/>
+                          <div className={`fitness-goal-bar-fill ${done?'done':''}`}
+                            style={{width:`${Math.min(100,pct)}%`,position:'relative',zIndex:1}}/>
+                        </div>
+                        <div className="fitness-goal-meta">
+                          {actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}
+                          <span style={{margin:'0 3px',opacity:0.5}}>·</span>
+                          {periodPct}% thru {goal.period}
+                          <span style={{margin:'0 3px',opacity:0.5}}>·</span>
+                          pace {expectedAtPace.toLocaleString()}
+                          {done && ' 🎉'}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ));
+            })()}
           </div>
         )}
-        {fitnessGoals.map(goal => {
-          const {actual, periodPct, expectedAtPace, aheadBehind} = goalProgressFull(goal);
-          const pct = Math.min(100, (actual/goal.target)*100);
-          const done = pct >= 100;
-          const exLabel = fitnessExercises.find(e=>e.id===goal.exerciseId)?.name || 'Unknown';
-          const ahead = aheadBehind >= 0;
-          return (
-            <div key={goal.id} className="fitness-goal-row">
-              <div className="fitness-goal-label">
-                <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11}}>{exLabel}</span>
-                <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
-                  <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",
-                    color:ahead?'var(--accent)':'var(--red)',fontWeight:600}}>
-                    {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))}
-                  </span>
-                  <button onClick={()=>deleteGoal(goal.id)}
-                    style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 1px',opacity:0.5}}>✕</button>
-                </div>
-              </div>
-              {/* Dual bar: period elapsed (faint) behind actual progress */}
-              <div className="fitness-goal-bar-bg" style={{position:'relative'}}>
-                <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,
-                  background:'rgba(0,0,0,0.08)',borderRadius:3,zIndex:0}}/>
-                <div className={`fitness-goal-bar-fill ${done?'done':''}`}
-                  style={{width:`${Math.min(100,pct)}%`,position:'relative',zIndex:1}}/>
-              </div>
-              <div className="fitness-goal-meta">
-                {actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}
-                <span style={{margin:'0 3px',opacity:0.5}}>·</span>
-                {periodPct}% thru {goal.period}
-                <span style={{margin:'0 3px',opacity:0.5}}>·</span>
-                pace {expectedAtPace.toLocaleString()}
-                {done && ' 🎉'}
-              </div>
-            </div>
-          );
-        })}
 
         <div style={{borderTop:'1px solid var(--border)',marginTop:8,paddingTop:8}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
