@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.0.0 -->
+<!-- LP Planner v3.1.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -479,6 +479,67 @@
     .fitness-sidebar { display: none; }
     .fitness-main { padding: 12px 14px; }
   }
+  /* ── FITNESS PHASE 2 ── */
+  .fitness-view-tabs {
+    display: flex; gap: 4px; background: var(--cream);
+    border-radius: var(--radius-md); padding: 3px; flex-shrink: 0;
+  }
+  .fitness-view-tab {
+    padding: 4px 14px; border-radius: var(--radius-sm); border: none;
+    cursor: pointer; font-size: 12px; font-family: 'DM Sans', sans-serif;
+    font-weight: 500; color: var(--ink-light); background: transparent;
+    transition: all 0.12s;
+  }
+  .fitness-view-tab.active { background: white; color: var(--accent); font-weight: 700; box-shadow: 0 1px 3px var(--shadow-md); }
+  .fitness-week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .fitness-week-col {
+    background: var(--paper); border-radius: var(--radius-md);
+    border: 1px solid var(--border); overflow: hidden; cursor: pointer; transition: box-shadow 0.15s;
+  }
+  .fitness-week-col:hover { box-shadow: 0 2px 8px var(--shadow-md); }
+  .fitness-week-col.today { border-color: var(--accent); }
+  .fitness-week-col-hdr {
+    padding: 6px 8px; text-align: center;
+    background: linear-gradient(180deg, #2d6b4a 0%, #256042 100%);
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+  }
+  .fitness-week-col.today .fitness-week-col-hdr { background: linear-gradient(180deg, #3a8a60 0%, #256042 100%); }
+  .fitness-week-col-day { font-size: 9px; color: rgba(255,255,255,0.65); font-family: 'DM Mono',monospace; text-transform: uppercase; letter-spacing: 0.06em; }
+  .fitness-week-col-date { font-size: 16px; color: white; font-family: 'Playfair Display',serif; font-weight: 600; }
+  .fitness-week-col.today .fitness-week-col-date { color: var(--gold); }
+  .fitness-week-col-body { padding: 6px; min-height: 60px; }
+  .fitness-week-workout-pill {
+    background: var(--accent-light); color: var(--accent); border-radius: 4px;
+    padding: 3px 6px; font-size: 10px; font-family: 'DM Sans',sans-serif; font-weight: 600;
+    margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .fitness-week-add {
+    background: none; border: 1px dashed var(--border); border-radius: 4px;
+    color: var(--ink-faint); font-size: 10px; cursor: pointer; width: 100%;
+    padding: 3px 0; margin-top: 2px; font-family: 'DM Sans',sans-serif; transition: all 0.1s;
+  }
+  .fitness-week-add:hover { border-color: var(--accent); color: var(--accent); }
+  .fitness-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .fitness-month-day-hdr {
+    text-align: center; font-size: 9px; font-family: 'DM Mono',monospace;
+    color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; padding: 4px 0;
+  }
+  .fitness-month-cell {
+    background: var(--paper); border-radius: var(--radius-sm); border: 1px solid var(--border);
+    padding: 4px; min-height: 52px; cursor: pointer; transition: all 0.1s; position: relative;
+  }
+  .fitness-month-cell:hover { border-color: var(--accent); box-shadow: 0 1px 4px var(--shadow-md); }
+  .fitness-month-cell.today { border-color: var(--accent); background: var(--accent-light); }
+  .fitness-month-cell.empty { background: transparent; border-color: transparent; cursor: default; pointer-events: none; }
+  .fitness-month-cell-num { font-size: 11px; font-family: 'DM Mono',monospace; color: var(--ink-light); font-weight: 600; }
+  .fitness-month-cell.today .fitness-month-cell-num { color: var(--accent); }
+  .fitness-month-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: inline-block; margin: 1px 1px 0; }
+  .fitness-goal-row { margin-bottom: 10px; }
+  .fitness-goal-label { font-size: 11px; font-family: 'DM Sans',sans-serif; color: var(--ink); font-weight: 500; margin-bottom: 3px; display: flex; justify-content: space-between; align-items: center; }
+  .fitness-goal-bar-bg { height: 6px; background: var(--cream); border-radius: 3px; overflow: hidden; }
+  .fitness-goal-bar-fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.3s; }
+  .fitness-goal-bar-fill.done { background: var(--gold); }
+  .fitness-goal-meta { font-size: 9px; font-family: 'DM Mono',monospace; color: var(--ink-faint); margin-top: 2px; }
 
   /* TASK CARDS */
   .task-card {
@@ -5002,7 +5063,7 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
 // ─────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────
-const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData','weightTarget','calsTarget','peopleDirectory','fitnessLog','fitnessExercises'];
+const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData','weightTarget','calsTarget','peopleDirectory','fitnessLog','fitnessExercises','fitnessGoals'];
 
 function App() {
   const [page, setPageRaw] = useState(() => sessionStorage.getItem('lp_page') || 'planner');
@@ -5027,6 +5088,7 @@ function App() {
   const [peopleDirectory, setPeopleDirectory] = useStorage('peopleDirectory', []); // [{id, name}] — master list across weeks
   const [fitnessLog, setFitnessLog] = useStorage('fitnessLog', {}); // {[dateKey]: [{id, name, exercises:[{id, exerciseId, sets:[{id,reps,weight,done}]}]}]}
   const [fitnessExercises, setFitnessExercises] = useStorage('fitnessExercises', []); // [{id, name, category}] library
+  const [fitnessGoals, setFitnessGoals] = useStorage('fitnessGoals', []); // [{id, exerciseId, period, target, unit}]
 
   // Auth state
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
@@ -5069,6 +5131,7 @@ function App() {
       if (data.peopleDirectory) setPeopleDirectory(data.peopleDirectory);
       if (data.fitnessLog) setFitnessLog(data.fitnessLog);
       if (data.fitnessExercises) setFitnessExercises(data.fitnessExercises);
+      if (data.fitnessGoals) setFitnessGoals(data.fitnessGoals);
       setDriveFileId(fileId); // set last to arm the save effect
       setAuthError(false);
       setSaveStatus('saved');
@@ -5146,7 +5209,7 @@ function App() {
   useEffect(() => {
     if (!driveFileId) return;
     scheduleSave(driveFileId);
-  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, habitMetrics, habitQty, habitNotes, monthlyGoals, pagesData, foldersData, peopleDirectory, fitnessLog, fitnessExercises, driveFileId]);
+  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, habitMetrics, habitQty, habitNotes, monthlyGoals, pagesData, foldersData, peopleDirectory, fitnessLog, fitnessExercises, fitnessGoals, driveFileId]);
 
   // On mount: restore session from localStorage token or silent Worker refresh
   useEffect(() => {
@@ -5371,7 +5434,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.0.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.1.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5456,7 +5519,7 @@ function App() {
         calsTarget={calsTarget} setCalsTarget={setCalsTarget}
         onBack={()=>setPage('habit')} />}
       {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} foldersData={foldersData} setFoldersData={setFoldersData} weekData={weekData} setWeekData={setWeekData} selectedId={selectedPagesId} setSelectedId={setSelectedPagesId} />}
-      {page==='fitness' && <FitnessView fitnessLog={fitnessLog} setFitnessLog={setFitnessLog} fitnessExercises={fitnessExercises} setFitnessExercises={setFitnessExercises} />}
+      {page==='fitness' && <FitnessView fitnessLog={fitnessLog} setFitnessLog={setFitnessLog} fitnessExercises={fitnessExercises} setFitnessExercises={setFitnessExercises} fitnessGoals={fitnessGoals} setFitnessGoals={setFitnessGoals} />}
       </div>
 
       {/* Mobile bottom nav — only visible on phones via CSS */}
@@ -5493,272 +5556,202 @@ function App() {
 const FITNESS_CATEGORIES = ['Strength','Cardio','Mobility','Sport','Other'];
 const UNCATEGORIZED = 'Other';
 
-function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessExercises }) {
+function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessExercises, fitnessGoals, setFitnessGoals }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDate] = useState(today);
-  const [showExPicker, setShowExPicker] = useState(null); // {workoutId} when open
+  const [fitView, setFitView] = useState('day'); // 'day' | 'week' | 'month'
+  const [showExPicker, setShowExPicker] = useState(null);
   const [showLibManager, setShowLibManager] = useState(false);
-  const [libSearch, setLibSearch] = useState('');
+  const [showGoalManager, setShowGoalManager] = useState(false);
 
   const dateKey = fmt(selectedDate);
-  const workouts = fitnessLog[dateKey] || [];
+  const weekStart = getWeekStart(selectedDate);
+  const weekDays = Array.from({length:7}, (_,i) => addDays(weekStart, i));
 
-  // ── Log helpers ──────────────────────────────
-  function setDayWorkouts(fn) {
+  // Month grid
+  const viewYear = selectedDate.getFullYear();
+  const viewMonth = selectedDate.getMonth();
+  const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
+  const daysInMonth = new Date(viewYear, viewMonth+1, 0).getDate();
+
+  // ── Log helpers ──
+  function setDayWorkouts(dk, fn) {
     setFitnessLog(log => {
-      const cur = log[dateKey] || [];
+      const cur = log[dk] || [];
       const next = typeof fn === 'function' ? fn(cur) : fn;
-      return { ...log, [dateKey]: next };
+      return { ...log, [dk]: next };
     });
   }
-
-  function addWorkout() {
+  function addWorkout(dk) {
     const id = 'w' + Date.now();
-    setDayWorkouts(ws => [...ws, { id, name: 'Workout', exercises: [] }]);
+    setDayWorkouts(dk, ws => [...ws, { id, name: 'Workout', exercises: [] }]);
+    if (fitView !== 'day') { setSelectedDate(new Date(dk+'T00:00:00')); setFitView('day'); }
   }
-
-  function updateWorkout(wid, patch) {
-    setDayWorkouts(ws => ws.map(w => w.id === wid ? { ...w, ...patch } : w));
-  }
-
-  function deleteWorkout(wid) {
-    setDayWorkouts(ws => ws.filter(w => w.id !== wid));
-  }
-
-  function addExerciseToWorkout(wid, exerciseId) {
-    const ex = fitnessExercises.find(e => e.id === exerciseId);
+  function updateWorkout(dk, wid, patch) { setDayWorkouts(dk, ws => ws.map(w => w.id===wid ? {...w,...patch} : w)); }
+  function deleteWorkout(dk, wid) { setDayWorkouts(dk, ws => ws.filter(w => w.id!==wid)); }
+  function addExerciseToWorkout(dk, wid, exerciseId) {
+    const ex = fitnessExercises.find(e => e.id===exerciseId);
     if (!ex) return;
-    const newEx = { id: 'ex' + Date.now(), exerciseId, sets: [{ id: 's' + Date.now(), reps: '', weight: '', done: false }] };
-    setDayWorkouts(ws => ws.map(w => w.id === wid ? { ...w, exercises: [...w.exercises, newEx] } : w));
+    const newEx = { id:'ex'+Date.now(), exerciseId, sets:[{id:'s'+Date.now(), reps:'', weight:'', done:false}] };
+    setDayWorkouts(dk, ws => ws.map(w => w.id===wid ? {...w, exercises:[...w.exercises, newEx]} : w));
   }
-
-  function deleteExercise(wid, exId) {
-    setDayWorkouts(ws => ws.map(w => w.id === wid ? { ...w, exercises: w.exercises.filter(e => e.id !== exId) } : w));
+  function deleteExercise(dk, wid, exId) { setDayWorkouts(dk, ws => ws.map(w => w.id===wid ? {...w, exercises:w.exercises.filter(e=>e.id!==exId)} : w)); }
+  function updateSet(dk, wid, exId, setId, patch) {
+    setDayWorkouts(dk, ws => ws.map(w => w.id!==wid ? w : {
+      ...w, exercises: w.exercises.map(e => e.id!==exId ? e : {
+        ...e, sets: e.sets.map(s => s.id!==setId ? s : {...s,...patch})
+      })
+    }));
   }
-
-  function updateSet(wid, exId, setId, patch) {
-    setDayWorkouts(ws => ws.map(w => w.id !== wid ? w : {
-      ...w, exercises: w.exercises.map(e => e.id !== exId ? e : {
-        ...e, sets: e.sets.map(s => s.id !== setId ? s : { ...s, ...patch })
+  function addSet(dk, wid, exId) {
+    setDayWorkouts(dk, ws => ws.map(w => w.id!==wid ? w : {
+      ...w, exercises: w.exercises.map(e => e.id!==exId ? e : {
+        ...e, sets:[...e.sets, {id:'s'+Date.now(), reps:'', weight:'', done:false}]
+      })
+    }));
+  }
+  function deleteSet(dk, wid, exId, setId) {
+    setDayWorkouts(dk, ws => ws.map(w => w.id!==wid ? w : {
+      ...w, exercises: w.exercises.map(e => e.id!==exId ? e : {
+        ...e, sets:e.sets.filter(s=>s.id!==setId)
       })
     }));
   }
 
-  function addSet(wid, exId) {
-    setDayWorkouts(ws => ws.map(w => w.id !== wid ? w : {
-      ...w, exercises: w.exercises.map(e => e.id !== exId ? e : {
-        ...e, sets: [...e.sets, { id: 's' + Date.now(), reps: '', weight: '', done: false }]
-      })
-    }));
-  }
-
-  function deleteSet(wid, exId, setId) {
-    setDayWorkouts(ws => ws.map(w => w.id !== wid ? w : {
-      ...w, exercises: w.exercises.map(e => e.id !== exId ? e : {
-        ...e, sets: e.sets.filter(s => s.id !== setId)
-      })
-    }));
-  }
-
-  // ── Exercise library helpers ──────────────────
+  // ── Library helpers ──
   function addExercise(name, category) {
     if (!name.trim()) return;
-    const id = 'e' + Date.now();
-    setFitnessExercises(es => [...es, { id, name: name.trim(), category: category || UNCATEGORIZED }]);
+    const id = 'e'+Date.now();
+    setFitnessExercises(es => [...es, {id, name:name.trim(), category:category||UNCATEGORIZED}]);
     return id;
   }
+  function updateExercise(id, patch) { setFitnessExercises(es => es.map(e => e.id===id ? {...e,...patch} : e)); }
+  function deleteExercise_lib(id) { setFitnessExercises(es => es.filter(e => e.id!==id)); }
 
-  function updateExercise(id, patch) {
-    setFitnessExercises(es => es.map(e => e.id === id ? { ...e, ...patch } : e));
+  // ── Goals helpers ──
+  function addGoal(exerciseId, period, target, unit) {
+    if (!exerciseId || !target) return;
+    setFitnessGoals(gs => [...gs, {id:'fg'+Date.now(), exerciseId, period, target:parseFloat(target), unit}]);
+  }
+  function deleteGoal(id) { setFitnessGoals(gs => gs.filter(g => g.id!==id)); }
+
+  // Compute progress for a goal
+  function goalProgress(goal) {
+    const now = new Date(); now.setHours(0,0,0,0);
+    let startDk, endDk;
+    if (goal.period === 'week') {
+      const ws = getWeekStart(now);
+      startDk = fmt(ws); endDk = fmt(addDays(ws,6));
+    } else if (goal.period === 'month') {
+      const y=now.getFullYear(), m=now.getMonth();
+      startDk = fmt(new Date(y,m,1)); endDk = fmt(new Date(y,m+1,0));
+    } else {
+      startDk = fmt(new Date(now.getFullYear(),0,1));
+      endDk = fmt(new Date(now.getFullYear(),11,31));
+    }
+    let total = 0;
+    Object.entries(fitnessLog).forEach(([dk, workouts]) => {
+      if (dk < startDk || dk > endDk) return;
+      (workouts||[]).forEach(w => {
+        w.exercises.forEach(ex => {
+          if (ex.exerciseId !== goal.exerciseId) return;
+          const doneSets = ex.sets.filter(s => s.done);
+          if (goal.unit === 'sets') { total += doneSets.length; }
+          else if (goal.unit === 'reps') { total += doneSets.reduce((a,s) => a+(parseFloat(s.reps)||0), 0); }
+          else if (goal.unit === 'volume') { total += doneSets.reduce((a,s) => a+(parseFloat(s.reps)||0)*(parseFloat(s.weight)||0), 0); }
+        });
+      });
+    });
+    return Math.round(total*10)/10;
   }
 
-  function deleteExercise_lib(id) {
-    setFitnessExercises(es => es.filter(e => e.id !== id));
-  }
-
-  // ── Stats helpers ────────────────────────────
+  // ── Stats helpers ──
   function exStats(workout, exId) {
-    const ex = workout.exercises.find(e => e.id === exId);
-    if (!ex) return { done: 0, total: ex?.sets.length || 0, volume: 0 };
+    const ex = workout.exercises.find(e => e.id===exId);
+    if (!ex) return {done:0, total:0, volume:0};
     const doneSets = ex.sets.filter(s => s.done);
-    const volume = doneSets.reduce((acc, s) => {
-      const r = parseFloat(s.reps) || 0;
-      const w = parseFloat(s.weight) || 0;
-      return acc + (w > 0 ? r * w : r);
+    const hasWeight = doneSets.some(s => parseFloat(s.weight)>0);
+    const volume = doneSets.reduce((acc,s) => {
+      const r=parseFloat(s.reps)||0, w=parseFloat(s.weight)||0;
+      return acc + (w>0 ? r*w : r);
     }, 0);
-    return { done: doneSets.length, total: ex.sets.length, volume: Math.round(volume) };
+    return {done:doneSets.length, total:ex.sets.length, volume:Math.round(volume), hasWeight};
   }
+  function exName(exerciseId) { return fitnessExercises.find(e=>e.id===exerciseId)?.name||'Unknown'; }
 
-  function exName(exerciseId) {
-    return fitnessExercises.find(e => e.id === exerciseId)?.name || 'Unknown';
-  }
-
-  // ── Grouped library for sidebar ──────────────
-  const categorized = FITNESS_CATEGORIES.reduce((acc, cat) => {
-    const items = fitnessExercises.filter(e => (e.category || UNCATEGORIZED) === cat);
-    if (items.length) acc[cat] = items;
+  const categorized = FITNESS_CATEGORIES.reduce((acc,cat) => {
+    const items = fitnessExercises.filter(e=>(e.category||UNCATEGORIZED)===cat);
+    if (items.length) acc[cat]=items;
     return acc;
   }, {});
 
-  // ── Render ───────────────────────────────────
-  return (
-    <div className="fitness-layout">
-
-      {/* ── DESKTOP SIDEBAR ── */}
-      <div className="fitness-sidebar">
-        <div className="fitness-day-nav" style={{marginBottom:16}}>
-          <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,-1))}>‹</button>
-          <div>
-            <div className="fitness-day-label" style={{fontSize:13}}>
-              {DAYS[selectedDate.getDay()].slice(0,3)}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}
-            </div>
-            <div className="fitness-day-sub">{selectedDate.getFullYear()}</div>
-          </div>
-          <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,1))}>›</button>
-        </div>
-
-        {/* Library header */}
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
-          <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Exercise Library</span>
-          <button className="add-btn" onClick={()=>setShowLibManager(true)} title="Manage library">⚙</button>
-        </div>
-
-        {fitnessExercises.length === 0 && (
-          <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px 6px'}}>
-            No exercises yet — click ⚙ to add
-          </div>
-        )}
-        {Object.entries(categorized).map(([cat, items]) => (
-          <div key={cat}>
-            <div className="ex-lib-cat">{cat}</div>
-            {items.map(ex => (
-              <div key={ex.id} className="ex-lib-item">
-                <span style={{fontSize:11,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ex.name}</span>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-
-      {/* ── MAIN LOG AREA ── */}
-      <div className="fitness-main">
-
-        {/* Mobile date nav */}
-        <div className="fitness-day-nav" style={{display:'none'}} id="fitness-mobile-nav">
-          <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,-1))}>‹</button>
-          <div>
-            <div className="fitness-day-label">
-              {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}, {selectedDate.getFullYear()}
-            </div>
-          </div>
-          <button className="nav-arrow" onClick={()=>setSelectedDate(d=>addDays(d,1))}>›</button>
-        </div>
-
-        {/* Mobile-only date + add row */}
-        <div style={{display:'flex',alignItems:'center',gap:10}}>
-          <div style={{flex:1}}>
-            <div className="fitness-day-label">
-              {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()].slice(0,3)} {selectedDate.getDate()}, {selectedDate.getFullYear()}
-            </div>
-          </div>
-          <button onClick={addWorkout}
-            style={{background:'var(--accent)',color:'white',border:'none',borderRadius:'var(--radius-md)',
-              padding:'7px 16px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:"'DM Sans',sans-serif",
-              flexShrink:0}}>
-            + Workout
-          </button>
-        </div>
-
-        {workouts.length === 0 && (
+  // ── Day view render helper ──
+  function renderDayWorkouts(dk) {
+    const dayWorkouts = fitnessLog[dk] || [];
+    return (
+      <div style={{display:'flex',flexDirection:'column',gap:16}}>
+        {dayWorkouts.length===0 && (
           <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)',fontSize:13,fontStyle:'italic'}}>
-            No workouts logged for this day.<br/>
-            <span style={{fontSize:11}}>Tap "+ Workout" to start.</span>
+            No workouts logged for this day.<br/><span style={{fontSize:11}}>Tap "+ Workout" to start.</span>
           </div>
         )}
-
-        {workouts.map(workout => (
+        {dayWorkouts.map(workout => (
           <div key={workout.id} className="workout-card">
-            {/* Workout header */}
             <div className="workout-card-header">
-              <input className="workout-name-input"
-                value={workout.name}
-                onChange={e=>updateWorkout(workout.id,{name:e.target.value})}
+              <input className="workout-name-input" value={workout.name}
+                onChange={e=>updateWorkout(dk,workout.id,{name:e.target.value})}
                 placeholder="Workout name…"
               />
               <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--accent)',opacity:0.7}}>
                 {workout.exercises.reduce((a,ex)=>a+ex.sets.filter(s=>s.done).length,0)}/
                 {workout.exercises.reduce((a,ex)=>a+ex.sets.length,0)} sets
               </span>
-              <button onClick={()=>deleteWorkout(workout.id)}
-                style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',
-                  padding:'0 2px',lineHeight:1,opacity:0.5}}
-                title="Delete workout">✕</button>
+              <button onClick={()=>deleteWorkout(dk,workout.id)}
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 2px',lineHeight:1,opacity:0.5}}>✕</button>
             </div>
-
-            {/* Exercises */}
             {workout.exercises.map(ex => {
               const stats = exStats(workout, ex.id);
-              const name = exName(ex.exerciseId);
               return (
                 <div key={ex.id} className="exercise-block">
                   <div className="exercise-header">
-                    <span className="exercise-name">{name}</span>
-                    {stats.done > 0 && (
+                    <span className="exercise-name">{exName(ex.exerciseId)}</span>
+                    {stats.done>0 && (
                       <span className="fitness-stat-pill">
-                        {stats.done}/{stats.total} sets
-                        {stats.volume > 0 && ` · ${stats.volume.toLocaleString()} ${stats.done > 0 && ex.sets.find(s=>s.done && parseFloat(s.weight)>0) ? 'lbs' : 'reps'}`}
+                        {stats.done}/{stats.total} sets{stats.volume>0 && ` · ${stats.volume.toLocaleString()} ${stats.hasWeight?'lbs':'reps'}`}
                       </span>
                     )}
-                    <button onClick={()=>addSet(workout.id, ex.id)}
-                      style={{background:'none',border:'1px solid var(--border)',borderRadius:4,cursor:'pointer',
-                        fontSize:10,color:'var(--ink-light)',padding:'2px 6px',fontFamily:"'DM Sans',sans-serif"}}>
+                    <button onClick={()=>addSet(dk,workout.id,ex.id)}
+                      style={{background:'none',border:'1px solid var(--border)',borderRadius:4,cursor:'pointer',fontSize:10,color:'var(--ink-light)',padding:'2px 6px',fontFamily:"'DM Sans',sans-serif"}}>
                       + Set
                     </button>
-                    <button onClick={()=>deleteExercise(workout.id, ex.id)}
-                      style={{background:'none',border:'none',cursor:'pointer',fontSize:12,
-                        color:'var(--ink-faint)',padding:'0 2px',opacity:0.5}}>✕</button>
+                    <button onClick={()=>deleteExercise(dk,workout.id,ex.id)}
+                      style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:'var(--ink-faint)',padding:'0 2px',opacity:0.5}}>✕</button>
                   </div>
-
-                  {/* Set column headers */}
-                  <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',
-                    borderBottom:'1px solid var(--border)',marginBottom:2}}>
+                  <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:2}}>
                     <span className="set-num"></span>
                     <span className="set-label" style={{width:52,textAlign:'center'}}>Reps</span>
                     <span className="set-label" style={{width:52,textAlign:'center',marginLeft:18}}>Weight</span>
                     <span className="set-label" style={{marginLeft:'auto',marginRight:2}}>Done</span>
                   </div>
-
-                  {/* Set rows */}
-                  {ex.sets.map((set, si) => (
+                  {ex.sets.map((set,si) => (
                     <div key={set.id} className={`set-row ${set.done?'done':''}`}>
                       <span className="set-num">{si+1}</span>
-                      <input type="number" min="0" className="set-input" placeholder="—"
-                        value={set.reps}
-                        onChange={e=>updateSet(workout.id,ex.id,set.id,{reps:e.target.value})}
-                        style={{opacity:set.done?0.6:1}}
-                      />
+                      <input type="number" min="0" className="set-input" placeholder="—" value={set.reps}
+                        onChange={e=>updateSet(dk,workout.id,ex.id,set.id,{reps:e.target.value})} style={{opacity:set.done?0.6:1}}/>
                       <span className="set-label">×</span>
-                      <input type="number" min="0" className="set-input" placeholder="—"
-                        value={set.weight}
-                        onChange={e=>updateSet(workout.id,ex.id,set.id,{weight:e.target.value})}
-                        style={{opacity:set.done?0.6:1}}
-                      />
+                      <input type="number" min="0" className="set-input" placeholder="—" value={set.weight}
+                        onChange={e=>updateSet(dk,workout.id,ex.id,set.id,{weight:e.target.value})} style={{opacity:set.done?0.6:1}}/>
                       <span className="set-label">lbs</span>
-                      <div className={`set-check ${set.done?'done':''}`}
-                        onClick={()=>updateSet(workout.id,ex.id,set.id,{done:!set.done})} />
-                      <button onClick={()=>deleteSet(workout.id,ex.id,set.id)}
-                        style={{background:'none',border:'none',cursor:'pointer',fontSize:11,
-                          color:'var(--ink-faint)',padding:'0 2px',opacity:0.35,marginLeft:2,lineHeight:1}}
-                        title="Remove set">✕</button>
+                      <div className={`set-check ${set.done?'done':''}`} onClick={()=>updateSet(dk,workout.id,ex.id,set.id,{done:!set.done})}/>
+                      <button onClick={()=>deleteSet(dk,workout.id,ex.id,set.id)}
+                        style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',opacity:0.35,marginLeft:2,lineHeight:1}}>✕</button>
                     </div>
                   ))}
                 </div>
               );
             })}
-
-            {/* Add exercise button */}
             <div style={{padding:'8px 14px'}}>
-              <button onClick={()=>setShowExPicker({workoutId:workout.id})}
+              <button onClick={()=>setShowExPicker({workoutId:workout.id, dk})}
                 style={{background:'none',border:'1px dashed var(--border)',borderRadius:'var(--radius-sm)',
                   cursor:'pointer',fontSize:11,color:'var(--ink-light)',padding:'5px 12px',width:'100%',
                   fontFamily:"'DM Sans',sans-serif",transition:'all 0.1s'}}
@@ -5770,29 +5763,205 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           </div>
         ))}
       </div>
+    );
+  }
 
-      {/* ── EXERCISE PICKER MODAL ── */}
+  return (
+    <div className="fitness-layout">
+      {/* SIDEBAR */}
+      <div className="fitness-sidebar">
+        {/* Date nav */}
+        <div className="fitness-day-nav" style={{marginBottom:12}}>
+          <button className="nav-arrow" onClick={()=>{
+            if(fitView==='day') setSelectedDate(d=>addDays(d,-1));
+            else if(fitView==='week') setSelectedDate(d=>addDays(d,-7));
+            else setSelectedDate(d=>new Date(d.getFullYear(),d.getMonth()-1,1));
+          }}>‹</button>
+          <div style={{textAlign:'center'}}>
+            <div className="fitness-day-label" style={{fontSize:12}}>
+              {fitView==='day'
+                ? `${DAYS[selectedDate.getDay()].slice(0,3)}, ${MONTHS[selectedDate.getMonth()].slice(0,3)} ${selectedDate.getDate()}`
+                : fitView==='week'
+                  ? `${MONTHS[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()} – ${MONTHS[addDays(weekStart,6).getMonth()].slice(0,3)} ${addDays(weekStart,6).getDate()}`
+                  : `${MONTHS[viewMonth]} ${viewYear}`}
+            </div>
+            <div className="fitness-day-sub">{viewYear}</div>
+          </div>
+          <button className="nav-arrow" onClick={()=>{
+            if(fitView==='day') setSelectedDate(d=>addDays(d,1));
+            else if(fitView==='week') setSelectedDate(d=>addDays(d,7));
+            else setSelectedDate(d=>new Date(d.getFullYear(),d.getMonth()+1,1));
+          }}>›</button>
+        </div>
+
+        {/* Goals section */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+          <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Goals</span>
+          <button className="add-btn" onClick={()=>setShowGoalManager(true)} title="Manage goals">+</button>
+        </div>
+        {fitnessGoals.length===0 && (
+          <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'2px 6px',marginBottom:10}}>
+            No goals yet — tap + to add
+          </div>
+        )}
+        {fitnessGoals.map(goal => {
+          const progress = goalProgress(goal);
+          const pct = Math.min(100, (progress/goal.target)*100);
+          const done = pct >= 100;
+          const exLabel = fitnessExercises.find(e=>e.id===goal.exerciseId)?.name || 'Unknown';
+          return (
+            <div key={goal.id} className="fitness-goal-row">
+              <div className="fitness-goal-label">
+                <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{exLabel}</span>
+                <button onClick={()=>deleteGoal(goal.id)}
+                  style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',flexShrink:0,opacity:0.5}}>✕</button>
+              </div>
+              <div className="fitness-goal-bar-bg">
+                <div className={`fitness-goal-bar-fill ${done?'done':''}`} style={{width:`${pct}%`}}/>
+              </div>
+              <div className="fitness-goal-meta">
+                {progress.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit} · {goal.period}
+                {done && ' 🎉'}
+              </div>
+            </div>
+          );
+        })}
+
+        <div style={{borderTop:'1px solid var(--border)',marginTop:8,paddingTop:8}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:6}}>
+            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>Exercise Library</span>
+            <button className="add-btn" onClick={()=>setShowLibManager(true)} title="Manage library">⚙</button>
+          </div>
+          {fitnessExercises.length===0 && (
+            <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px 6px'}}>No exercises yet — click ⚙</div>
+          )}
+          {Object.entries(categorized).map(([cat,items]) => (
+            <div key={cat}>
+              <div className="ex-lib-cat">{cat}</div>
+              {items.map(ex => (
+                <div key={ex.id} className="ex-lib-item">
+                  <span style={{fontSize:11,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{ex.name}</span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* MAIN */}
+      <div className="fitness-main">
+        {/* Header row: date label + view tabs + add button */}
+        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+          <div style={{flex:1,minWidth:0}}>
+            <div className="fitness-day-label">
+              {fitView==='day'
+                ? `${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()].slice(0,3)} ${selectedDate.getDate()}, ${viewYear}`
+                : fitView==='week'
+                  ? `Week of ${MONTHS[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()}`
+                  : `${MONTHS[viewMonth]} ${viewYear}`}
+            </div>
+          </div>
+          <div className="fitness-view-tabs">
+            {['day','week','month'].map(v => (
+              <button key={v} className={`fitness-view-tab ${fitView===v?'active':''}`}
+                onClick={()=>setFitView(v)}>
+                {v.charAt(0).toUpperCase()+v.slice(1)}
+              </button>
+            ))}
+          </div>
+          {fitView==='day' && (
+            <button onClick={()=>addWorkout(dateKey)}
+              style={{background:'var(--accent)',color:'white',border:'none',borderRadius:'var(--radius-md)',
+                padding:'7px 16px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:"'DM Sans',sans-serif",flexShrink:0}}>
+              + Workout
+            </button>
+          )}
+        </div>
+
+        {/* ── DAY VIEW ── */}
+        {fitView==='day' && renderDayWorkouts(dateKey)}
+
+        {/* ── WEEK VIEW ── */}
+        {fitView==='week' && (
+          <div className="fitness-week-grid">
+            {weekDays.map(d => {
+              const dk = fmt(d);
+              const isToday = isSameDay(d, today);
+              const dayWorkouts = fitnessLog[dk] || [];
+              return (
+                <div key={dk} className={`fitness-week-col ${isToday?'today':''}`}
+                  onClick={()=>{ setSelectedDate(d); setFitView('day'); }}>
+                  <div className="fitness-week-col-hdr">
+                    <div className="fitness-week-col-day">{DAYS[d.getDay()].slice(0,3)}</div>
+                    <div className="fitness-week-col-date">{d.getDate()}</div>
+                  </div>
+                  <div className="fitness-week-col-body">
+                    {dayWorkouts.map(w => (
+                      <div key={w.id} className="fitness-week-workout-pill" title={w.name}>
+                        {w.name}
+                      </div>
+                    ))}
+                    {dayWorkouts.length===0 && (
+                      <div style={{fontSize:9,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px 0',textAlign:'center'}}>Rest</div>
+                    )}
+                    <button className="fitness-week-add"
+                      onClick={e=>{e.stopPropagation(); addWorkout(dk);}}
+                      title="Add workout">
+                      + Add
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── MONTH VIEW ── */}
+        {fitView==='month' && (
+          <div>
+            <div className="fitness-month-grid" style={{marginBottom:4}}>
+              {DAYS.map(d => <div key={d} className="fitness-month-day-hdr">{d.slice(0,1)}</div>)}
+            </div>
+            <div className="fitness-month-grid">
+              {Array.from({length:firstDayOfMonth},(_,i)=>(
+                <div key={'empty'+i} className="fitness-month-cell empty"/>
+              ))}
+              {Array.from({length:daysInMonth},(_,i)=>{
+                const d = new Date(viewYear, viewMonth, i+1);
+                const dk = fmt(d);
+                const isToday = isSameDay(d, today);
+                const dayWorkouts = fitnessLog[dk] || [];
+                return (
+                  <div key={dk} className={`fitness-month-cell ${isToday?'today':''}`}
+                    onClick={()=>{ setSelectedDate(d); setFitView('day'); }}>
+                    <div className="fitness-month-cell-num">{i+1}</div>
+                    <div style={{marginTop:3}}>
+                      {dayWorkouts.map(w => (
+                        <span key={w.id} className="fitness-month-dot" title={w.name}/>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* EXERCISE PICKER MODAL */}
       {showExPicker && (
         <ExercisePicker
           exercises={fitnessExercises}
-          onAdd={(exerciseId) => {
-            addExerciseToWorkout(showExPicker.workoutId, exerciseId);
-            setShowExPicker(null);
-          }}
-          onAddNew={(name, category) => {
+          onAdd={exerciseId => { addExerciseToWorkout(showExPicker.dk||dateKey, showExPicker.workoutId, exerciseId); setShowExPicker(null); }}
+          onAddNew={(name,category) => {
             const id = addExercise(name, category);
-            if (id) {
-              setTimeout(() => {
-                addExerciseToWorkout(showExPicker.workoutId, id);
-                setShowExPicker(null);
-              }, 50);
-            }
+            if (id) setTimeout(()=>{ addExerciseToWorkout(showExPicker.dk||dateKey, showExPicker.workoutId, id); setShowExPicker(null); }, 50);
           }}
           onClose={()=>setShowExPicker(null)}
         />
       )}
 
-      {/* ── LIBRARY MANAGER MODAL ── */}
+      {/* LIBRARY MANAGER MODAL */}
       {showLibManager && (
         <ExerciseLibraryManager
           exercises={fitnessExercises}
@@ -5802,6 +5971,108 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           onClose={()=>setShowLibManager(false)}
         />
       )}
+
+      {/* GOAL MANAGER MODAL */}
+      {showGoalManager && (
+        <GoalManager
+          goals={fitnessGoals}
+          exercises={fitnessExercises}
+          onAdd={addGoal}
+          onDelete={deleteGoal}
+          onClose={()=>setShowGoalManager(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// GOAL MANAGER — add/remove fitness goals
+// ─────────────────────────────────────────────
+function GoalManager({ goals, exercises, onAdd, onDelete, onClose }) {
+  const [exId, setExId] = useState(exercises[0]?.id || '');
+  const [period, setPeriod] = useState('month');
+  const [target, setTarget] = useState('');
+  const [unit, setUnit] = useState('reps');
+
+  return (
+    <div className="fitness-picker-overlay" onClick={onClose}>
+      <div className="fitness-picker-modal" style={{width:340,maxHeight:500}} onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+          padding:'14px 16px 10px',borderBottom:'1px solid var(--border)',flexShrink:0}}>
+          <span style={{fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,color:'var(--ink)'}}>Fitness Goals</span>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',fontSize:16,color:'var(--ink-faint)',lineHeight:1}}>✕</button>
+        </div>
+
+        {/* Existing goals */}
+        <div style={{flex:1,overflowY:'auto',padding:'8px 12px'}}>
+          {goals.length===0 && <div style={{fontSize:12,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px'}}>No goals yet</div>}
+          {goals.map(g => {
+            const exName = exercises.find(e=>e.id===g.exerciseId)?.name||'Unknown';
+            return (
+              <div key={g.id} style={{display:'flex',alignItems:'center',gap:8,padding:'6px 4px',borderRadius:6,
+                borderBottom:'1px solid var(--border)'}}
+                onMouseEnter={e=>e.currentTarget.style.background='var(--cream)'}
+                onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,color:'var(--ink)'}}>{exName}</div>
+                  <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
+                    {g.target.toLocaleString()} {g.unit} / {g.period}
+                  </div>
+                </div>
+                <button onClick={()=>onDelete(g.id)}
+                  style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 4px',opacity:0.6}}>✕</button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Add new goal */}
+        <div style={{padding:'10px 12px 12px',borderTop:'1px solid var(--border)',flexShrink:0}}>
+          <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:8,textTransform:'uppercase',letterSpacing:'0.05em'}}>New goal:</div>
+          {exercises.length===0 ? (
+            <div style={{fontSize:12,color:'var(--ink-faint)',fontStyle:'italic'}}>Add exercises to the library first</div>
+          ) : (
+            <div style={{display:'flex',flexDirection:'column',gap:7}}>
+              <select value={exId} onChange={e=>setExId(e.target.value)}
+                style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
+                  borderRadius:'var(--radius-sm)',padding:'5px 8px',background:'white',color:'var(--ink)',outline:'none'}}>
+                {exercises.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+              <div style={{display:'flex',gap:6}}>
+                <select value={period} onChange={e=>setPeriod(e.target.value)}
+                  style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
+                    borderRadius:'var(--radius-sm)',padding:'5px 6px',background:'white',color:'var(--ink)',outline:'none'}}>
+                  <option value="week">Per Week</option>
+                  <option value="month">Per Month</option>
+                  <option value="year">Per Year</option>
+                </select>
+                <select value={unit} onChange={e=>setUnit(e.target.value)}
+                  style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
+                    borderRadius:'var(--radius-sm)',padding:'5px 6px',background:'white',color:'var(--ink)',outline:'none'}}>
+                  <option value="reps">Reps</option>
+                  <option value="sets">Sets</option>
+                  <option value="volume">Volume (lbs)</option>
+                </select>
+              </div>
+              <div style={{display:'flex',gap:6}}>
+                <input type="number" min="1" value={target} onChange={e=>setTarget(e.target.value)}
+                  placeholder="Target amount"
+                  style={{flex:1,fontSize:12,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',
+                    borderRadius:'var(--radius-sm)',padding:'5px 8px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+                />
+                <button onClick={()=>{ if(exId&&target){onAdd(exId,period,target,unit);setTarget('');} }}
+                  disabled={!exId||!target}
+                  style={{background:exId&&target?'var(--accent)':'var(--border)',border:'none',
+                    borderRadius:'var(--radius-sm)',padding:'5px 16px',cursor:exId&&target?'pointer':'default',
+                    fontSize:12,fontWeight:600,color:exId&&target?'white':'var(--ink-faint)'}}>
+                  Add
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
