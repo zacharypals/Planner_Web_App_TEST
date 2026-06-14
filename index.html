@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.4.4 -->
+<!-- LP Planner v3.10.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-512.png">
-<meta name="theme-color" content="#3b1f5e">
+<meta name="theme-color" content="#7c3f6e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="LP Planner">
@@ -22,13 +22,13 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --cream: #f4f2ee;
-    --paper: #faf9f7;
+    --cream: #f5edf3;
+    --paper: #fdf9fc;
     --ink: #2c2418;
     --ink-light: #78716a;
     --ink-faint: #bfb8ad;
     --accent: #2d6b4a;
-    --accent-light: #eaf5ef;
+    --accent-light: #f5edf3;
     --gold: #c4960e;
     --gold-light: #fdf8ec;
     --border: #e8e4dd;
@@ -60,7 +60,7 @@
   /* LAYOUT */
   .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
   .nav-bar {
-    background: linear-gradient(135deg, #1a3528 0%, #2a5038 100%);
+    background: linear-gradient(135deg, #5c2d52 0%, #7c3f6e 100%);
     color: var(--paper);
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 24px; height: 48px; flex-shrink: 0;
@@ -276,7 +276,7 @@
     padding: 10px; position: relative; background: var(--paper);
     transition: background 0.15s, box-shadow 0.15s; min-height: 200px;
   }
-  .cal-day:hover { background: #f8f5ef; box-shadow: inset 0 0 0 1px var(--border); }
+  .cal-day:hover { background: #f5edf3; box-shadow: inset 0 0 0 1px var(--border); }
   .cal-day.today { background: var(--gold-light); }
   .add-task-btn {
     width: 100%; border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
@@ -310,13 +310,13 @@
   }
   .habit-task-label {
     display: flex; align-items: center; gap: 4px;
-    font-size: 9px; font-family: 'DM Mono', monospace; letter-spacing: 0.06em;
+    font-size: 12px; font-family: 'DM Mono', monospace; letter-spacing: 0.06em;
     text-transform: uppercase; color: var(--accent);
-    padding: 4px 6px; cursor: pointer; user-select: none;
+    padding: 7px 8px; cursor: pointer; user-select: none;
     background: var(--accent-light); border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     font-weight: 600; transition: background 0.1s;
   }
-  .habit-task-label:hover { background: #d0edda; }
+  .habit-task-label:hover { background: #edd9e8; }
   .habit-task-row {
     background: white;
     border-bottom: 1px solid rgba(0,0,0,0.04);
@@ -324,11 +324,12 @@
   }
   .habit-task-row:last-child { border-bottom: none; border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
   .habit-task-check {
-    width: 13px; height: 13px; border-radius: 50%; border: 1.5px solid;
+    width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; flex-shrink: 0; transition: all 0.12s;
   }
   .habit-task-check:active { transform: scale(0.9); }
+  .habit-selected-date-mobile { display: none; }
   /* ── SCHEDULE SELECTOR (habit checklist) ── */
   .habit-schedule-selector {
     display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
@@ -390,8 +391,8 @@
   }
   .workout-card-header {
     display: flex; align-items: center; gap: 8px;
-    padding: 10px 14px; background: var(--accent-light);
-    border-bottom: 1px solid var(--border);
+    padding: 10px 14px; background: #e8d9e4;
+    border-bottom: 1px solid rgba(92,45,82,0.15);
   }
   .workout-name-input {
     flex: 1; background: transparent; border: none; outline: none;
@@ -438,12 +439,14 @@
     flex-shrink: 0;
   }
   .set-check {
-    width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border);
+    width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink-faint);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; flex-shrink: 0; transition: all 0.12s; margin-left: auto;
+    background: white;
   }
+  .set-check:hover { border-color: var(--accent); background: var(--accent-light); }
   .set-check.done { background: var(--accent); border-color: var(--accent); }
-  .set-check.done::after { content: '✓'; color: white; font-size: 9px; }
+  .set-check.done::after { content: '✓'; color: white; font-size: 12px; font-weight: 700; }
   /* Exercise library in sidebar */
   .ex-lib-item {
     display: flex; align-items: center; gap: 6px;
@@ -477,7 +480,22 @@
   /* Mobile fitness */
   @media (max-width: 767px) {
     .fitness-sidebar { display: none; }
-    .fitness-main { padding: 12px 14px; }
+    .fitness-main { padding: 10px 12px 80px; }
+    .fitness-view-tabs { width: 100%; }
+    .fitness-view-tab { padding: 5px 8px; font-size: 11px; }
+  }
+  /* Mobile habit accordion — larger tap targets */
+  @media (max-width: 767px) {
+    .habit-task-label { padding: 8px 9px; font-size: 14px; }
+    .habit-task-check { width: 25px; height: 25px; }
+    .goal-check { width: 24px; height: 24px; border-radius: 8px; border-width: 2px; }
+    .goal-check.checked::after { font-size: 16px; }
+    .habit-selected-date-mobile {
+      display: block; text-align: center;
+      font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 700;
+      color: var(--ink); padding: 10px 0 6px;
+      border-top: 1px solid var(--border); margin-bottom: 4px;
+    }
   }
   /* ── FITNESS PHASE 2 ── */
   .fitness-view-tabs {
@@ -500,19 +518,25 @@
   .fitness-week-col.today { border-color: var(--accent); }
   .fitness-week-col-hdr {
     padding: 6px 8px; text-align: center;
-    background: linear-gradient(180deg, #2d6b4a 0%, #256042 100%);
+    background: linear-gradient(180deg, #7c3f6e 0%, #5c2d52 100%);
     border-radius: var(--radius-md) var(--radius-md) 0 0;
   }
-  .fitness-week-col.today .fitness-week-col-hdr { background: linear-gradient(180deg, #3a8a60 0%, #256042 100%); }
+  .fitness-week-col.today .fitness-week-col-hdr { background: linear-gradient(180deg, #9a4f87 0%, #7c3f6e 100%); }
   .fitness-week-col-day { font-size: 9px; color: rgba(255,255,255,0.65); font-family: 'DM Mono',monospace; text-transform: uppercase; letter-spacing: 0.06em; }
   .fitness-week-col-date { font-size: 16px; color: white; font-family: 'Playfair Display',serif; font-weight: 600; }
   .fitness-week-col.today .fitness-week-col-date { color: var(--gold); }
   .fitness-week-col-body { padding: 6px; min-height: 60px; }
+  .fitness-week-col.drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-light); }
+  .fitness-week-col.drag-over .fitness-week-col-body { background: var(--accent-light); }
+  .fitness-month-cell.drag-over { border-color: var(--accent) !important; background: var(--accent-light) !important; box-shadow: 0 0 0 2px var(--accent-light); }
+  .fitness-week-workout-pill[draggable] { cursor: grab; }
+  .fitness-week-workout-pill[draggable]:active { cursor: grabbing; opacity: 0.6; }
   .fitness-week-workout-pill {
     background: var(--accent-light); color: var(--accent); border-radius: 4px;
     padding: 3px 6px; font-size: 10px; font-family: 'DM Sans',sans-serif; font-weight: 600;
     margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
+  .fitness-week-workout-pill.cardio { background: var(--gold-light); color: var(--gold); border: 1px solid rgba(196,150,14,0.25); }
   .fitness-week-add {
     background: none; border: 1px dashed var(--border); border-radius: 4px;
     color: var(--ink-faint); font-size: 10px; cursor: pointer; width: 100%;
@@ -593,6 +617,22 @@
     visibility: visible; opacity: 1; transition: none;
   }
   .task-delete-btn.confirming:hover { background: #96281b; }
+  /* Two-option confirm for repeat tasks (desktop) */
+  .task-delete-repeat-confirm {
+    position: absolute; top: 4px; right: 4px;
+    display: flex; align-items: center; gap: 3px; z-index: 10;
+  }
+  .task-delete-repeat-btn {
+    font-size: 10px; padding: 2px 6px; border-radius: 5px; border: none; cursor: pointer;
+    background: var(--red); color: white; font-family: 'DM Sans', sans-serif;
+    font-weight: 600; white-space: nowrap;
+  }
+  .task-delete-repeat-btn.all { background: var(--purple); }
+  .task-delete-repeat-btn:hover { opacity: 0.85; }
+  .task-delete-repeat-cancel {
+    font-size: 11px; padding: 2px 5px; border-radius: 5px; border: none; cursor: pointer;
+    background: var(--border); color: var(--ink-light); line-height: 1;
+  }
   @media (hover: none) { .task-delete-btn { display: none !important; } }
   .task-mobile-delete-btn {
     background: #e74c3c; border: none; border-radius: 6px; cursor: pointer;
@@ -735,6 +775,61 @@
 
   /* ===================== HABIT TRACKER ===================== */
   .habit-sidebar {}
+  /* Countdown cards */
+  .countdown-section-title {
+    font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-light);
+    margin-bottom: 6px;
+  }
+  .countdown-card {
+    background: white; border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    border-left-width: 3px;
+    padding: 8px 10px 8px 10px;
+    margin-bottom: 6px; position: relative;
+    box-shadow: 0 1px 3px var(--shadow);
+    transition: box-shadow 0.15s;
+  }
+  .countdown-card:hover { box-shadow: 0 2px 8px var(--shadow-md); }
+  .countdown-card-row { display: flex; align-items: flex-start; gap: 8px; }
+  .countdown-number {
+    font-family: 'Playfair Display', serif; font-size: 30px; font-weight: 700;
+    line-height: 1; flex-shrink: 0; min-width: 44px;
+  }
+  .countdown-number.done { font-size: 22px; }
+  .countdown-info { flex: 1; min-width: 0; }
+  .countdown-unit {
+    font-family: 'DM Mono', monospace; font-size: 8px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--ink-faint); margin-top: 2px;
+  }
+  .countdown-title {
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
+    color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .countdown-dates {
+    font-family: 'DM Mono', monospace; font-size: 9px; color: var(--ink-faint); margin-top: 1px;
+  }
+  .countdown-progress-bg {
+    height: 4px; background: var(--border); border-radius: 2px; margin-top: 6px;
+  }
+  .countdown-progress-fill { height: 100%; border-radius: 2px; transition: width 0.4s; }
+  .countdown-delete {
+    position: absolute; top: 5px; right: 5px; background: none; border: none;
+    cursor: pointer; font-size: 10px; color: var(--ink-faint); opacity: 0;
+    transition: opacity 0.15s; line-height: 1; padding: 2px 3px; border-radius: 3px;
+  }
+  .countdown-card:hover .countdown-delete { opacity: 1; }
+  .countdown-delete:hover { background: var(--red-light); color: var(--red); opacity: 1 !important; }
+  .countdown-add-form {
+    background: var(--cream); border-radius: var(--radius-sm); border: 1px solid var(--border);
+    padding: 10px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 7px;
+  }
+  .countdown-color-swatch {
+    width: 16px; height: 16px; border-radius: 50%; cursor: pointer; flex-shrink: 0;
+    transition: transform 0.1s;
+  }
+  .countdown-color-swatch:hover { transform: scale(1.2); }
+  .countdown-color-swatch.selected { outline: 2px solid var(--ink); outline-offset: 2px; }
   .habit-qty-input {
     width: 36px; border: 1px solid var(--border); border-radius: 6px;
     padding: 2px 4px; font-size: 11px; font-family: 'DM Mono', monospace;
@@ -847,15 +942,15 @@
   .daily-goals-grid { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; justify-content: center; }
   .daily-goal-card {
     display: flex; flex-direction: column; align-items: center; gap: 8px;
-    padding: 16px 20px; border-radius: var(--radius-md); border: 2px solid var(--border);
+    padding: 14px 19px; border-radius: var(--radius-md); border: 2.5px solid var(--border);
     background: white; cursor: pointer; transition: all 0.2s; min-width: 100px;
   }
   .daily-goal-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px var(--shadow-md); }
   .daily-goal-card.checked-today { box-shadow: 0 4px 12px var(--shadow-md); }
   .daily-goal-icon { width: 32px; height: 32px; border-radius: 50%; }
-  .daily-goal-name { font-size: 12px; font-weight: 500; text-align: center; }
+  .daily-goal-name { font-size: 14px; font-weight: 550; text-align: center; }
   .daily-goal-check-big {
-    width: 24px; height: 24px; border-radius: 50%; border: 2px solid currentColor;
+    width: 32px; height: 32px; border-radius: 50%; border: 2px solid currentColor;
     display: flex; align-items: center; justify-content: center; font-size: 13px;
   }
 
@@ -924,6 +1019,7 @@
   .monthly-cal-wrap { padding: 20px 24px; min-width: 560px; }
   .monthly-cal-header {
     display: grid; grid-template-columns: repeat(7, 1fr);
+    column-gap: 2px; /* match monthly-cal-grid gap so DOW labels stay over their columns */
     margin-bottom: 4px;
   }
   .monthly-dow {
@@ -942,7 +1038,7 @@
     background: var(--paper);
     box-shadow: 0 0 0 1px rgba(0,0,0,0.06);
   }
-  .monthly-cell:hover { background: #f8f5ef; box-shadow: 0 0 0 1px var(--border), 0 2px 8px var(--shadow); }
+  .monthly-cell:hover { background: #f5edf3; box-shadow: 0 0 0 1px var(--border), 0 2px 8px var(--shadow); }
   .monthly-cell.empty { background: var(--cream); cursor: default; min-height: 110px; box-shadow: none; }
   .monthly-cell.today { background: var(--gold-light); }
   .monthly-cell.today .monthly-cell-date { color: var(--gold); font-weight: 700; }
@@ -953,6 +1049,7 @@
     font-family: 'Playfair Display', serif; font-size: 14px; color: var(--ink);
     margin-bottom: 4px;
   }
+  .monthly-cell-dow { display: none; } /* mobile only — replaces the separate header row */
   .monthly-cell-events { display: flex; flex-direction: column; gap: 2px; }
   .monthly-event-chip {
     font-size: 10.5px; padding: 2px 6px; border-radius: 5px; cursor: pointer;
@@ -965,11 +1062,23 @@
     font-family: 'DM Mono', monospace; font-size: 9px; opacity: 0.7; margin-right: 3px;
   }
   .monthly-event-more { font-size: 10px; color: var(--ink-faint); padding: 1px 4px; font-family: 'DM Mono', monospace; }
+  .mobile-month-nav { display: none; } /* shown only on mobile — desktop uses the sidebar */
   .month-event-item {
     display: flex; align-items: baseline; gap: 6px; padding: 5px 4px;
     border-radius: 5px; cursor: pointer; transition: background 0.1s;
   }
   .month-event-item:hover { background: var(--cream); }
+  .month-event-item.pending { border-left: 3px solid var(--gold); background: var(--gold-light); }
+  .month-event-item.pending:hover { background: #faefd8; }
+  .invite-badge { font-size: 9px; font-family: 'DM Mono',monospace; font-weight: 700; padding: 1px 5px; border-radius: 3px; flex-shrink: 0; }
+  .invite-badge.needsAction { background: var(--gold-light); color: var(--gold); border: 1px solid var(--gold); }
+  .invite-badge.accepted { background: var(--accent-light); color: var(--accent); border: 1px solid var(--accent); }
+  .invite-badge.declined { background: var(--red-light); color: var(--red); border: 1px solid var(--red); }
+  .invite-response-btns { display: flex; gap: 4px; margin-top: 4px; }
+  .invite-btn { font-size: 10px; font-family: 'DM Sans',sans-serif; font-weight: 600; padding: 2px 8px; border-radius: 4px; border: none; cursor: pointer; transition: opacity 0.1s; }
+  .invite-btn.accept { background: var(--accent); color: white; }
+  .invite-btn.decline { background: var(--red-light); color: var(--red); border: 1px solid var(--red); }
+  .invite-btn.tentative { background: var(--gold-light); color: var(--gold); border: 1px solid var(--gold); }
   .month-event-date { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-faint); flex-shrink: 0; min-width: 64px; }
   .month-event-time { color: var(--gold); }
   .month-event-title { font-size: 12px; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1082,7 +1191,8 @@
     .app { height: auto; min-height: 100vh; overflow: visible; }
     .main-content { flex-direction: column; overflow: visible; padding-bottom: 64px; }
     .main-panel { overflow: visible; }
-    .habit-main { overflow-x: hidden; overflow-y: auto; height: auto; }
+    .habit-main { overflow-x: hidden; overflow-y: auto; height: auto; padding-bottom: 148px; }
+    /* 148px = nav (56px) + FAB top-from-nav (80px - 56px = 24px offset) + FAB height (48px) + breathing room (20px) */
     /* Hide weekly desktop panel on mobile — replaced by mobile-day-view */
     .weekly-main-panel { display: none !important; }
     /* Bigger tap targets for task radio and accordion caret on mobile */
@@ -1180,6 +1290,7 @@
       box-shadow: 0 -2px 8px var(--shadow-md);
       display: flex; height: 56px;
     }
+    .save-error-toast { bottom: 56px !important; } /* sit above mobile bottom nav */
     .mobile-bottom-nav-btn {
       flex: 1; background: none; border: none; cursor: pointer;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -1195,6 +1306,24 @@
 
     /* cal grid hidden on mobile — replaced by day view */
     .weekly-calendar { display: none; }
+
+    /* Monthly calendar — hide separate header row; day labels live inside each tile instead */
+    .monthly-cal-wrap { padding: 8px 8px 16px; }
+    .mobile-month-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 2px 10px;
+    }
+    .mobile-month-label {
+      font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; color: var(--ink);
+    }
+    .monthly-cal-header { display: none; }
+    .monthly-cell-dow {
+      display: block; font-size: 7px; text-transform: uppercase; letter-spacing: 0.05em;
+      font-family: 'DM Mono', monospace; color: var(--ink-faint);
+      text-align: center; margin-bottom: 1px;
+    }
+    .monthly-cell.today .monthly-cell-dow { color: var(--gold); }
+    .monthly-cell-date { text-align: center; }
   }
 
   /* Monthly habit checklist below calendar */
@@ -1558,17 +1687,18 @@ const { useState, useEffect, useRef, useCallback } = React;
 
 // ── CONSTANTS ──
 const GOAL_COLORS = ['#2d5a3d','#c0392b','#e0a800','#2471a3','#7d3c98','#d35400','#148f77','#e91e8c'];
+const COUNTDOWN_COLORS = ['#8b4aac','#2e7eb8','#1a9c82','#c4960e','#dc4a3a','#2d6b4a','#d35400','#e91e8c'];
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // ── HELPERS ──
-function useSwipe(onSwipeLeft, onSwipeRight) {
+function useSwipe(onSwipeLeft, onSwipeRight, threshold=50) {
   const touchStartX = React.useRef(null);
   function onTouchStart(e) { touchStartX.current = e.touches[0].clientX; }
   function onTouchEnd(e) {
     if (touchStartX.current === null) return;
     const dx = e.changedTouches[0].clientX - touchStartX.current;
-    if (Math.abs(dx) > 50) { dx < 0 ? onSwipeLeft() : onSwipeRight(); }
+    if (Math.abs(dx) > threshold) { dx < 0 ? onSwipeLeft() : onSwipeRight(); }
     touchStartX.current = null;
   }
   return { onTouchStart, onTouchEnd };
@@ -1593,6 +1723,22 @@ function fmtDisplay(d) {
 }
 function isSameDay(a,b) { return fmt(a)===fmt(b); }
 
+// ── QTY LINE ITEM HELPERS ──
+// Normalizes legacy flat number/string into LineItem[]. Safe to call on any stored value.
+function normalizeQty(val) {
+  if (Array.isArray(val)) return val;
+  const n = parseFloat(val);
+  if (!isNaN(n) && n !== 0) return [{id:'li'+Date.now()+Math.random().toString(36).slice(2,6), amount:n, note:'', ts:0}];
+  return [];
+}
+// Sums a LineItem[] (or legacy value) to a number for display/rollup
+function qtyTotal(val) {
+  if (Array.isArray(val)) return val.reduce((s,li) => s + (parseFloat(li.amount)||0), 0);
+  const n = parseFloat(val);
+  return isNaN(n) ? 0 : n;
+}
+function genLiId() { return 'li'+Date.now()+Math.random().toString(36).slice(2,7); }
+
 // ─────────────────────────────────────────────
 // GOOGLE AUTH + DRIVE + CALENDAR ENGINE
 // ─────────────────────────────────────────────
@@ -1604,6 +1750,10 @@ const REDIRECT_URI = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
 const WORKER_URL = 'https://planner-auth.plannertracker.workers.dev';
 
 let _loadingFromDrive = false;
+let _lastCalSyncMs = 0; // timestamp of last auto calendar sync — throttles to once per 5 min
+// Pages body flush: PagesView registers a synchronous flush fn here so App can
+// call it before any Drive save (beforeunload, visibilitychange, manual sync).
+const _bodyFlushRef = { fn: null };
 // Debounce timers for calendar sync — keyed by task id
 const _calSyncTimers = {};
 function debouncedCalSync(id, fn, delay = 2500) {
@@ -1683,8 +1833,17 @@ function requestToken(onSuccess, onError) {
   }
   window.addEventListener('message', onMessage);
   const check = setInterval(() => {
-    if (popup.closed) { clearInterval(check); if (!done) { done=true; window.removeEventListener('message', onMessage); } }
-  }, 1000);
+    if (popup.closed) {
+      clearInterval(check);
+      if (!done) {
+        // Popup closed — but postMessage may have been queued just before close.
+        // Give it a 2-second grace period to arrive before removing the listener.
+        setTimeout(() => {
+          if (!done) { done = true; window.removeEventListener('message', onMessage); }
+        }, 2000);
+      }
+    }
+  }, 500); // check every 500ms instead of 1000ms for faster detection
 }
 
 // Silent refresh via Worker — no popup, no user interaction needed
@@ -1750,19 +1909,37 @@ async function loadFromDrive() {
     `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
   );
   const text = await res.text();
-  try { return { data: JSON.parse(text), fileId }; }
-  catch { return { data: {}, fileId }; }
+  let data = {};
+  try { data = JSON.parse(text); } catch {}
+
+  // Multi-device conflict detection:
+  // If we have a local _lp_savedAt that is NEWER than what's in Drive,
+  // it means this device made changes that were never uploaded (e.g. network drop,
+  // or another device saved over them). Warn before overwriting.
+  const driveSavedAt = data._savedAt || null;
+  const localSavedAt = (() => { try { return localStorage.getItem('_lp_savedAt'); } catch { return null; } })();
+
+  let conflict = false;
+  if (driveSavedAt && localSavedAt && localSavedAt > driveSavedAt) {
+    // Local is newer than Drive — possible data loss
+    conflict = true;
+  }
+
+  return { data, fileId, driveSavedAt, localSavedAt, conflict };
 }
 
 async function saveToDrive(fileId, allData) {
+  const payload = { ...allData, _savedAt: new Date().toISOString() };
   await driveRequest(
     `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(allData),
+      body: JSON.stringify(payload),
     }
   );
+  // Record when we last successfully saved so multi-device conflict detection works
+  try { localStorage.setItem('_lp_savedAt', payload._savedAt); } catch {}
 }
 
 // ── CALENDAR HELPERS ──
@@ -1783,13 +1960,15 @@ async function pushEventToCalendar(event, dateKey) {
     start = { date: dateStr };
     end = { date: nextStr };
   }
+  const inviteeList = (event.invitees||[]).filter(Boolean);
   const body = {
     summary: event.title || 'Untitled Event',
     description: event.details || '',
     start, end,
     extendedProperties: { private: { plannerId: event.id } },
+    ...(inviteeList.length > 0 ? { attendees: inviteeList.map(email=>({email})) } : {}),
   };
-  const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+  const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -1814,6 +1993,25 @@ async function deleteEventFromCalendar(gcalId) {
   });
 }
 
+async function respondToCalendarInvite(gcalId, response) {
+  // response: 'accepted' | 'declined' | 'tentative'
+  const token = getToken();
+  if (!token || !gcalId) return;
+  const email = getSavedEmail();
+  if (!email) return;
+  // PATCH only the attendee entry for this user
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}?sendUpdates=all`, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ attendees: [{ email, responseStatus: response }] }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(()=>({}));
+    throw new Error(`Calendar respond failed: ${res.status} ${err?.error?.message||''}`);
+  }
+  return response;
+}
+
 async function updateEventInCalendar(gcalId, event, dateKey) {
   const token = getToken();
   if (!token || !gcalId) return;
@@ -1823,27 +2021,29 @@ async function updateEventInCalendar(gcalId, event, dateKey) {
   if (event.eventTime) {
     const [h, m] = event.eventTime.split(':');
     const endH = String(parseInt(h) + 1).padStart(2, '0');
-    // Explicitly only set dateTime, no date field at all
     start = { dateTime: `${dateStr}T${event.eventTime}:00`, timeZone: tz };
     end   = { dateTime: `${dateStr}T${endH}:${m}:00`, timeZone: tz };
   } else {
     const nextDay = new Date(dateStr + 'T00:00:00'); nextDay.setDate(nextDay.getDate() + 1);
-    // Explicitly only set date, no dateTime field at all
     start = { date: dateStr };
     end   = { date: fmt(nextDay) };
   }
-  // Build a clean body — do NOT spread the existing event as it contains
-  // read-only fields (etag, htmlLink, etc.) that cause PUT to fail or be ignored.
-  // Only include fields we actually manage.
+  // Use PATCH (not PUT) — PATCH merges fields rather than replacing the entire event.
+  // PUT would wipe any attendees/fields not included in the body.
+  const inviteeList = (event.invitees||[]).filter(Boolean);
   const body = {
     summary: event.title || 'Untitled Event',
     description: event.details || '',
     start,
     end,
+    // Only include attendees if we have them — PATCH won't remove existing ones if omitted
+    ...(inviteeList.length > 0 ? { attendees: inviteeList.map(email=>({email})) } : {}),
   };
-  console.log('updateEventInCalendar PUT body:', JSON.stringify({gcalId, start, end, summary: body.summary}));
-  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}`, {
-    method: 'PUT',
+  console.log('updateEventInCalendar PATCH body:', JSON.stringify({
+    gcalId, summary: body.summary, attendees: body.attendees||'(not included)', start, end
+  }));
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}?sendUpdates=all`, {
+    method: 'PATCH',
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
@@ -1878,19 +2078,27 @@ async function pullNewFromCalendar(weekData) {
   const now = new Date();
   const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
   const oneYearFwd = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${oneYearAgo.toISOString()}&timeMax=${oneYearFwd.toISOString()}&singleEvents=true&maxResults=500`,
-    { headers: { 'Authorization': `Bearer ${token}` } }
-  );
-  if (!res.ok) {
-    let detail = '';
-    try { const j = await res.clone().json(); detail = j?.error?.message || ''; } catch {}
-    console.error('Calendar pull failed:', res.status, detail);
-    throw new Error(`Calendar error ${res.status}${detail ? ': ' + detail : ''}`);
-  }
-  const data = await res.json();
-  const gcalEvents = data.items || [];
-  console.log('Calendar pull: fetched', gcalEvents.length, 'events');
+  const baseParams = `timeMin=${oneYearAgo.toISOString()}&timeMax=${oneYearFwd.toISOString()}&singleEvents=true&maxResults=2500&showHiddenInvitations=true&fields=items(id,summary,description,start,end,extendedProperties,attendees,organizer),nextPageToken`;
+
+  // Paginate through ALL results — maxResults=2500/page means a single request covers
+  // most calendars, but we keep paginating via nextPageToken for very large ones.
+  let gcalEvents = [];
+  let pageToken = null;
+  do {
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?${baseParams}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+    if (!res.ok) {
+      let detail = '';
+      try { const j = await res.clone().json(); detail = j?.error?.message || ''; } catch {}
+      console.error('Calendar pull failed:', res.status, detail);
+      throw new Error(`Calendar error ${res.status}${detail ? ': ' + detail : ''}`);
+    }
+    const data = await res.json();
+    gcalEvents = gcalEvents.concat(data.items || []);
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+
+  console.log('Calendar pull: fetched', gcalEvents.length, 'events total');
 
   // Build a map of gcalId → local task for quick lookup
   const gcalIdToTask = {}; // gcalId → {task, wk, dayKey}
@@ -1906,10 +2114,14 @@ async function pullNewFromCalendar(weekData) {
 
   const newWeekData = JSON.parse(JSON.stringify(weekData));
   let added = 0, updated = 0;
+  const addedDates = [];
 
   gcalEvents.forEach(ev => {
     const newDateStr = ev.start?.date || ev.start?.dateTime?.slice(0, 10);
-    if (!newDateStr) return;
+    if (!newDateStr) {
+      console.warn('Calendar sync: skipping event with no start date', ev.id, ev.summary);
+      return;
+    }
     const newTimeStr = ev.start?.dateTime ? ev.start.dateTime.slice(11, 16) : '';
 
     if (gcalIdToTask[ev.id]) {
@@ -1919,7 +2131,10 @@ async function pullNewFromCalendar(weekData) {
         task.details !== (ev.description||'') ||
         task.eventTime !== newTimeStr ||
         dayKey !== newDateStr;
-      if (!changed) return;
+      if (!changed) {
+        console.log('Calendar sync: already up-to-date', ev.id, ev.summary, 'on', dayKey);
+        return;
+      }
       updated++;
       // Remove from old location
       newWeekData[wk].tasks[dayKey] = (newWeekData[wk].tasks[dayKey] || []).filter(t => t.id !== task.id);
@@ -1928,28 +2143,41 @@ async function pullNewFromCalendar(weekData) {
       const newWeekKey = fmt(getWeekStart(newDateObj));
       if (!newWeekData[newWeekKey]) newWeekData[newWeekKey] = {proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{}};
       if (!newWeekData[newWeekKey].tasks[newDateStr]) newWeekData[newWeekKey].tasks[newDateStr] = [];
+      // Find my responseStatus if I'm an attendee
+      const myEmail = typeof getSavedEmail === 'function' ? getSavedEmail() : null;
+      const myAttendee = myEmail && (ev.attendees||[]).find(a => a.email?.toLowerCase()===myEmail.toLowerCase());
+      const responseStatus = myAttendee?.responseStatus || null;
       newWeekData[newWeekKey].tasks[newDateStr].push({
         ...task, title: ev.summary||'', details: ev.description||'', eventTime: newTimeStr,
+        responseStatus, calendarInvite: !!myAttendee,
       });
     } else {
       // Net new event — add it
       const plannerId = ev.extendedProperties?.private?.plannerId;
-      if (plannerId && existingPlannerIds.has(plannerId)) return; // already tracked
+      if (plannerId && existingPlannerIds.has(plannerId)) {
+        console.log('Calendar sync: skipping (plannerId match)', ev.id, ev.summary);
+        return; // already tracked
+      }
       added++;
+      addedDates.push(newDateStr);
       const newDateObj = new Date(newDateStr + 'T00:00:00');
       const newWeekKey = fmt(getWeekStart(newDateObj));
       if (!newWeekData[newWeekKey]) newWeekData[newWeekKey] = {proverb:'',toCreate:[],weekGoals:[],people:[],beWord:'',proud:'',story:'',tasks:{}};
       if (!newWeekData[newWeekKey].tasks[newDateStr]) newWeekData[newWeekKey].tasks[newDateStr] = [];
+      const myEmail2 = typeof getSavedEmail === 'function' ? getSavedEmail() : null;
+      const myAttendee2 = myEmail2 && (ev.attendees||[]).find(a => a.email?.toLowerCase()===myEmail2.toLowerCase());
+      const responseStatus2 = myAttendee2?.responseStatus || null;
       newWeekData[newWeekKey].tasks[newDateStr].push({
         id: 'gcal_' + ev.id, gcalId: ev.id,
         title: ev.summary||'', details: ev.description||'',
         done: false, expanded: false, colorIndex: 3,
         isEvent: true, eventTime: newTimeStr,
+        responseStatus: responseStatus2, calendarInvite: !!myAttendee2,
       });
     }
   });
 
-  return { added, updated, newWeekData };
+  return { added, updated, newWeekData, addedDates };
 }
 
 function useStorage(key, init) {
@@ -2137,6 +2365,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   });
   const [sheetOpen, setSheetOpen] = useState(false);
   const [showPeoplePicker, setShowPeoplePicker] = useState(false);
+  const [showRepeatCleanup, setShowRepeatCleanup] = useState(false);
   const pendingTaskFocus = useRef(null); // {id, dayKey} — task to focus after render
   const taskTitleRefs = useRef({}); // id -> input ref (desktop)
   const taskTitleRefsMobile = useRef({}); // id -> input ref (mobile)
@@ -2219,6 +2448,54 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     });
   }
 
+  // Scan all weekData and group repeat task instances.
+  // New tasks: keyed by repeatId. Legacy tasks (no repeatId): keyed by title+days combo.
+  function getRepeatGroups() {
+    const groups = {}; // key -> { key, title, days, endDate, count, instances:[{wk,dk,id}] }
+    Object.entries(weekData).forEach(([wk, wkData]) => {
+      Object.entries((wkData.tasks)||{}).forEach(([dk, tasks]) => {
+        (tasks||[]).forEach(t => {
+          if (!t.repeat?.days?.length && !t.repeatId) return; // not a repeat task
+          const key = t.repeatId
+            ? `id:${t.repeatId}`
+            : `legacy:${t.title}:${JSON.stringify((t.repeat?.days||[]).slice().sort())}`;
+          if (!groups[key]) {
+            groups[key] = {
+              key, title: t.title||'(untitled)',
+              days: t.repeat?.days || [],
+              endDate: t.repeat?.endDate || '',
+              repeatId: t.repeatId || null,
+              instances: [],
+            };
+          }
+          groups[key].instances.push({ wk, dk, id: t.id });
+        });
+      });
+    });
+    return Object.values(groups).filter(g => g.instances.length > 0)
+      .sort((a,b) => a.title.localeCompare(b.title));
+  }
+
+  // Delete ALL instances of a repeat group (regardless of date — used by cleanup tool)
+  function deleteRepeatGroup(groupKey, repeatId, title, days) {
+    setWeekData(wd => {
+      const draft = JSON.parse(JSON.stringify(wd));
+      Object.keys(draft).forEach(wk => {
+        const tasks = draft[wk]?.tasks;
+        if (!tasks) return;
+        Object.keys(tasks).forEach(dk => {
+          tasks[dk] = tasks[dk].filter(t => {
+            if (repeatId) return t.repeatId !== repeatId;
+            // Legacy match: same title and same days set
+            const sameDays = JSON.stringify((t.repeat?.days||[]).slice().sort()) === JSON.stringify((days||[]).slice().sort());
+            return !(t.title === title && sameDays);
+          });
+        });
+      });
+      return draft;
+    });
+  }
+
   function addTask(dayKey, afterId) {
     const id = Date.now().toString();
     pendingTaskFocus.current = {id, dayKey};
@@ -2290,6 +2567,32 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       }));
     }
     setTasks(dayKey, t => t.filter(x=>x.id!==id));
+  }
+
+  // Delete this instance and all future instances of a repeat task (same repeatId, on or after dayKey)
+  function deleteTaskAndFuture(dayKey, id) {
+    const task = getTasks(dayKey).find(t => t.id===id);
+    if (!task) return;
+    const repeatId = task.repeatId;
+    const legacyTitle = task.title;
+    const legacyDays = (task.repeat?.days||[]).slice().sort();
+    setWeekData(wd => {
+      const draft = JSON.parse(JSON.stringify(wd));
+      Object.keys(draft).forEach(wk => {
+        const tasks = draft[wk]?.tasks;
+        if (!tasks) return;
+        Object.keys(tasks).forEach(dk => {
+          if (dk < dayKey) return; // keep past instances
+          tasks[dk] = tasks[dk].filter(t => {
+            if (repeatId) return t.repeatId !== repeatId;
+            // Legacy: match by title + days
+            const sameDays = JSON.stringify((t.repeat?.days||[]).slice().sort()) === JSON.stringify(legacyDays);
+            return !(t.title === legacyTitle && sameDays);
+          });
+        });
+      });
+      return draft;
+    });
   }
 
   const weekDays = Array.from({length:7}, (_,i)=>addDays(weekStart,i));
@@ -2505,6 +2808,14 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         <textarea className="sidebar-textarea" placeholder="Your be-word and how to apply it…"
           value={wd.beWord||''} onChange={e=>setWD(w=>({...w,beWord:e.target.value}))} rows={10} />
       </div>
+      <div className="sidebar-section" style={{borderTop:'1px solid var(--border)',paddingTop:12}}>
+        <button onClick={()=>setShowRepeatCleanup(true)}
+          style={{width:'100%',padding:'6px 10px',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)',
+                  background:'var(--paper)',color:'var(--ink-light)',fontSize:11,cursor:'pointer',
+                  fontFamily:"'DM Sans',sans-serif",textAlign:'left'}}>
+          🔁 Manage repeat tasks…
+        </button>
+      </div>
     </>
   );
 
@@ -2562,6 +2873,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                         onUpdate={p=>updateTask(dk,task.id,p)}
                         onBlurSync={()=>syncTaskToCalendar(dk,task.id)}
                         onDelete={()=>deleteTask(dk,task.id)}
+                        onDeleteFuture={(task.repeatId || task.repeat?.days?.length) ? ()=>deleteTaskAndFuture(dk,task.id) : null}
                         onEnterKey={()=>addTask(dk,task.id)}
                         titleRef={el=>taskTitleRefs.current[task.id]=el}
                         deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(dk,task.id);}}
@@ -2657,6 +2969,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                     onUpdate={p=>updateTask(mobileDayKey,task.id,p)}
                     onBlurSync={()=>syncTaskToCalendar(mobileDayKey,task.id)}
                     onDelete={()=>deleteTask(mobileDayKey,task.id)}
+                    onDeleteFuture={(task.repeatId || task.repeat?.days?.length) ? ()=>deleteTaskAndFuture(mobileDayKey,task.id) : null}
                     onEnterKey={()=>addTask(mobileDayKey,task.id)}
                     titleRef={el=>taskTitleRefsMobile.current[task.id]=el}
                     deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(mobileDayKey,task.id);}}
@@ -2684,6 +2997,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
             </div>
           ))}
           <button className="mobile-add-btn" onClick={()=>addTask(mobileDayKey)}>+ Add task</button>
+          <DayNote dayKey={mobileDayKey} note={getDayNote(mobileDayKey)} onChange={note=>setDayNote(mobileDayKey,note)} />
         </div>
         {/* Week dot row */}
         <div className="mobile-week-dots">
@@ -2752,6 +3066,102 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         />
       )}
 
+      {showRepeatCleanup && (
+        <RepeatCleanupModal
+          groups={getRepeatGroups()}
+          onDeleteGroup={(g)=>deleteRepeatGroup(g.key, g.repeatId, g.title, g.days)}
+          onClose={()=>setShowRepeatCleanup(false)}
+        />
+      )}
+
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// REPEAT CLEANUP MODAL
+// Lists all repeat task groups across all weeks; lets user delete entire groups at once.
+// ─────────────────────────────────────────────
+const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+function RepeatCleanupModal({ groups, onDeleteGroup, onClose }) {
+  const [deletedKeys, setDeletedKeys] = useState(new Set());
+  const [confirmKey, setConfirmKey] = useState(null);
+  const visible = groups.filter(g => !deletedKeys.has(g.key));
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" style={{maxWidth:460,maxHeight:'80vh',display:'flex',flexDirection:'column'}}
+        onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:'var(--ink)'}}>
+            🔁 Repeat Task Groups
+          </div>
+          <button onClick={onClose}
+            style={{background:'none',border:'none',cursor:'pointer',fontSize:18,color:'var(--ink-faint)',lineHeight:1}}>✕</button>
+        </div>
+        <div style={{fontSize:12,color:'var(--ink-light)',marginBottom:14}}>
+          Each row is a group of repeat task instances across all weeks.
+          Deleting a group removes every instance — past and future.
+        </div>
+        <div style={{flex:1,overflowY:'auto'}}>
+          {visible.length === 0 && (
+            <div style={{textAlign:'center',color:'var(--ink-faint)',fontSize:13,padding:'24px 0'}}>
+              No repeat tasks found.
+            </div>
+          )}
+          {visible.map(g => {
+            const isConfirming = confirmKey === g.key;
+            const dayStr = DAY_LABELS.filter((_,i)=>g.days.includes(i)).join(' ');
+            return (
+              <div key={g.key}
+                style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',
+                        borderRadius:'var(--radius-sm)',marginBottom:6,
+                        background:'var(--paper)',border:'1px solid var(--border)'}}>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:600,color:'var(--ink)',
+                               overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {g.title||'(untitled)'}
+                  </div>
+                  <div style={{fontSize:10,color:'var(--ink-light)',marginTop:2}}>
+                    {dayStr || 'unknown days'}{g.endDate ? ` · until ${g.endDate}` : ''}
+                    {' · '}<span style={{color:'var(--ink-faint)'}}>{g.instances.length} instance{g.instances.length!==1?'s':''}</span>
+                  </div>
+                </div>
+                {isConfirming ? (
+                  <div style={{display:'flex',gap:4,flexShrink:0}}>
+                    <button onClick={()=>{
+                      onDeleteGroup(g);
+                      setDeletedKeys(s=>new Set([...s,g.key]));
+                      setConfirmKey(null);
+                    }} style={{padding:'3px 8px',borderRadius:5,border:'none',cursor:'pointer',
+                               background:'var(--red)',color:'white',fontSize:11,fontWeight:600}}>
+                      Delete all
+                    </button>
+                    <button onClick={()=>setConfirmKey(null)}
+                      style={{padding:'3px 6px',borderRadius:5,border:'1px solid var(--border)',
+                              cursor:'pointer',background:'none',fontSize:11,color:'var(--ink-light)'}}>
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={()=>setConfirmKey(g.key)}
+                    style={{padding:'3px 8px',borderRadius:5,border:'1px solid var(--border)',
+                            cursor:'pointer',background:'none',fontSize:11,color:'var(--ink-light)',
+                            flexShrink:0}}>
+                    Delete…
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <div style={{marginTop:12,textAlign:'right'}}>
+          <button onClick={onClose}
+            style={{padding:'6px 16px',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)',
+                    background:'none',cursor:'pointer',fontSize:13,color:'var(--ink-light)'}}>
+            Done
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -3074,9 +3484,18 @@ function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitComp
       return { ...c, [dayKey]: has ? arr.filter(x => x !== goalId) : [...arr, goalId] };
     });
   }
-  function getQty(goalId) { return (habitQty[dayKey] || {})[goalId] || ''; }
+  function getQty(goalId) {
+    const raw = (habitQty[dayKey] || {})[goalId];
+    const total = qtyTotal(raw);
+    return total === 0 ? '' : String(total);
+  }
   function setQtyVal(goalId, val) {
-    setHabitQty(q => ({ ...q, [dayKey]: { ...(q[dayKey] || {}), [goalId]: val } }));
+    const raw = (habitQty[dayKey] || {})[goalId];
+    const existing = normalizeQty(raw);
+    const note = existing.length > 0 ? existing[0].note : '';
+    const n = parseFloat(val);
+    const items = (val === '' || isNaN(n)) ? [] : [{id: existing.length > 0 ? existing[0].id : genLiId(), amount:n, note, ts: existing.length > 0 ? existing[0].ts : Date.now()}];
+    setHabitQty(q => ({ ...q, [dayKey]: { ...(q[dayKey] || {}), [goalId]: items } }));
   }
   function getNoteVal(goalId) { return (habitNotes[dayKey] || {})[goalId] || ''; }
   function setNoteVal(goalId, val) {
@@ -3099,19 +3518,19 @@ function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitComp
         const isExpanded = !!expandedIds[g.id];
         return (
           <div key={g.id} className="habit-task-row" style={{borderLeft:`3px solid ${g.color}`}}>
-            <div style={{display:'flex', alignItems:'center', gap:5, padding:'4px 6px'}}>
+            <div style={{display:'flex', alignItems:'center', gap:5, padding:'6px 8px'}}>
               <div className="habit-task-check"
                 style={{background: done ? g.color : 'transparent', borderColor: g.color}}
                 onClick={e => { e.stopPropagation(); toggleHabit(g.id); }}>
                 {done && <span style={{color:'white', fontSize:9, lineHeight:1}}>✓</span>}
               </div>
-              <span style={{flex:1, fontSize:11.5, fontFamily:"'DM Sans',sans-serif", fontWeight:500,
+              <span style={{flex:1, fontSize:12, fontFamily:"'DM Sans',sans-serif", fontWeight:500,
                 color: done ? g.color : 'var(--ink)', textDecoration: done ? 'line-through' : 'none',
                 opacity: done ? 0.7 : 1}}>
                 {g.name}
               </span>
               <button
-                style={{background:'none',border:'none',cursor:'pointer',fontSize:9,color:'var(--ink-faint)',padding:'0 2px',flexShrink:0,lineHeight:1}}
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'2px 4px',flexShrink:0,lineHeight:1}}
                 onClick={e => { e.stopPropagation(); setExpandedIds(ex => ({...ex, [g.id]: !ex[g.id]})); }}>
                 {isExpanded ? '▲' : '▼'}
               </button>
@@ -3179,7 +3598,7 @@ const EVENT_COLORS = [
   '#ffe4e6', // blush
   '#ecfdf5', // aqua mist
 ];
-function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
+function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
   const textareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
   const [mobileConfirming, setMobileConfirming] = useState(false);
@@ -3200,10 +3619,12 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
 
   function handleDeleteClick(e) {
     e.stopPropagation();
-    if (confirming) {
-      onDelete();
+    if (!onDeleteFuture) {
+      // Non-repeat task: standard two-click confirm
+      if (confirming) { onDelete(); } else { setConfirming(true); }
     } else {
-      setConfirming(true);
+      // Repeat task: first click arms confirm, second click is handled by the two-button UI
+      if (!confirming) setConfirming(true);
     }
   }
 
@@ -3243,12 +3664,21 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
       onTouchStart={onReschedule ? handleCardTouchStart : undefined}
       onTouchEnd={onReschedule ? handleCardTouchEnd : undefined}
       onTouchMove={onReschedule ? handleCardTouchMove : undefined}>
-      <button
-        className={`task-delete-btn ${confirming?'confirming':''}`}
-        title={confirming ? 'Click again to confirm delete' : 'Delete task'}
-        onClick={handleDeleteClick}>
-        {confirming ? 'Delete?' : '✕'}
-      </button>
+      {confirming && onDeleteFuture ? (
+        // Repeat task: offer "Just this" vs "All future"
+        <div className="task-delete-repeat-confirm" onClick={e=>e.stopPropagation()}>
+          <button className="task-delete-repeat-btn" onClick={e=>{e.stopPropagation();onDelete();}}>Just this</button>
+          <button className="task-delete-repeat-btn all" onClick={e=>{e.stopPropagation();onDeleteFuture();}}>All future</button>
+          <button className="task-delete-repeat-cancel" onClick={e=>{e.stopPropagation();setConfirming(false);}}>✕</button>
+        </div>
+      ) : (
+        <button
+          className={`task-delete-btn ${confirming?'confirming':''}`}
+          title={confirming ? 'Click again to confirm delete' : 'Delete task'}
+          onClick={handleDeleteClick}>
+          {confirming ? 'Delete?' : '✕'}
+        </button>
+      )}
       <div className="task-card-header">
         {task.isProjectTask ? (
           <span className="task-type-btn event" title={`From project: ${task.projectTitle||''}`}
@@ -3261,6 +3691,9 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
             {task.isEvent ? '📅' : '⠿'}
           </button>
         )}
+        {task.isEvent && task.calendarInvite && task.responseStatus==='needsAction' && (
+          <span className="invite-badge needsAction" style={{fontSize:8,padding:'1px 4px'}}>📨</span>
+        )}
         <div className={`task-check ${task.done?'done':''}`}
           style={{borderColor: task.done ? '#2d5a3d' : undefined, color: task.done ? '#2d5a3d' : undefined, background: task.done ? '#e8f0eb' : undefined}}
           onClick={()=>onUpdate({done:!task.done})} />
@@ -3269,8 +3702,9 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
             ref={el=>{if(titleRef)titleRef(el);}}
             className="task-title-input"
             placeholder={task.isEvent ? 'Event…' : 'Task…'}
+            autoCapitalize="sentences"
             value={task.title}
-            onChange={e=>onUpdate({title:e.target.value})}
+            onChange={e=>{let v=e.target.value; if(task.title===''&&v.length===1) v=v.toUpperCase(); onUpdate({title:v});}}
             onBlur={()=>{
               if(onBlurSync && task.isEvent) onBlurSync();
               if(deleteIfEmpty) deleteIfEmpty();
@@ -3305,10 +3739,25 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
         )}
         {mobileConfirming && onReschedule ? (
           <>
-            <button className="task-mobile-delete-btn"
-              onClick={e=>{e.stopPropagation();onDelete();}}>
-              Delete?
-            </button>
+            {onDeleteFuture ? (
+              // Repeat task: two options
+              <>
+                <button className="task-mobile-delete-btn"
+                  onClick={e=>{e.stopPropagation();setMobileConfirming(false);onDelete();}}>
+                  Just this
+                </button>
+                <button className="task-mobile-delete-btn"
+                  style={{background:'#8b4aac'}}
+                  onClick={e=>{e.stopPropagation();setMobileConfirming(false);onDeleteFuture();}}>
+                  All future
+                </button>
+              </>
+            ) : (
+              <button className="task-mobile-delete-btn"
+                onClick={e=>{e.stopPropagation();onDelete();}}>
+                Delete?
+              </button>
+            )}
             <button onClick={e=>{e.stopPropagation();setMobileConfirming(false);}}
               style={{background:'none',border:'none',cursor:'pointer',fontSize:13,
                       color:'var(--ink-faint)',padding:'0 4px',flexShrink:0}}>✕</button>
@@ -3330,6 +3779,51 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
             <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:4}} onClick={e=>e.stopPropagation()}>
               <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Time:</span>
               <TimeSelect value={task.eventTime||''} onChange={v=>onUpdate({eventTime:v})} />
+            </div>
+          )}
+          {task.isEvent && (
+            <div style={{paddingTop:5}} onClick={e=>e.stopPropagation()}>
+              <div style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:3}}>Invite (emails):</div>
+              <input type="text" placeholder="friend@email.com, other@…"
+                value={(task.invitees||[]).join(', ')}
+                onChange={e=>onUpdate({invitees:e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})}
+                style={{width:'100%',fontSize:11,fontFamily:"'DM Sans',sans-serif",
+                  border:'1px solid var(--border)',borderRadius:4,padding:'4px 7px',
+                  background:'white',color:'var(--ink)',outline:'none',boxSizing:'border-box'}}
+              />
+            </div>
+          )}
+          {task.isEvent && task.calendarInvite && (
+            <div style={{paddingTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',marginTop:4}} onClick={e=>e.stopPropagation()}>
+              {task.responseStatus==='needsAction' ? (<>
+                <div style={{fontSize:10,color:'var(--gold)',fontFamily:"'DM Mono',monospace",marginBottom:5}}>📨 You've been invited — respond:</div>
+                <div className="invite-response-btns">
+                  <button className="invite-btn accept" onClick={e=>{
+                    e.stopPropagation();
+                    respondToCalendarInvite(task.gcalId,'accepted')
+                      .then(()=>onUpdate({responseStatus:'accepted'}))
+                      .catch(err=>alert('Could not respond: '+err.message));
+                  }}>✓ Accept</button>
+                  <button className="invite-btn tentative" onClick={e=>{
+                    e.stopPropagation();
+                    respondToCalendarInvite(task.gcalId,'tentative')
+                      .then(()=>onUpdate({responseStatus:'tentative'}))
+                      .catch(err=>alert('Could not respond: '+err.message));
+                  }}>? Maybe</button>
+                  <button className="invite-btn decline" onClick={e=>{
+                    e.stopPropagation();
+                    respondToCalendarInvite(task.gcalId,'declined')
+                      .then(()=>onUpdate({responseStatus:'declined'}))
+                      .catch(err=>alert('Could not respond: '+err.message));
+                  }}>✗ Decline</button>
+                </div>
+              </>) : (
+                <div style={{fontSize:10,fontFamily:"'DM Mono',monospace"}}>
+                  <span className={`invite-badge ${task.responseStatus||'needsAction'}`}>
+                    {task.responseStatus==='accepted'?'✓ accepted':task.responseStatus==='declined'?'✗ declined':task.responseStatus==='tentative'?'? maybe':'📨 invited'}
+                  </span>
+                </div>
+              )}
             </div>
           )}
           <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:6}}>
@@ -3496,7 +3990,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onEnterKey, titleRef, 
 // ─────────────────────────────────────────────
 // HABIT TRACKER
 // ─────────────────────────────────────────────
-function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completions, setCompletions, metrics, setMetrics, qty, setQty, notes, setNotes, fitnessLog, fitnessExercises }) {
+function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completions, setCompletions, metrics, setMetrics, qty, setQty, notes, setNotes, fitnessLog, fitnessExercises, countdowns, setCountdowns }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDateRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_habitDate'));
@@ -3514,6 +4008,112 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
   const [expandedGoals, setExpandedGoals] = useState({}); // {goalId: bool} for sidebar
   const [dragGoalId, setDragGoalId] = useState(null);
   const [dragOverGoalId, setDragOverGoalId] = useState(null);
+  // Countdown state
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [addingCountdown, setAddingCountdown] = useState(false);
+  const [newCdTitle, setNewCdTitle] = useState('');
+  const [newCdStart, setNewCdStart] = useState(fmt(new Date()));
+  const [newCdEnd, setNewCdEnd] = useState('');
+  const [newCdColor, setNewCdColor] = useState(COUNTDOWN_COLORS[0]);
+
+  function saveCountdown() {
+    if (!newCdTitle.trim() || !newCdEnd) return;
+    const cd = { id: 'cd'+Date.now(), title: newCdTitle.trim(), startDate: newCdStart, endDate: newCdEnd, color: newCdColor };
+    setCountdowns(cs => [...cs, cd]);
+    setNewCdTitle(''); setNewCdEnd(''); setNewCdStart(fmt(new Date())); setNewCdColor(COUNTDOWN_COLORS[0]);
+    setAddingCountdown(false);
+  }
+  function deleteCountdown(id) { setCountdowns(cs => cs.filter(c => c.id !== id)); }
+
+  function renderCountdownCards() {
+    if (!countdowns || countdowns.length === 0) return null;
+    return countdowns.map(cd => {
+      const end = parseLocal(cd.endDate);
+      const start = cd.startDate ? parseLocal(cd.startDate) : null;
+      const daysLeft = Math.ceil((end - today) / 86400000);
+      const isDone = daysLeft <= 0;
+      const pct = start ? Math.min(100, Math.max(0, (today - start) / (end - start) * 100)) : null;
+      const color = cd.color || COUNTDOWN_COLORS[0];
+      const [ey, em, ed] = cd.endDate.split('-').map(Number);
+      const endDisplay = MONTHS[em-1].slice(0,3)+' '+ed+', '+ey;
+      const totalDays = start ? Math.round((end - start) / 86400000) : null;
+      return (
+        <div key={cd.id} className="countdown-card" style={{borderLeftColor: color}}>
+          <button className="countdown-delete" onClick={()=>deleteCountdown(cd.id)}>✕</button>
+          <div className="countdown-card-row">
+            <div>
+              <div className={`countdown-number${isDone?' done':''}`} style={{color: isDone?'var(--gold)':color}}>
+                {isDone ? '🎉' : daysLeft}
+              </div>
+              <div className="countdown-unit">{isDone ? 'done!' : 'days left'}</div>
+            </div>
+            <div className="countdown-info">
+              <div className="countdown-title">{cd.title}</div>
+              <div className="countdown-dates">
+                {start ? `${cd.startDate} → ` : ''}{endDisplay}
+                {totalDays ? ` (${totalDays}d)` : ''}
+              </div>
+            </div>
+          </div>
+          {pct !== null && (
+            <div className="countdown-progress-bg">
+              <div className="countdown-progress-fill" style={{width: pct+'%', background: color}}/>
+            </div>
+          )}
+        </div>
+      );
+    });
+  }
+
+  function renderCountdownAddForm() {
+    return addingCountdown ? (
+      <div className="countdown-add-form">
+        <input
+          placeholder="Title (e.g. 100 Days of Practice)"
+          value={newCdTitle} onChange={e=>setNewCdTitle(e.target.value)}
+          style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
+            borderRadius:4,padding:'4px 7px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+          onKeyDown={e=>e.key==='Enter'&&saveCountdown()}
+        />
+        <div style={{display:'flex',gap:6}}>
+          <div style={{flex:1,display:'flex',flexDirection:'column',gap:2}}>
+            <label style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Start</label>
+            <input type="date" value={newCdStart} onChange={e=>setNewCdStart(e.target.value)}
+              style={{width:'100%',fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',outline:'none',background:'white',boxSizing:'border-box'}}/>
+          </div>
+          <div style={{flex:1,display:'flex',flexDirection:'column',gap:2}}>
+            <label style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.05em'}}>End *</label>
+            <input type="date" value={newCdEnd} onChange={e=>setNewCdEnd(e.target.value)}
+              style={{width:'100%',fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',outline:'none',background:'white',boxSizing:'border-box'}}/>
+          </div>
+        </div>
+        <div style={{display:'flex',gap:4,alignItems:'center'}}>
+          {COUNTDOWN_COLORS.map(c=>(
+            <div key={c} className={`countdown-color-swatch${newCdColor===c?' selected':''}`}
+              style={{background:c}} onClick={()=>setNewCdColor(c)}/>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:6}}>
+          <button onClick={saveCountdown} disabled={!newCdTitle.trim()||!newCdEnd}
+            style={{flex:1,background:newCdTitle.trim()&&newCdEnd?'var(--accent)':'var(--border)',color:newCdTitle.trim()&&newCdEnd?'white':'var(--ink-faint)',
+              border:'none',borderRadius:4,padding:'5px 0',cursor:newCdTitle.trim()&&newCdEnd?'pointer':'default',
+              fontSize:12,fontWeight:600,fontFamily:"'DM Sans',sans-serif"}}>Save</button>
+          <button onClick={()=>{setAddingCountdown(false);setNewCdTitle('');setNewCdEnd('');}}
+            style={{background:'none',border:'1px solid var(--border)',borderRadius:4,padding:'5px 10px',
+              cursor:'pointer',fontSize:12,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)'}}>Cancel</button>
+        </div>
+      </div>
+    ) : (
+      <button onClick={()=>setAddingCountdown(true)}
+        style={{width:'100%',background:'none',border:'1px dashed var(--border)',borderRadius:'var(--radius-sm)',
+          padding:'5px 0',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',fontFamily:"'DM Sans',sans-serif",
+          marginBottom:8,transition:'all 0.15s'}}
+        onMouseEnter={e=>{e.target.style.borderColor='var(--accent)';e.target.style.color='var(--accent)';}}
+        onMouseLeave={e=>{e.target.style.borderColor='var(--border)';e.target.style.color='var(--ink-faint)';}}>
+        + Add countdown
+      </button>
+    );
+  }
 
   // ── Fitness → Habit sync is handled at App level ──────────────────────
 
@@ -3534,10 +4134,35 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
     setMetrics(m => ({...m, [selectedDayKey]: {...(m[selectedDayKey]||{}), [field]: val}}));
   }
 
-  // Qty helpers (amount per goal per day)
-  function getQty(goalId) { return (qty[selectedDayKey] || {})[goalId] || ''; }
+  // Qty helpers (amount per goal per day) — line-item aware
+  function getRawQty(goalId) { return (qty[selectedDayKey] || {})[goalId]; }
+  function getQtyItems(goalId) { return normalizeQty(getRawQty(goalId)); }
+  function getQty(goalId) {
+    const total = qtyTotal(getRawQty(goalId));
+    return total === 0 ? '' : String(total);
+  }
   function setGoalQty(goalId, val) {
-    setQty(q => ({...q, [selectedDayKey]: {...(q[selectedDayKey]||{}), [goalId]: val}}));
+    // For single-entry habits: write as LineItem[] with one item preserving any existing note
+    const existing = getQtyItems(goalId);
+    const note = existing.length > 0 ? existing[0].note : '';
+    const n = parseFloat(val);
+    const items = (val === '' || isNaN(n)) ? [] : [{id: existing.length > 0 ? existing[0].id : genLiId(), amount:n, note, ts: existing.length > 0 ? existing[0].ts : Date.now()}];
+    setQty(q => ({...q, [selectedDayKey]: {...(q[selectedDayKey]||{}), [goalId]: items}}));
+  }
+  function addQtyEntry(goalId, amount, note) {
+    const n = parseFloat(amount);
+    if (isNaN(n) || n === 0) return;
+    const existing = getQtyItems(goalId);
+    const newItem = {id: genLiId(), amount: n, note: note||'', ts: Date.now()};
+    setQty(q => ({...q, [selectedDayKey]: {...(q[selectedDayKey]||{}), [goalId]: [...existing, newItem]}}));
+  }
+  function removeQtyEntry(goalId, liId) {
+    const updated = getQtyItems(goalId).filter(li => li.id !== liId);
+    setQty(q => ({...q, [selectedDayKey]: {...(q[selectedDayKey]||{}), [goalId]: updated}}));
+  }
+  function updateQtyEntry(goalId, liId, patch) {
+    const updated = getQtyItems(goalId).map(li => li.id === liId ? {...li, ...patch} : li);
+    setQty(q => ({...q, [selectedDayKey]: {...(q[selectedDayKey]||{}), [goalId]: updated}}));
   }
   function getNote(goalId) { return (notes[selectedDayKey] || {})[goalId] || ''; }
   function setGoalNote(goalId, val) {
@@ -3580,6 +4205,29 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
       while(d.getFullYear()===selectedDate.getFullYear()) { dates.push(fmt(d)); d.setDate(d.getDate()+1); }
     }
     return dates.filter(dk=>isCompleted(goalId,dk)).length;
+  }
+
+  // Sum qty for a goal across all dates in the current view window
+  function qtyRollup(goalId) {
+    let dates = [];
+    if (view==='daily') { dates=[fmt(selectedDate)]; }
+    else if (view==='weekly') {
+      const ws=getWeekStart(selectedDate);
+      dates=Array.from({length:7},(_,i)=>fmt(addDays(ws,i)));
+    }
+    else if (view==='monthly') {
+      const d=new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+      const m=d.getMonth();
+      while(d.getMonth()===m) { dates.push(fmt(d)); d.setDate(d.getDate()+1); }
+    }
+    else { // yearly
+      const d=new Date(selectedDate.getFullYear(),0,1);
+      while(d.getFullYear()===selectedDate.getFullYear()) { dates.push(fmt(d)); d.setDate(d.getDate()+1); }
+    }
+    return dates.reduce((sum, dk) => {
+      const v = qtyTotal((qty[dk]||{})[goalId]);
+      return sum + v;
+    }, 0);
   }
 
   function calcStreak(goalId) {
@@ -3650,6 +4298,15 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
             📈
           </button>
         </div>
+
+        <div className="checklist-header" style={{marginBottom:8}}>
+          <div>
+            <div className="sidebar-section-title">Countdowns</div>
+          </div>
+          <button className="add-btn" onClick={()=>setAddingCountdown(a=>!a)}>+</button>
+        </div>
+        {renderCountdownCards()}
+        {renderCountdownAddForm()}
 
         <div className="checklist-header" style={{marginBottom:8}}>
           <div>
@@ -3745,17 +4402,25 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                     </div>
                   </div>
                 )}
+                {/* Multi-entry toggle */}
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
-                  <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Qty:</span>
-                  <input type="number" min="0" step="1"
-                    className="habit-qty-input"
-                    placeholder="—"
-                    value={getQty(goal.id)}
-                    onChange={e=>setGoalQty(goal.id, e.target.value)}
-                    onClick={e=>e.stopPropagation()}
-                    style={{width:60}}
-                  />
+                  <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Multi-entry:</span>
+                  <button
+                    onClick={e=>{e.stopPropagation();updateGoal(goal.id,{multiEntry:!goal.multiEntry});}}
+                    style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 8px',borderRadius:10,border:'1px solid var(--border)',background:goal.multiEntry?'var(--accent)':'var(--cream)',color:goal.multiEntry?'white':'var(--ink-light)',cursor:'pointer',lineHeight:1.6}}
+                    title="Allow multiple line-item entries per day">
+                    {goal.multiEntry ? 'On' : 'Off'}
+                  </button>
+                  <button
+                    onClick={e=>{e.stopPropagation();updateGoal(goal.id,{qtyMode:(goal.qtyMode||'qty')==='qty'?'$':'qty'});}}
+                    style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 6px',borderRadius:10,border:'1px solid var(--border)',background:(goal.qtyMode||'qty')==='$'?'var(--gold)':'var(--cream)',color:(goal.qtyMode||'qty')==='$'?'white':'var(--ink-light)',cursor:'pointer',flexShrink:0,lineHeight:1.6}}
+                    title="Toggle between Qty and $ mode">
+                    {(goal.qtyMode||'qty')==='$' ? '$' : 'Qty'}
+                  </button>
                 </div>
+                <QtySection goal={goal} items={getQtyItems(goal.id)} getQty={getQty}
+                  setGoalQty={setGoalQty} addQtyEntry={addQtyEntry}
+                  removeQtyEntry={removeQtyEntry} updateQtyEntry={updateQtyEntry} />
                 <div style={{display:'flex',flexDirection:'column',gap:2}}>
                   <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Notes:</span>
                   <textarea
@@ -3789,7 +4454,8 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
       {(() => {
         const habitSwipe = useSwipe(
           () => setSelectedDate(d => addDays(d, view==='daily'?1:view==='weekly'?7:view==='monthly'?31:365)),
-          () => setSelectedDate(d => addDays(d, view==='daily'?-1:view==='weekly'?-7:view==='monthly'?-31:-365))
+          () => setSelectedDate(d => addDays(d, view==='daily'?-1:view==='weekly'?-7:view==='monthly'?-31:-365)),
+          100
         );
         return (
       <div className="habit-main" {...habitSwipe}>
@@ -3825,40 +4491,77 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
           <HabitNavArrows view={view} date={selectedDate} onChange={setSelectedDate}/>
         </div>
 
+        {/* Qty rollup banner — shown when a single habit is filtered and it has a qty mode */}
+        {filterGoal && (() => {
+          const fg = goals.find(g => g.id === filterGoal);
+          if (!fg || view === 'daily') return null;
+          const total = qtyRollup(filterGoal);
+          if (total === 0) return null;
+          const isDollar = (fg.qtyMode || 'qty') === '$';
+          const displayVal = isDollar
+            ? '$' + (Number.isInteger(total) ? total.toLocaleString() : total.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}))
+            : (Number.isInteger(total) ? total.toLocaleString() : parseFloat(total.toFixed(4)).toString());
+          const viewLabel = view === 'weekly' ? 'This Week' : view === 'monthly' ? 'This Month' : 'This Year';
+          return (
+            <div style={{
+              display:'flex',alignItems:'baseline',justifyContent:'center',gap:8,
+              padding:'8px 16px',marginBottom:10,
+              background: fg.color + '12',
+              borderRadius:10,border:`1px solid ${fg.color}30`,
+            }}>
+              <span style={{fontFamily:"'DM Mono',monospace",fontSize:26,fontWeight:700,color:fg.color,lineHeight:1}}>
+                {displayVal}
+              </span>
+              <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:12,color:'var(--ink-faint)',letterSpacing:'0.03em'}}>
+                total · {viewLabel}
+              </span>
+            </div>
+          );
+        })()}
+
         {view==='monthly' && <>
           <MonthlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions}
             qty={qty} notes={notes}
             onDayClick={setSelectedDate} today={today} />
+          <div className="habit-selected-date-mobile">
+            {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}
+          </div>
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
             onReorder={reorderGoals}
             onGoToMetrics={onGoToMetrics}
             getMetric={getMetric} setMetric={setMetric}
-            getQty={getQty} setGoalQty={setGoalQty}
+            getQty={getQty} setGoalQty={setGoalQty} getQtyItems={getQtyItems} addQtyEntry={addQtyEntry} removeQtyEntry={removeQtyEntry} updateQtyEntry={updateQtyEntry}
             getNote={getNote} setGoalNote={setGoalNote}
             countInView={countInView} calcStreak={calcStreak}
             fitnessExercises={fitnessExercises} />
         </>}
         {view==='weekly' && <>
           <WeeklyHabitView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} qty={qty} notes={notes} onDayClick={setSelectedDate} />
+          <div className="habit-selected-date-mobile">
+            {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}
+          </div>
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
             onReorder={reorderGoals}
             onGoToMetrics={onGoToMetrics}
             getMetric={getMetric} setMetric={setMetric}
-            getQty={getQty} setGoalQty={setGoalQty}
+            getQty={getQty} setGoalQty={setGoalQty} getQtyItems={getQtyItems} addQtyEntry={addQtyEntry} removeQtyEntry={removeQtyEntry} updateQtyEntry={updateQtyEntry}
             getNote={getNote} setGoalNote={setGoalNote}
             countInView={countInView} calcStreak={calcStreak}
             fitnessExercises={fitnessExercises} />
         </>}
         {view==='yearly' && <>
           <YearlyView date={selectedDate} selected={selectedDate} goals={displayGoals} completions={completions} today={today} onDayClick={setSelectedDate} />
+          <div className="habit-selected-date-mobile">
+            {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}
+          </div>
           <HabitChecklist date={selectedDate} goals={goals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
             onReorder={reorderGoals}
             onGoToMetrics={onGoToMetrics}
             getMetric={getMetric} setMetric={setMetric}
-            getQty={getQty} setGoalQty={setGoalQty}
+            getQty={getQty} setGoalQty={setGoalQty} getQtyItems={getQtyItems} addQtyEntry={addQtyEntry} removeQtyEntry={removeQtyEntry} updateQtyEntry={updateQtyEntry}
             getNote={getNote} setGoalNote={setGoalNote}
             countInView={countInView} calcStreak={calcStreak}
             fitnessExercises={fitnessExercises} />
@@ -3867,11 +4570,148 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
           onToggle={(gid)=>toggleCompletion(gid,fmt(selectedDate))} />}
       </div>
       );})()}
+
+      {/* Mobile FAB + sheet for countdowns */}
+      <div className={`mobile-sheet-overlay ${sheetOpen?'open':''}`} onClick={()=>setSheetOpen(false)} />
+      <div className={`mobile-sheet ${sheetOpen?'open':''}`}>
+        <div className="mobile-sheet-handle" />
+        <div className="mobile-sheet-header">
+          <span className="mobile-sheet-title">Countdowns</span>
+          <button className="mobile-sheet-close" onClick={()=>setSheetOpen(false)}>✕</button>
+        </div>
+        <div className="mobile-sheet-body">
+          {renderCountdownCards()}
+          {renderCountdownAddForm()}
+        </div>
+      </div>
+      <button className="mobile-fab" onClick={()=>setSheetOpen(o=>!o)} title="Countdowns">⏳</button>
     </div>
   );
 }
 
-function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, onRename, onReorder, onGoToMetrics, getMetric, setMetric, getQty, setGoalQty, getNote, setGoalNote, countInView, calcStreak, fitnessExercises }) {
+// ── QtySection — reusable qty entry UI (single or multi-entry) ──
+function QtySection({ goal, items, getQty, setGoalQty, addQtyEntry, removeQtyEntry, updateQtyEntry }) {
+  const [showItems, setShowItems] = useState(false);
+  const [addAmount, setAddAmount] = useState('');
+  const [addNote, setAddNote] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const isDollar = (goal.qtyMode || 'qty') === '$';
+  const prefix = isDollar ? '$' : '';
+  const totalVal = qtyTotal(items);
+  const displayTotal = totalVal === 0 ? '' : (isDollar
+    ? '$' + (Number.isInteger(totalVal) ? totalVal.toLocaleString() : totalVal.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}))
+    : String(parseFloat(totalVal.toFixed(4))));
+
+  function commitAdd() {
+    const n = parseFloat(addAmount);
+    if (isNaN(n) || n === 0) return;
+    addQtyEntry(goal.id, n, addNote.trim());
+    setAddAmount(''); setAddNote('');
+  }
+  function startEdit(li) {
+    setEditingId(li.id); setEditAmount(String(li.amount)); setEditNote(li.note||'');
+  }
+  function commitEdit() {
+    const n = parseFloat(editAmount);
+    if (!isNaN(n)) updateQtyEntry(goal.id, editingId, {amount:n, note:editNote.trim()});
+    setEditingId(null);
+  }
+
+  if (!goal.multiEntry) {
+    // Single-entry: plain editable field with mode indicator
+    return (
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 6px',borderRadius:10,border:'1px solid var(--border)',background:isDollar?'var(--gold)':'var(--cream)',color:isDollar?'white':'var(--ink-light)',flexShrink:0,lineHeight:1.6}}>
+          {isDollar ? '$' : 'Qty'}
+        </span>
+        <input type="number" min="0" step="any" inputMode="decimal"
+          className="habit-qty-input"
+          placeholder="—"
+          value={getQty(goal.id)}
+          onChange={e=>setGoalQty(goal.id, e.target.value)}
+          onClick={e=>e.stopPropagation()}
+          style={{width:70}}
+        />
+      </div>
+    );
+  }
+
+  // Multi-entry mode
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:4}} onClick={e=>e.stopPropagation()}>
+      {/* Header row: mode toggle, total, expand toggle */}
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <button
+          onClick={e=>{e.stopPropagation();}}
+          style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 6px',borderRadius:10,border:'1px solid var(--border)',background:isDollar?'var(--gold)':'var(--cream)',color:isDollar?'white':'var(--ink-light)',cursor:'default',flexShrink:0,lineHeight:1.6}}
+          title="Mode indicator">
+          {isDollar ? '$' : 'Qty'}
+        </button>
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:'var(--ink)',minWidth:40}}>
+          {displayTotal || '—'}
+        </span>
+        {items.length > 0 && (
+          <button onClick={e=>{e.stopPropagation();setShowItems(s=>!s);}}
+            style={{fontSize:10,color:'var(--ink-faint)',background:'none',border:'none',cursor:'pointer',padding:'0 2px',lineHeight:1}}>
+            {showItems ? '▲' : `▾ ${items.length} item${items.length>1?'s':''}`}
+          </button>
+        )}
+      </div>
+      {/* Line items list */}
+      {showItems && items.length > 0 && (
+        <div style={{display:'flex',flexDirection:'column',gap:3,paddingLeft:4,borderLeft:'2px solid var(--border)'}}>
+          {items.map(li => (
+            <div key={li.id} style={{display:'flex',alignItems:'center',gap:4,fontSize:11}}>
+              {editingId===li.id ? (
+                <>
+                  <input type="number" min="0" step="any" inputMode="decimal" value={editAmount}
+                    onChange={e=>setEditAmount(e.target.value)}
+                    style={{width:54,fontSize:11,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:3,padding:'1px 4px',background:'white',color:'var(--ink)',outline:'none'}}
+                    autoFocus />
+                  <input type="text" value={editNote} onChange={e=>setEditNote(e.target.value)}
+                    placeholder="note…"
+                    style={{flex:1,fontSize:11,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:3,padding:'1px 4px',background:'white',color:'var(--ink)',outline:'none',minWidth:0}}
+                    onKeyDown={e=>{if(e.key==='Enter')commitEdit();if(e.key==='Escape')setEditingId(null);}} />
+                  <button onClick={commitEdit} style={{fontSize:10,background:'var(--accent)',color:'white',border:'none',borderRadius:3,padding:'1px 5px',cursor:'pointer',fontFamily:"'DM Mono',monospace",flexShrink:0}}>✓</button>
+                </>
+              ) : (
+                <>
+                  <span style={{fontFamily:"'DM Mono',monospace",fontWeight:700,color:'var(--ink)',flexShrink:0}}>{prefix}{li.amount}</span>
+                  {li.note && <span style={{fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{li.note}</span>}
+                  {!li.note && <span style={{flex:1}}/>}
+                  <button onClick={()=>startEdit(li)} style={{fontSize:10,background:'none',border:'none',cursor:'pointer',color:'var(--ink-faint)',padding:'0 2px',flexShrink:0}} title="Edit">✎</button>
+                  <button onClick={()=>removeQtyEntry(goal.id,li.id)} style={{fontSize:11,background:'none',border:'none',cursor:'pointer',color:'var(--ink-faint)',padding:'0 2px',flexShrink:0}} title="Remove">✕</button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {/* Add new entry row */}
+      <div style={{display:'flex',alignItems:'center',gap:4}}>
+        <input type="number" min="0" step="any" inputMode="decimal"
+          value={addAmount}
+          onChange={e=>setAddAmount(e.target.value)}
+          placeholder={prefix+'0'}
+          onKeyDown={e=>{if(e.key==='Enter')commitAdd();}}
+          style={{width:60,fontSize:11,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:3,padding:'2px 4px',background:'white',color:'var(--ink)',outline:'none'}}
+        />
+        <input type="text" value={addNote} onChange={e=>setAddNote(e.target.value)}
+          placeholder="note (optional)"
+          onKeyDown={e=>{if(e.key==='Enter')commitAdd();}}
+          style={{flex:1,fontSize:11,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:3,padding:'2px 4px',background:'white',color:'var(--ink)',outline:'none',minWidth:0}}
+        />
+        <button onClick={e=>{e.stopPropagation();commitAdd();}}
+          style={{fontSize:13,background:'var(--accent)',color:'white',border:'none',borderRadius:4,padding:'2px 8px',cursor:'pointer',fontWeight:700,flexShrink:0,lineHeight:1.5}}
+          title="Add entry">+</button>
+      </div>
+    </div>
+  );
+}
+
+function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, onRename, onReorder, onGoToMetrics, getMetric, setMetric, getQty, setGoalQty, getQtyItems, addQtyEntry, removeQtyEntry, updateQtyEntry, getNote, setGoalNote, countInView, calcStreak, fitnessExercises }) {
   const dk = fmt(date);
   const [confirmId, setConfirmId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -3892,6 +4732,11 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
     if (editingId && editRef.current) {
       editRef.current.focus();
       editRef.current.select();
+      // Scroll the input into view after a short delay so the mobile keyboard has time
+      // to appear and resize the viewport before we ask the browser to scroll.
+      setTimeout(() => {
+        editRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
     }
   }, [editingId]);
 
@@ -4045,7 +4890,7 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                 )}
                 {/* Expand toggle */}
                 <button
-                  style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',flexShrink:0}}
+                  style={{background:'none',border:'none',cursor:'pointer',fontSize:16,color:'var(--ink-faint)',padding:'4px 6px',flexShrink:0,lineHeight:1}}
                   onClick={e=>{e.stopPropagation();setExpandedGoals(ex=>({...ex,[g.id]:!ex[g.id]}));}}
                   title="Qty & notes">
                   {isExpanded ? '▲' : '▼'}
@@ -4108,16 +4953,28 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                     </div>
                   )}
                   {getQty && (
-                    <div style={{display:'flex',alignItems:'center',gap:8}}>
-                      <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Qty:</span>
-                      <input type="number" min="0" step="1" inputMode="numeric"
-                        className="habit-qty-input"
-                        placeholder="—"
-                        value={getQty(g.id)}
-                        onChange={e=>setGoalQty(g.id, e.target.value)}
-                        style={{width:70}}
-                      />
-                    </div>
+                    <>
+                      {onRename && (
+                        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+                          <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Multi-entry:</span>
+                          <button
+                            onClick={e=>{e.stopPropagation();onRename(g.id,{multiEntry:!g.multiEntry});}}
+                            style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 8px',borderRadius:10,border:'1px solid var(--border)',background:g.multiEntry?'var(--accent)':'var(--cream)',color:g.multiEntry?'white':'var(--ink-light)',cursor:'pointer',lineHeight:1.6}}
+                            title="Allow multiple line-item entries per day">
+                            {g.multiEntry ? 'On' : 'Off'}
+                          </button>
+                          <button
+                            onClick={e=>{e.stopPropagation();onRename(g.id,{qtyMode:(g.qtyMode||'qty')==='qty'?'$':'qty'});}}
+                            style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,padding:'1px 6px',borderRadius:10,border:'1px solid var(--border)',background:(g.qtyMode||'qty')==='$'?'var(--gold)':'var(--cream)',color:(g.qtyMode||'qty')==='$'?'white':'var(--ink-light)',cursor:'pointer',flexShrink:0,lineHeight:1.6}}
+                            title="Toggle between Qty and $ mode">
+                            {(g.qtyMode||'qty')==='$' ? '$' : 'Qty'}
+                          </button>
+                        </div>
+                      )}
+                      <QtySection goal={g} items={getQtyItems ? getQtyItems(g.id) : normalizeQty(getQty(g.id))}
+                        getQty={getQty} setGoalQty={setGoalQty}
+                        addQtyEntry={addQtyEntry} removeQtyEntry={removeQtyEntry} updateQtyEntry={updateQtyEntry} />
+                    </>
                   )}
                   {getNote && (
                     <div style={{display:'flex',flexDirection:'column',gap:2}}>
@@ -4220,13 +5077,15 @@ function MonthlyView({date, selected, goals, completions, onDayClick, today, qty
               {goals.length === 1 && (() => {
                 const g = goals[0];
                 const done = (completions[dk]||[]).includes(g.id);
-                const qtyVal = qty ? (qty[dk]||{})[g.id] || '' : '';
+                const qtyRaw = qty ? (qty[dk]||{})[g.id] : null;
+                const qtyVal = qtyRaw != null ? qtyTotal(qtyRaw) : 0;
                 const notesVal = notes ? (notes[dk]||{})[g.id] || '' : '';
                 const noteLines = notesVal.split('\n').slice(0,4).filter(l=>l.trim());
                 if (!done && !qtyVal && !noteLines.length) return null;
+                const qtyDisplay = qtyVal ? ((g.qtyMode||'qty')==='$' ? '$'+qtyVal : String(qtyVal)) : '';
                 return (
                   <div style={{marginTop:2,padding:'1px 3px'}}>
-                    {qtyVal && <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:g.color,fontWeight:700,lineHeight:1.3}}>{qtyVal}</div>}
+                    {qtyDisplay && <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:g.color,fontWeight:700,lineHeight:1.3}}>{qtyDisplay}</div>}
                     {noteLines.map((l,i)=>(
                       <div key={i} style={{fontSize:8,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)',lineHeight:1.3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{l}</div>
                     ))}
@@ -4264,7 +5123,8 @@ function WeeklyHabitView({date, selected, goals, completions, today, onDayClick,
                 {goals.map(g=>{
                   const done=(completions[dk]||[]).includes(g.id);
                   const isSingle = goals.length === 1;
-                  const qtyVal = (isSingle && qty) ? (qty[dk]||{})[g.id] || '' : '';
+                  const qtyRaw = (isSingle && qty) ? (qty[dk]||{})[g.id] : null;
+                  const qtyVal = qtyRaw != null ? qtyTotal(qtyRaw) : 0;
                   const notesVal = (isSingle && notes) ? (notes[dk]||{})[g.id] || '' : '';
                   const noteLines = notesVal.split('\n').slice(0,4).filter(l=>l.trim());
                   return (
@@ -4280,8 +5140,8 @@ function WeeklyHabitView({date, selected, goals, completions, today, onDayClick,
                       flexDirection:'column', justifyContent:'flex-start', gap:1,
                       overflow:'hidden',
                     }}>
-                      {isSingle && qtyVal && (
-                        <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:done?'white':g.color,lineHeight:1.3}}>{qtyVal}</div>
+                      {isSingle && !!qtyVal && (
+                        <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:done?'white':g.color,lineHeight:1.3}}>{(g.qtyMode||'qty')==='$'?'$':''}{qtyVal}</div>
                       )}
                       {isSingle && noteLines.map((l,li)=>(
                         <div key={li} style={{fontSize:9,fontFamily:"'DM Sans',sans-serif",color:done?'rgba(255,255,255,0.85)':'var(--ink-light)',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l}</div>
@@ -4414,7 +5274,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
   const [selectedDate, setSelectedDate] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null); // {dayKey, taskId} or null
-  const [eventForm, setEventForm] = useState({title:'', time:'', date:'', details:''});
+  const [eventForm, setEventForm] = useState({title:'', time:'', date:'', details:'', invitees:''});
   const [dragInfo, setDragInfo] = useState(null); // {eventId, fromDayKey}
   const [dragOverDay, setDragOverDay] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -4508,13 +5368,13 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
   function openAddEvent(dateKey) {
     setSelectedDate(dateKey);
     setEditingEvent(null);
-    setEventForm({title:'', time:'', date:dateKey, details:''});
+    setEventForm({title:'', time:'', date:dateKey, details:'', invitees:''});
     setShowEventModal(true);
   }
 
   function openEditEvent(ev) {
     setEditingEvent({dayKey: ev.dayKey, taskId: ev.id});
-    setEventForm({title: ev.title||'', time: ev.eventTime||'', date: ev.dayKey||'', details: ev.details||''});
+    setEventForm({title: ev.title||'', time: ev.eventTime||'', date: ev.dayKey||'', details: ev.details||'', invitees:(ev.invitees||[]).join(', ')});
     setShowEventModal(true);
   }
 
@@ -4531,7 +5391,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
           if (tasks) {
             const idx = tasks.findIndex(t => t.id === editingEvent.taskId);
             if (idx !== -1) {
-              const updatedTask = {...tasks[idx], title:eventForm.title, eventTime:eventForm.time, details:eventForm.details};
+              const updatedTask = {...tasks[idx], title:eventForm.title, eventTime:eventForm.time, details:eventForm.details, invitees:eventForm.invitees.split(',').map(s=>s.trim()).filter(Boolean)};
               if (dateChanged) {
                 // Remove from old day
                 updated[wk].tasks[editingEvent.dayKey] = tasks.filter(t => t.id !== editingEvent.taskId);
@@ -4558,7 +5418,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
       const dateObj = new Date(targetDate + 'T00:00:00');
       const weekKey = fmt(getWeekStart(dateObj));
       const newTask = {
-        id: Date.now().toString(), title: eventForm.title, details: eventForm.details,
+        id: Date.now().toString(), title: eventForm.title, details: eventForm.details, invitees:eventForm.invitees.split(',').map(s=>s.trim()).filter(Boolean),
         done: false, expanded: false, colorIndex: 3, isEvent: true, eventTime: eventForm.time,
         gcalId: null,
       };
@@ -4655,21 +5515,57 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
         {monthEvents.length === 0 && (
           <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',marginTop:4}}>No events yet</div>
         )}
-        {monthEvents.map(ev=>(
-          <div key={ev.id} className="month-event-item" onClick={()=>openEditEvent(ev)}>
-            <div className="month-event-date">
-              {MONTHS[ev.date.getMonth()].slice(0,3)} {ev.date.getDate()}
-              {ev.eventTime && <span className="month-event-time"> {ev.eventTime}</span>}
+        {monthEvents.map(ev=>{
+          const isPending = ev.calendarInvite && ev.responseStatus === 'needsAction';
+          const isDeclined = ev.responseStatus === 'declined';
+          function handleRespond(response, e) {
+            e.stopPropagation();
+            if (!ev.gcalId) return;
+            respondToCalendarInvite(ev.gcalId, response).then(() => {
+              setWeekData(wd => {
+                const updated = JSON.parse(JSON.stringify(wd));
+                Object.values(updated).forEach(week => {
+                  Object.values(week.tasks || {}).forEach(tasks => {
+                    const t = tasks.find(t => t.gcalId === ev.gcalId);
+                    if (t) { t.responseStatus = response; t.calendarInvite = true; }
+                  });
+                });
+                return updated;
+              });
+            }).catch(err => alert('Could not respond: ' + err.message));
+          }
+          return (
+            <div key={ev.id} className={`month-event-item ${isPending?'pending':''}`} onClick={()=>openEditEvent(ev)}>
+              <div style={{flex:1,minWidth:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <div className="month-event-date">
+                    {MONTHS[ev.date.getMonth()].slice(0,3)} {ev.date.getDate()}
+                    {ev.eventTime && <span className="month-event-time"> {ev.eventTime}</span>}
+                  </div>
+                  {ev.calendarInvite && (
+                    <span className={`invite-badge ${ev.responseStatus||'needsAction'}`}>
+                      {ev.responseStatus==='accepted'?'✓ accepted':ev.responseStatus==='declined'?'✗ declined':ev.responseStatus==='tentative'?'? maybe':'📨 invited'}
+                    </span>
+                  )}
+                </div>
+                <div className="month-event-title" style={{opacity:isDeclined?0.45:1}}>{ev.title||<em style={{opacity:0.5}}>Untitled</em>}</div>
+                {isPending && (
+                  <div className="invite-response-btns" onClick={e=>e.stopPropagation()}>
+                    <button className="invite-btn accept" onClick={e=>handleRespond('accepted',e)}>✓ Accept</button>
+                    <button className="invite-btn tentative" onClick={e=>handleRespond('tentative',e)}>? Maybe</button>
+                    <button className="invite-btn decline" onClick={e=>handleRespond('declined',e)}>✗ Decline</button>
+                  </div>
+                )}
+              </div>
+              <button className="delete-item-btn" style={{marginLeft:'auto',flexShrink:0,opacity:0.4,fontSize:13,color:'var(--red)',alignSelf:'flex-start'}}
+                onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.4}
+                onClick={e=>{
+                  e.stopPropagation();
+                  if(window.confirm(`Delete "${ev.title||'Untitled'}"?`)) deleteEvent(ev);
+                }}>✕</button>
             </div>
-            <div className="month-event-title">{ev.title||<em style={{opacity:0.5}}>Untitled</em>}</div>
-            <button className="delete-item-btn" style={{marginLeft:'auto',flexShrink:0,opacity:0.4,fontSize:13,color:'var(--red)'}}
-              onMouseEnter={e=>e.currentTarget.style.opacity=1} onMouseLeave={e=>e.currentTarget.style.opacity=0.4}
-              onClick={e=>{
-                e.stopPropagation();
-                if(window.confirm(`Delete "${ev.title||'Untitled'}"?`)) deleteEvent(ev);
-              }}>✕</button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );
@@ -4691,6 +5587,12 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
       {/* MAIN CALENDAR GRID */}
       <div className="main-panel" style={{overflowY:'auto'}}>
         <div className="monthly-cal-wrap">
+          {/* Mobile month navigation — desktop uses the sidebar nav instead */}
+          <div className="mobile-month-nav">
+            <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()-1, 1))}>‹</button>
+            <span className="mobile-month-label">{MONTHS[month]} {year}</span>
+            <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()+1, 1))}>›</button>
+          </div>
           {/* Day-of-week headers */}
           <div className="monthly-cal-header">
             {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map(d=>(
@@ -4700,7 +5602,11 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
           {/* Grid */}
           <div className="monthly-cal-grid">
             {cells.map((d,i)=>{
-              if (!d) return <div key={'e'+i} className="monthly-cell empty" />;
+              if (!d) return (
+                <div key={'e'+i} className="monthly-cell empty">
+                  <div className="monthly-cell-dow">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i%7]}</div>
+                </div>
+              );
               const dk = fmt(d);
               const isToday = isSameDay(d, today);
               const dayEvents = getEventsForDay(dk);
@@ -4712,6 +5618,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
                   onDragOver={e=>handleDragOver(e,dk)}
                   onDragLeave={()=>setDragOverDay(null)}
                   onDrop={e=>handleDrop(e,dk)}>
+                  <div className="monthly-cell-dow">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]}</div>
                   <div className="monthly-cell-date">{d.getDate()}</div>
                   <div className="monthly-cell-events">
                     {dayEvents.slice(0,3).map(ev=>(
@@ -4753,7 +5660,26 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
       <button className="mobile-fab" onClick={()=>setSheetOpen(o=>!o)} title="Monthly goals & events">☰</button>
 
       {/* EVENT MODAL */}
-      {showEventModal && (
+      {showEventModal && (()=>{
+        const editTask = editingEvent
+          ? Object.values(weekData).flatMap(wd=>Object.values(wd.tasks||{}).flat()).find(t=>t.id===editingEvent.taskId)
+          : null;
+        const isPending = editTask?.calendarInvite && editTask?.responseStatus==='needsAction';
+        function handleModalRespond(response) {
+          if (!editTask?.gcalId) return;
+          respondToCalendarInvite(editTask.gcalId, response).then(()=>{
+            setWeekData(wd=>{
+              const updated=JSON.parse(JSON.stringify(wd));
+              Object.values(updated).forEach(week=>Object.values(week.tasks||{}).forEach(tasks=>{
+                const t=tasks.find(t=>t.gcalId===editTask.gcalId);
+                if(t){t.responseStatus=response;t.calendarInvite=true;}
+              }));
+              return updated;
+            });
+            setShowEventModal(false);
+          }).catch(err=>alert('Could not respond: '+err.message));
+        }
+        return (
         <div className="modal-backdrop" onClick={()=>setShowEventModal(false)}>
           <div className="modal-box" onClick={e=>e.stopPropagation()}>
             <div className="modal-title">{editingEvent ? 'Edit Event' : `Add Event — ${selectedDate}`}</div>
@@ -4770,6 +5696,44 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
             </div>
             <textarea className="modal-textarea" placeholder="Details (optional)…"
               value={eventForm.details} onChange={e=>setEventForm(f=>({...f,details:e.target.value}))} rows={3} />
+            <div style={{marginTop:8}}>
+              <label style={{fontSize:12,color:'var(--ink-faint)',display:'block',marginBottom:4}}>
+                Invite (comma-separated emails):
+              </label>
+              <input className="modal-input" placeholder="friend@email.com, other@email.com…"
+                value={eventForm.invitees}
+                onChange={e=>setEventForm(f=>({...f,invitees:e.target.value}))}
+                style={{marginTop:0,fontSize:12}} />
+              <div style={{fontSize:10,color:'var(--ink-faint)',marginTop:3,fontStyle:'italic'}}>
+                Google Calendar will send invitations to these addresses.
+              </div>
+            </div>
+            {editTask?.calendarInvite && (
+              <div style={{marginTop:10,padding:'8px 10px',borderRadius:'var(--radius-sm)',
+                background: isPending?'var(--gold-light)':'var(--accent-light)',
+                border:`1px solid ${isPending?'var(--gold)':'var(--accent)'}`}}>
+                {isPending ? (<>
+                  <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:'var(--gold)',fontWeight:700,marginBottom:6}}>
+                    📨 You've been invited — respond:
+                  </div>
+                  <div className="invite-response-btns">
+                    <button className="invite-btn accept" onClick={()=>handleModalRespond('accepted')}>✓ Accept</button>
+                    <button className="invite-btn tentative" onClick={()=>handleModalRespond('tentative')}>? Maybe</button>
+                    <button className="invite-btn decline" onClick={()=>handleModalRespond('declined')}>✗ Decline</button>
+                  </div>
+                </>) : (
+                  <div style={{fontSize:11,fontFamily:"'DM Mono',monospace"}}>
+                    Your RSVP: <span className={`invite-badge ${editTask.responseStatus}`}>
+                      {editTask.responseStatus==='accepted'?'✓ accepted':editTask.responseStatus==='declined'?'✗ declined':'? maybe'}
+                    </span>
+                    <button style={{marginLeft:8,fontSize:10,background:'none',border:'none',cursor:'pointer',color:'var(--ink-faint)',textDecoration:'underline'}}
+                      onClick={()=>setWeekData(wd=>{const u=JSON.parse(JSON.stringify(wd));Object.values(u).forEach(wk=>Object.values(wk.tasks||{}).forEach(ts=>{const t=ts.find(t=>t.gcalId===editTask.gcalId);if(t)t.responseStatus='needsAction';}));return u;})}>
+                      Change
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="modal-actions">
               {editingEvent && (
                 <button className="modal-btn danger" onClick={()=>{
@@ -4782,7 +5746,8 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
@@ -4838,7 +5803,8 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
 
   function dflt30() {
     const end = new Date(); end.setHours(0,0,0,0);
-    const start = new Date(end); start.setDate(start.getDate() - 29);
+    // vvv this is where you set the days back default in the Weight/Cal Charts
+    const start = new Date(end); start.setDate(start.getDate() - 20); // 21 days total (today + 20 back)
     return { start: fmt(start), end: fmt(end) };
   }
   const [dateRange, setDateRange] = useState(dflt30);
@@ -5122,13 +6088,13 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
 // ─────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────
-const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData','weightTarget','calsTarget','peopleDirectory','fitnessLog','fitnessExercises','fitnessGoals'];
+const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData','weightTarget','calsTarget','peopleDirectory','fitnessLog','fitnessExercises','fitnessGoals','countdowns'];
 
 function App() {
   const [page, setPageRaw] = useState(() => sessionStorage.getItem('lp_page') || 'planner');
   const setPage = (p) => { sessionStorage.setItem('lp_page', p); setPageRaw(p); };
-  const [navColor, setNavColor] = useStorage('navColor', '#1e3d29');
-  const [calHeaderColor, setCalHeaderColor] = useStorage('calHeaderColor', '#2d5a3d');
+  const [navColor, setNavColor] = useStorage('navColor', '#5c2d52');
+  const [calHeaderColor, setCalHeaderColor] = useStorage('calHeaderColor', '#7c3f6e');
   const [weekData, setWeekData] = useStorage('weekData', {});
   const [pagesData, setPagesData] = useStorage('pagesData', []); // [{id,title,body,createdAt,lastModified,folderId,order,tasks:[]}]
   const [foldersData, setFoldersData] = useStorage('foldersData', []); // [{id,name,expanded,order}]
@@ -5148,12 +6114,15 @@ function App() {
   const [fitnessLog, setFitnessLog] = useStorage('fitnessLog', {}); // {[dateKey]: [{id, name, exercises:[{id, exerciseId, sets:[{id,reps,weight,done}]}]}]}
   const [fitnessExercises, setFitnessExercises] = useStorage('fitnessExercises', []); // [{id, name, category}] library
   const [fitnessGoals, setFitnessGoals] = useStorage('fitnessGoals', []); // [{id, exerciseId, period, target, unit}]
+  const [countdowns, setCountdowns] = useStorage('countdowns', []); // [{id, title, startDate, endDate, color}]
 
   // Auth state
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
   const [driveFileId, setDriveFileId] = useState(null);
   const [saveStatus, setSaveStatus] = useState(''); // '', 'saving', 'saved', 'error'
+  const [saveRetrying, setSaveRetrying] = useState(false); // true while manual retry is in flight
   const [authError, setAuthError] = useState(false); // true when session expired and silent refresh failed
+  const [authLoading, setAuthLoading] = useState(true); // true while silent session restore is in progress on mount
   const [syncing, setSyncing] = useState(false);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const [pullDisplayY, setPullDisplayY] = useState(0);
@@ -5162,13 +6131,56 @@ function App() {
   const pullActive = useRef(false);
   const saveTimerRef = useRef(null);
   const pendingSaveRef = useRef(false); // true while a save is debounced but not yet flushed
+  const saveInProgressRef = useRef(false); // true while a saveToDrive fetch is actually in flight
+  const lastDriveCheckRef = useRef(0); // timestamp of last Drive freshness check (multi-device sync)
 
   // Load all data from Drive after sign-in
-  async function loadAllFromDrive() {
+  // Silently sync Google Calendar events after every Drive load so events are always
+  // current on app open without requiring a manual "Sync Calendar" tap.
+  // Uses currentWeekData (the freshly loaded Drive data) rather than the React state,
+  // which isn't re-rendered yet at the moment this is called.
+  // Throttled to once per 5 minutes so frequent Drive refreshes don't spam the API.
+  async function autoSyncCalendar(currentWeekData, fileId) {
+    if (!getToken()) return;
+    const now = Date.now();
+    if (now - _lastCalSyncMs < 5 * 60 * 1000) return; // at most once per 5 min
+    _lastCalSyncMs = now;
+    try {
+      const result = await pullNewFromCalendar(currentWeekData);
+      if (!result || (result.added === 0 && result.updated === 0)) return;
+      setWeekData(result.newWeekData);
+      // Immediately persist the merged calendar events to Drive so they survive the next reload.
+      // We pass fileId directly because driveFileId React state isn't set yet at this point.
+      if (fileId) {
+        const allData = { weekData: result.newWeekData };
+        ALL_STORAGE_KEYS.filter(k => k !== 'weekData').forEach(k => {
+          try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
+        });
+        saveToDrive(fileId, allData).catch(e => console.log('Auto-sync Drive save failed:', e?.message));
+      }
+      console.log(`Auto calendar sync: ${result.added} added, ${result.updated} updated`);
+    } catch (e) {
+      console.log('Auto calendar sync skipped:', e?.message);
+    }
+  }
+
+  async function loadAllFromDrive(forceOverwrite) {
     _loadingFromDrive = true;
     setSaveStatus('saving');
     try {
-      const { data, fileId } = await loadFromDrive();
+      const { data, fileId, conflict, driveSavedAt, localSavedAt } = await loadFromDrive();
+
+      // Warn about multi-device conflict before overwriting local data
+      if (conflict && !forceOverwrite) {
+        _loadingFromDrive = false;
+        setSaveStatus('');
+        const msg = `⚠️ Conflict detected: this device has local changes from ${new Date(localSavedAt).toLocaleString()} that are newer than Drive (${new Date(driveSavedAt).toLocaleString()}).\n\nLoad from Drive anyway? (Your local changes will be lost)\n\nClick Cancel to keep local data (Drive will be overwritten on next save).`;
+        if (!window.confirm(msg)) {
+          // User wants to keep local — trigger a save to push local → Drive
+          setDriveFileId(fileId);
+          return;
+        }
+      }
       ALL_STORAGE_KEYS.forEach(k => {
         if (data[k] !== undefined) {
           try { localStorage.setItem(k, JSON.stringify(data[k])); } catch {}
@@ -5191,10 +6203,13 @@ function App() {
       if (data.fitnessLog) setFitnessLog(data.fitnessLog);
       if (data.fitnessExercises) setFitnessExercises(data.fitnessExercises);
       if (data.fitnessGoals) setFitnessGoals(data.fitnessGoals);
+      if (data.countdowns) setCountdowns(data.countdowns);
       setDriveFileId(fileId); // set last to arm the save effect
       setAuthError(false);
       setSaveStatus('saved');
       setTimeout(() => { setSaveStatus(''); _loadingFromDrive = false; }, 2000);
+      // Auto-sync Google Calendar in background — non-blocking, silent
+      autoSyncCalendar(data.weekData || {}, fileId);
     } catch (e) {
       _loadingFromDrive = false;
       const msg = e?.message || 'Unknown error';
@@ -5210,18 +6225,21 @@ function App() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     pendingSaveRef.current = true;
     setSaveStatus('saving');
-    saveTimerRef.current = setTimeout(async () => {
+    saveTimerRef.current = setTimeout(async () => { // 1500ms debounce
       pendingSaveRef.current = false;
+      saveInProgressRef.current = true; // Drive fetch is now in flight
       const allData = {};
       ALL_STORAGE_KEYS.forEach(k => {
         try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
       });
       try {
         await saveToDrive(fid, allData);
+        saveInProgressRef.current = false;
         setAuthError(false);
         setSaveStatus('saved');
         setTimeout(() => setSaveStatus(''), 2000);
       } catch (e) {
+        saveInProgressRef.current = false;
         const msg = e?.message || 'Save failed';
         const is401 = msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('not authenticated');
         if (is401) {
@@ -5249,7 +6267,7 @@ function App() {
           // Don't auto-clear save errors — user must see them
         }
       }
-    }, 2500);
+    }, 1500);
   }, []);
 
   // Flush any pending save immediately — used by beforeunload and visibilitychange
@@ -5261,14 +6279,42 @@ function App() {
     ALL_STORAGE_KEYS.forEach(k => {
       try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
     });
-    try { await saveToDrive(driveFileId, allData); } catch {}
+    try {
+      await saveToDrive(driveFileId, allData);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(''), 2000);
+    } catch (e) {
+      // Surface the error — same treatment as scheduleSave failures
+      const msg = e?.message || 'Save failed';
+      const is401 = msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('not authenticated');
+      if (is401) {
+        requestTokenSilent(
+          async () => {
+            try {
+              await saveToDrive(driveFileId, allData);
+              setSaveStatus('saved');
+              setTimeout(() => setSaveStatus(''), 2000);
+            } catch (e2) {
+              setSaveStatus('ERR:' + (e2?.message || 'Save failed'));
+            }
+          },
+          () => {
+            clearToken();
+            setAuthError(true);
+            setSaveStatus('ERR:Session expired');
+          }
+        );
+      } else {
+        setSaveStatus('ERR:' + msg);
+      }
+    }
   }, [driveFileId]);
 
   // Watch for localStorage changes and trigger Drive save
   useEffect(() => {
     if (!driveFileId) return;
     scheduleSave(driveFileId);
-  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, habitMetrics, habitQty, habitNotes, monthlyGoals, pagesData, foldersData, peopleDirectory, fitnessLog, fitnessExercises, fitnessGoals, driveFileId]);
+  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, habitMetrics, habitQty, habitNotes, monthlyGoals, pagesData, foldersData, peopleDirectory, fitnessLog, fitnessExercises, fitnessGoals, countdowns, driveFileId]);
 
   // Fitness → Habit sync (runs at App level so it fires on ALL pages, not just Habit page)
   useEffect(() => {
@@ -5311,9 +6357,10 @@ function App() {
 
           if (!newQty) newQty = {...habitQty};
           const dayQty = {...(newQty[dk] || {})};
-          const existing = parseFloat(dayQty[habit.id]) || 0;
-          if (Math.abs(total - existing) > 0.001) {
-            dayQty[habit.id] = String(Math.round(total * 100) / 100);
+          const existingTotal = qtyTotal(dayQty[habit.id]);
+          if (Math.abs(total - existingTotal) > 0.001) {
+            const rounded = Math.round(total * 100) / 100;
+            dayQty[habit.id] = [{id: genLiId(), amount: rounded, note: 'fitness sync', ts: Date.now()}];
             newQty[dk] = dayQty;
           }
         }
@@ -5337,13 +6384,17 @@ function App() {
           if (user.email) {
             setAuthUser({ name: user.name, email: user.email, picture: user.picture });
             await loadAllFromDrive();
+            setAuthLoading(false);
             return;
           }
         } catch {}
       }
-      // Case 2: no valid token — try silent iframe re-auth if we have a hint
+      // Case 2: no valid token — try silent Worker refresh if we have a saved email hint
       const hint = getSavedEmail();
-      if (!hint) return;
+      if (!hint) {
+        setAuthLoading(false); // no saved session at all — show sign-in wall immediately
+        return;
+      }
       // Worker-based silent refresh
       requestTokenSilent(
         async (data) => {
@@ -5351,28 +6402,85 @@ function App() {
           const email = getSavedEmail();
           setAuthUser({ name: email, email, picture: null }); // will be updated after Drive load
           await loadAllFromDrive();
+          setAuthLoading(false);
         },
-        (err) => console.log('Silent refresh failed:', err, '— user must sign in manually')
+        (err) => {
+          console.log('Silent refresh failed:', err, '— user must sign in manually');
+          setAuthLoading(false); // silent refresh failed — show sign-in wall
+        }
       );
     }
     tryRestoreSession();
   }, []);
 
   // Flush pending saves when tab is closed, refreshed, or hidden (mobile home button etc.)
+  // Also re-check Drive for newer data when tab becomes visible (multi-device sync).
   useEffect(() => {
+    // Lightweight check: is Drive newer than our last save? If so, silently reload.
+    // Only runs when no local changes are pending, and at most once every 30 seconds.
+    async function checkAndRefreshFromDrive() {
+      if (!authUser || !driveFileId || _loadingFromDrive) return;
+      if (pendingSaveRef.current || saveInProgressRef.current) return; // local changes in flight — don't overwrite
+      const now = Date.now();
+      if (now - lastDriveCheckRef.current < 30000) return; // max once per 30s
+      lastDriveCheckRef.current = now;
+      try {
+        const token = getToken();
+        if (!token) return;
+        // Fetch just the modifiedTime — tiny request, no full file download
+        const metaRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=modifiedTime`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!metaRes.ok) return;
+        const { modifiedTime } = await metaRes.json();
+        const localSaved = localStorage.getItem('_lp_savedAt');
+        // If Drive modifiedTime is newer than our last successful save, reload
+        if (!modifiedTime || (localSaved && localSaved >= modifiedTime)) return;
+        // Drive is newer — reload silently (forceOverwrite=true: skip conflict dialog
+        // since we already verified no local changes are pending above)
+        await loadAllFromDrive(true);
+      } catch {} // silently ignore — don't surface network errors as UI noise
+    }
+
     function handleBeforeUnload(e) {
-      if (pendingSaveRef.current && driveFileId) {
-        // Attempt a synchronous-ish flush (best effort — browsers may not honor async here)
-        flushSave();
-        // Show browser's native "leave page?" dialog to give user a chance to wait
+      // Always flush any pending Pages body save synchronously first
+      _bodyFlushRef.fn?.();
+      // Send keepalive if a save is debounced (pendingSaveRef) OR if a Drive fetch is
+      // mid-flight (saveInProgressRef) — the in-flight fetch will be cancelled by the
+      // browser on unload, so we need the keepalive to rescue the data.
+      if ((pendingSaveRef.current || saveInProgressRef.current) && driveFileId) {
+        const allData = {};
+        ALL_STORAGE_KEYS.forEach(k => {
+          try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
+        });
+        allData._savedAt = new Date().toISOString();
+        try { localStorage.setItem('_lp_savedAt', allData._savedAt); } catch {}
+        const token = getToken();
+        if (token) {
+          // fetch with keepalive:true survives page unload AND supports auth headers.
+          // sendBeacon cannot send Authorization headers so Drive always rejected it with 401.
+          const beaconUrl = `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`;
+          fetch(beaconUrl, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(allData),
+            keepalive: true,
+          }).catch(() => {});
+        }
         e.preventDefault();
-        e.returnValue = 'You have unsaved changes. Please wait a moment before closing.';
+        e.returnValue = 'Saving your data…';
         return e.returnValue;
       }
     }
     function handleVisibilityChange() {
-      if (document.visibilityState === 'hidden' && pendingSaveRef.current) {
-        flushSave();
+      if (document.visibilityState === 'hidden') {
+        // Flush any pending Pages body save to localStorage/state before Drive save
+        _bodyFlushRef.fn?.();
+        if (pendingSaveRef.current) flushSave();
+      } else if (document.visibilityState === 'visible') {
+        // Tab came back into focus — check if another device saved to Drive while we were away
+        checkAndRefreshFromDrive();
       }
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -5381,7 +6489,7 @@ function App() {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [flushSave, driveFileId]);
+  }, [flushSave, driveFileId, authUser]);
 
   function handleSignIn() {
     requestToken(
@@ -5419,10 +6527,38 @@ function App() {
         alert('Calendar sync failed: could not reach Google Calendar.\n\nMake sure:\n1. Google Calendar API is enabled in Cloud Console\n2. You signed in and approved Calendar access on the consent screen\n3. Try signing out and back in');
       } else if (result.added > 0 || result.updated > 0) {
         setWeekData(result.newWeekData);
+        // Save to Drive immediately — don't rely on the 1500ms debounce.
+        // setWeekData queues a React state update; localStorage may not yet reflect it
+        // when the debounce or beforeunload handler fires, causing synced events to be lost.
+        // We save here explicitly using result.newWeekData directly to avoid that race.
+        if (driveFileId && !_loadingFromDrive) {
+          if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+          pendingSaveRef.current = false;
+          const allData = { weekData: result.newWeekData };
+          ALL_STORAGE_KEYS.filter(k => k !== 'weekData').forEach(k => {
+            try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
+          });
+          try {
+            await saveToDrive(driveFileId, allData);
+            setSaveStatus('saved');
+            setTimeout(() => setSaveStatus(''), 2000);
+          } catch (saveErr) {
+            console.error('Sync Drive save failed:', saveErr?.message);
+            // Don't alert here — the data is in state/localStorage; debounce will retry
+          }
+        }
         const parts = [];
-        if (result.added > 0) parts.push(`${result.added} new event${result.added===1?'':'s'} added`);
+        if (result.added > 0) {
+          // Build human-readable date labels so the user knows where to navigate
+          const dateLabels = [...new Set(result.addedDates)].map(d => {
+            const o = parseLocal(d);
+            return o ? `${MONTHS[o.getMonth()].slice(0, 3)} ${o.getDate()}` : d;
+          });
+          parts.push(`${result.added} new event${result.added===1?'':'s'} added`);
+          if (dateLabels.length) parts.push(`(${dateLabels.join(', ')})`);
+        }
         if (result.updated > 0) parts.push(`${result.updated} event${result.updated===1?'':'s'} updated`);
-        alert('✓ ' + parts.join(', ') + ' from Google Calendar.');
+        alert('✓ ' + parts.join(' ') + ' from Google Calendar.');
       } else {
         alert('✓ All caught up — no changes to import from Google Calendar.');
       }
@@ -5474,80 +6610,154 @@ function App() {
 
   return (
     <div className="app">
-      {/* ── PERSISTENT SAVE ERROR BANNER ── */}
-      {isErr && (
-        <div style={{
-          position:'fixed', top:0, left:0, right:0, zIndex:10000,
-          background:'#7f1d1d', color:'white', padding:'10px 16px',
+      {/* ── SAVE ERROR TOAST — bottom, persistent until save actually succeeds ── */}
+      {(isErr || authError) && (
+        <div className="save-error-toast" style={{
+          position:'fixed', bottom: 0, left:0, right:0, zIndex:10000,
+          background: authError ? '#7c2d52' : '#7f1d1d',
+          color:'white', padding:'14px 18px',
           fontFamily:"'DM Sans',sans-serif", fontSize:13,
           display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
-          boxShadow:'0 2px 8px rgba(0,0,0,0.3)',
+          boxShadow:'0 -2px 16px rgba(0,0,0,0.35)',
+          borderTop: authError ? '1px solid rgba(255,255,255,0.15)' : '1px solid rgba(255,100,100,0.3)',
         }}>
-          <span>⚠️ <strong>Save error — your changes are NOT being saved to Drive.</strong> {errDetail && <span style={{opacity:0.85}}>{errDetail}</span>}</span>
-          <div style={{display:'flex',gap:8,flexShrink:0}}>
-            <button onClick={()=>{ if(driveFileId) scheduleSave(driveFileId); setSaveStatus(''); }}
-              style={{background:'rgba(255,255,255,0.2)',border:'1px solid rgba(255,255,255,0.4)',borderRadius:6,
-                padding:'4px 12px',cursor:'pointer',fontWeight:600,fontSize:12,
-                fontFamily:"'DM Sans',sans-serif",color:'white',whiteSpace:'nowrap'}}>
-              Retry
-            </button>
-            <button onClick={()=>setSaveStatus('')}
-              style={{background:'none',border:'none',cursor:'pointer',fontSize:18,color:'rgba(255,255,255,0.7)',
-                lineHeight:1,padding:'0 4px'}}>✕</button>
+          <div style={{display:'flex',flexDirection:'column',gap:3,minWidth:0}}>
+            <span style={{fontWeight:700,fontSize:13}}>
+              {authError ? '⚠️ Session expired — changes are not saving' : '⚠️ Changes not saved to Drive'}
+            </span>
+            {!authError && errDetail && (
+              <span style={{fontSize:11,opacity:0.7,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{errDetail}</span>
+            )}
+            {!authError && (
+              <span style={{fontSize:11,opacity:0.6}}>Your data is safe locally — tap Retry to save to Drive.</span>
+            )}
           </div>
-        </div>
-      )}
-      {/* ── AUTH SESSION EXPIRED BANNER ── */}
-      {authError && (
-        <div style={{
-          position:'fixed', top:isErr?44:0, left:0, right:0, zIndex:9999,
-          background:'#7f1d1d', color:'white', padding:'10px 16px',
-          fontFamily:"'DM Sans',sans-serif", fontSize:13,
-          display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
-          boxShadow:'0 2px 8px rgba(0,0,0,0.3)',
-        }}>
-          <span>⚠️ Your session has expired — changes are <strong>not saving</strong>. Please sign in again.</span>
-          <button onClick={()=>{
-            setAuthError(false);
-            requestToken(
-              async (data) => {
+          <button
+            disabled={saveRetrying}
+            onClick={async () => {
+              if (authError) {
+                // Session expired — re-open sign-in
+                setAuthError(false);
+                requestToken(
+                  async (data) => {
+                    try {
+                      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${getToken()}` } });
+                      const user = await res.json();
+                      if (user.email) { setAuthUser({ name: user.name, email: user.email, picture: user.picture }); saveEmail(user.email); }
+                    } catch {}
+                    if (driveFileId) scheduleSave(driveFileId);
+                  },
+                  (err) => { setAuthError(true); setSaveStatus('ERR:Sign-in failed'); }
+                );
+              } else {
+                // Normal save error — retry immediately
+                setSaveRetrying(true);
+                setSaveStatus('saving');
+                const allData = {};
+                ALL_STORAGE_KEYS.forEach(k => {
+                  try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
+                });
                 try {
-                  const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${getToken()}` } });
-                  const user = await res.json();
-                  if (user.email) { setAuthUser({ name: user.name, email: user.email, picture: user.picture }); saveEmail(user.email); }
-                } catch {}
-                if (driveFileId) scheduleSave(driveFileId);
-              },
-              (err) => { setAuthError(true); setSaveStatus('ERR:Sign-in failed'); }
-            );
-          }} style={{
-            background:'white', color:'#7f1d1d', border:'none', borderRadius:6,
-            padding:'4px 12px', cursor:'pointer', fontWeight:600, fontSize:12,
-            fontFamily:"'DM Sans',sans-serif", whiteSpace:'nowrap', flexShrink:0,
-          }}>Sign in again</button>
+                  await saveToDrive(driveFileId, allData);
+                  setAuthError(false);
+                  setSaveStatus('saved');
+                  setTimeout(() => setSaveStatus(''), 2000);
+                } catch (e) {
+                  const msg = e?.message || 'Save failed';
+                  const is401 = msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('not authenticated');
+                  if (is401) {
+                    requestTokenSilent(
+                      async () => {
+                        try {
+                          await saveToDrive(driveFileId, allData);
+                          setAuthError(false);
+                          setSaveStatus('saved');
+                          setTimeout(() => setSaveStatus(''), 2000);
+                        } catch (e2) {
+                          setSaveStatus('ERR:' + (e2?.message || 'Save failed'));
+                        }
+                      },
+                      () => { clearToken(); setAuthError(true); setSaveStatus('ERR:Session expired'); }
+                    );
+                  } else {
+                    setSaveStatus('ERR:' + msg);
+                  }
+                }
+                setSaveRetrying(false);
+              }
+            }}
+            style={{
+              background: saveRetrying ? 'rgba(255,255,255,0.15)' : 'white',
+              color: authError ? '#7c2d52' : '#7f1d1d',
+              border:'none', borderRadius:8,
+              padding:'8px 18px', cursor: saveRetrying ? 'default' : 'pointer',
+              fontWeight:700, fontSize:13,
+              fontFamily:"'DM Sans',sans-serif", whiteSpace:'nowrap', flexShrink:0,
+              minWidth:90, display:'flex', alignItems:'center', justifyContent:'center', gap:6,
+              opacity: saveRetrying ? 0.7 : 1,
+              transition:'opacity 0.15s',
+            }}>
+            {saveRetrying
+              ? <><span style={{display:'inline-block',animation:'spin 0.8s linear infinite'}}>↻</span> Retrying…</>
+              : authError ? 'Sign in again' : 'Retry'
+            }
+          </button>
         </div>
       )}
-      {/* ── NOT SIGNED IN BANNER (shown while editing Pages) ── */}
-      {!authUser && page === 'pages' && (
+      {/* ── AUTH LOADING SCREEN — shown while silent session restore is in progress ── */}
+      {authLoading && (
         <div style={{
-          position:'fixed', top:0, left:0, right:0, zIndex:9998,
-          background:'#78350f', color:'white', padding:'8px 16px',
-          fontFamily:"'DM Sans',sans-serif", fontSize:12,
-          display:'flex', alignItems:'center', justifyContent:'space-between', gap:12,
-          boxShadow:'0 2px 8px rgba(0,0,0,0.3)',
+          position:'fixed', inset:0, zIndex:20000,
+          background:'linear-gradient(135deg, #5c2d52 0%, #7c3f6e 100%)',
+          display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14,
         }}>
-          <span>☁ Not signed in — your documents are only saved locally and will be <strong>lost if you clear your browser data.</strong></span>
-          <button onClick={handleSignIn}
-            style={{background:'white',color:'#78350f',border:'none',borderRadius:6,
-              padding:'3px 10px',cursor:'pointer',fontWeight:600,fontSize:12,
-              fontFamily:"'DM Sans',sans-serif",whiteSpace:'nowrap',flexShrink:0}}>
-            Sign in
-          </button>
+          <span style={{fontSize:32,color:'rgba(255,255,255,0.85)',display:'inline-block',animation:'spin 1.1s linear infinite'}}>↻</span>
+          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:'rgba(255,255,255,0.55)'}}>Restoring session…</span>
+        </div>
+      )}
+      {/* ── SIGN-IN WALL — blocks all app content; no data access or edits without signing in ── */}
+      {!authLoading && !authUser && (
+        <div style={{
+          position:'fixed', inset:0, zIndex:20000,
+          background:'linear-gradient(135deg, #5c2d52 0%, #7c3f6e 100%)',
+          display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24,
+        }}>
+          <div style={{
+            background:'rgba(255,255,255,0.09)', borderRadius:20,
+            border:'1px solid rgba(255,255,255,0.15)', padding:'40px 36px',
+            maxWidth:380, width:'100%', display:'flex', flexDirection:'column',
+            alignItems:'center', gap:20, boxShadow:'0 16px 64px rgba(0,0,0,0.3)',
+          }}>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:28,fontWeight:700,color:'rgba(255,255,255,0.95)',letterSpacing:'0.02em'}}>
+              ✦ LP Planner
+            </div>
+            <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:14,color:'rgba(255,255,255,0.75)',textAlign:'center',lineHeight:1.65}}>
+              Sign in with Google to access your planner. Your data is stored privately in your Google Drive and is only accessible when you're signed in.
+            </div>
+            <div style={{
+              background:'rgba(0,0,0,0.15)', borderRadius:10, padding:'12px 16px',
+              border:'1px solid rgba(255,255,255,0.1)',
+              fontFamily:"'DM Sans',sans-serif", fontSize:12, color:'rgba(255,255,255,0.55)',
+              textAlign:'center', lineHeight:1.55,
+            }}>
+              🔒 Sign-in is required to protect your data. Without it, any changes you make locally can be silently overwritten the next time you log in.
+            </div>
+            <button onClick={handleSignIn} style={{
+              background:'white', color:'#5c2d52', border:'none', borderRadius:10,
+              padding:'13px 32px', fontFamily:"'DM Sans',sans-serif", fontWeight:700,
+              fontSize:15, cursor:'pointer', width:'100%', letterSpacing:'0.01em',
+              boxShadow:'0 4px 16px rgba(0,0,0,0.2)', transition:'transform 0.15s',
+            }}
+            onMouseOver={e=>e.currentTarget.style.transform='scale(1.02)'}
+            onMouseOut={e=>e.currentTarget.style.transform='scale(1)'}>
+              Sign in with Google
+            </button>
+          </div>
         </div>
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.4.4</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -5625,6 +6835,7 @@ function App() {
         qty={habitQty} setQty={setHabitQty}
         notes={habitNotes} setNotes={setHabitNotes}
         fitnessLog={fitnessLog} fitnessExercises={fitnessExercises}
+        countdowns={countdowns} setCountdowns={setCountdowns}
         onGoToPlanner={()=>setPage('planner')}
         onGoToMetrics={()=>setPage('metrics')} />}
       {page==='metrics' && <MetricsView
@@ -5673,8 +6884,11 @@ const UNCATEGORIZED = 'Other';
 function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessExercises, fitnessGoals, setFitnessGoals }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDate] = useState(today);
-  const [fitView, setFitView] = useState('day');
+  const [fitView, setFitView] = useState('week');
   const [showExPicker, setShowExPicker] = useState(null);
+  const [dragEx, setDragEx] = useState(null); // {exId, fromDk, exerciseId}
+  const [dragOverDk, setDragOverDk] = useState(null);
+  const [dragOverExId, setDragOverExId] = useState(null); // for day-view reorder
   const [showLibManager, setShowLibManager] = useState(false);
   const [showGoalManager, setShowGoalManager] = useState(false);
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
@@ -5822,7 +7036,12 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   }
   function setDayExs(dk, fn) {
     setFitnessLog(log => {
-      const cur = getDayExercises(dk);
+      // Derive cur from `log` (latest state), NOT from getDayExercises(dk) which
+      // closes over the stale `fitnessLog` render snapshot. Without this, rapid
+      // successive updates (adding sets, toggling done, editing reps) each capture
+      // the same stale snapshot and later writes silently overwrite earlier ones.
+      const raw = log[dk] || [];
+      const cur = (raw[0] && Array.isArray(raw[0].exercises)) ? raw.flatMap(w=>w.exercises||[]) : raw;
       const next = typeof fn==='function' ? fn(cur) : fn;
       return {...log, [dk]: next};
     });
@@ -5835,6 +7054,32 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     if (fitView!=='day') { setSelectedDate(new Date(dk+'T00:00:00')); setFitView('day'); }
   }
   function deleteExercise(dk, exId) { setDayExs(dk, exs=>exs.filter(e=>e.id!==exId)); }
+  function reorderExercises(dk, fromExId, toExId) {
+    if (fromExId === toExId) return;
+    setDayExs(dk, exs => {
+      const from = exs.findIndex(e=>e.id===fromExId);
+      const to   = exs.findIndex(e=>e.id===toExId);
+      if (from===-1||to===-1) return exs;
+      const next = [...exs];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }
+  function moveExercise(fromDk, toDk, exId) {
+    if (fromDk===toDk) return;
+    setFitnessLog(log => {
+      const fromExs = (()=>{ const r=log[fromDk]||[]; return (r[0]&&Array.isArray(r[0].exercises))?r.flatMap(w=>w.exercises||[]):r; })();
+      const toExs   = (()=>{ const r=log[toDk]||[];   return (r[0]&&Array.isArray(r[0].exercises))?r.flatMap(w=>w.exercises||[]):r; })();
+      const ex = fromExs.find(e=>e.id===exId);
+      if (!ex) return log;
+      return {
+        ...log,
+        [fromDk]: fromExs.filter(e=>e.id!==exId),
+        [toDk]:   [...toExs, {...ex, id:'ex'+Date.now()}],
+      };
+    });
+  }
   function updateSet(dk, exId, setId, patch) {
     setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:e.sets.map(s=>s.id!==setId?s:{...s,...patch})}));
   }
@@ -5858,26 +7103,33 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   // ── Progress calculation ─────────────────────────────────────────────────
   function goalProgressFull(goal, refDate) {
     const now = refDate||new Date(); if(!refDate) now.setHours(0,0,0,0);
-    let startDk, endDk, totalDays, elapsedDays;
+    let startDk, endDk, totalDays, periodStartDate, periodEndDate;
     if (goal.period==='week') {
       const ws=getWeekStart(now);
-      startDk=fmt(ws); endDk=fmt(addDays(ws,6));
-      totalDays=7; elapsedDays=Math.min(7,Math.floor((now-ws)/86400000)+1);
+      periodStartDate=ws; periodEndDate=addDays(ws,6);
+      startDk=fmt(ws); endDk=fmt(periodEndDate);
+      totalDays=7;
     } else if (goal.period==='month') {
       const y=now.getFullYear(),m=now.getMonth();
-      const first=new Date(y,m,1),last=new Date(y,m+1,0);
-      startDk=fmt(first); endDk=fmt(last);
-      totalDays=last.getDate(); elapsedDays=Math.min(totalDays,now.getDate());
+      periodStartDate=new Date(y,m,1); periodEndDate=new Date(y,m+1,0);
+      startDk=fmt(periodStartDate); endDk=fmt(periodEndDate);
+      totalDays=periodEndDate.getDate();
     } else {
-      const first=new Date(now.getFullYear(),0,1),last=new Date(now.getFullYear(),11,31);
-      startDk=fmt(first); endDk=fmt(last);
+      periodStartDate=new Date(now.getFullYear(),0,1); periodEndDate=new Date(now.getFullYear(),11,31);
+      startDk=fmt(periodStartDate); endDk=fmt(periodEndDate);
       totalDays=365+(now.getFullYear()%4===0?1:0);
-      elapsedDays=Math.floor((now-first)/86400000)+1;
     }
     // Clamp to goal's own startDate/endDate
     if (goal.startDate && goal.startDate>startDk) startDk=goal.startDate;
     if (goal.endDate && goal.endDate<endDk) endDk=goal.endDate;
+    // Elapsed days: use today clamped to the viewed period so past periods show 100%,
+    // future periods show 0%, and the current period shows actual progress.
+    const todayMs=today.getTime();
+    const elapsedDays = todayMs < periodStartDate.getTime() ? 0
+      : todayMs > periodEndDate.getTime() ? totalDays
+      : Math.floor((todayMs - periodStartDate.getTime()) / 86400000) + 1;
     let total=0;
+    const sessionDays=new Set(); // for 'sessions' unit — track unique days with ≥1 done set
     Object.entries(fitnessLog).forEach(([dk,raw])=>{
       if (dk<startDk||dk>endDk) return;
       const exList=(raw&&raw[0]&&Array.isArray(raw[0].exercises))?raw.flatMap(w=>w.exercises||[]):(raw||[]);
@@ -5887,8 +7139,11 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
         if (goal.unit==='sets') total+=doneSets.length;
         else if (goal.unit==='reps') total+=doneSets.reduce((a,s)=>a+(parseFloat(s.reps)||0),0);
         else if (goal.unit==='volume') total+=doneSets.reduce((a,s)=>a+(parseFloat(s.reps)||0)*(parseFloat(s.weight)||0),0);
+        else if (goal.unit==='distance') total+=doneSets.reduce((a,s)=>a+(parseFloat(s.dist)||0),0);
+        else if (goal.unit==='sessions') { if(doneSets.length>0) sessionDays.add(dk); }
       });
     });
+    if (goal.unit==='sessions') total=sessionDays.size;
     const actual=Math.round(total*10)/10;
     const periodPct=Math.round((elapsedDays/totalDays)*100);
     const targetPace=Math.round((elapsedDays/totalDays)*goal.target*10)/10;
@@ -5901,10 +7156,31 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   function exStats(ex) {
     const doneSets=ex.sets.filter(s=>s.done);
     const hasWeight=doneSets.some(s=>parseFloat(s.weight)>0);
+    const totalReps=doneSets.reduce((acc,s)=>acc+(parseFloat(s.reps)||0),0);
     const volume=doneSets.reduce((acc,s)=>{const r=parseFloat(s.reps)||0,w=parseFloat(s.weight)||0;return acc+(w>0?r*w:r);},0);
-    return {done:doneSets.length,total:ex.sets.length,volume:Math.round(volume),hasWeight};
+    return {done:doneSets.length,total:ex.sets.length,volume:Math.round(volume),hasWeight,totalReps:Math.round(totalReps)};
   }
   function exName(exerciseId) { return fitnessExercises.find(e=>e.id===exerciseId)?.name||'Unknown'; }
+
+  // Parse "M:SS" or legacy decimal string → decimal minutes
+  function parseTimeInput(val) {
+    if (!val && val !== 0) return 0;
+    const s = String(val).trim();
+    if (s.includes(':')) {
+      const parts = s.split(':');
+      const mins = parseFloat(parts[0]) || 0;
+      const secs = parseFloat(parts[1]) || 0;
+      return mins + secs / 60;
+    }
+    return parseFloat(s) || 0;
+  }
+  // Format decimal minutes → "M:SS"
+  function formatPace(decimalMins) {
+    if (!decimalMins || decimalMins <= 0) return null;
+    const mins = Math.floor(decimalMins);
+    const secs = Math.round((decimalMins - mins) * 60);
+    return `${mins}:${String(secs).padStart(2,'0')}`;
+  }
 
   const categorized=FITNESS_CATEGORIES.reduce((acc,cat)=>{
     const items=fitnessExercises.filter(e=>(e.category||UNCATEGORIZED)===cat);
@@ -5917,27 +7193,35 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal,refDate);
     const pct=Math.min(100,(actual/goal.target)*100),done=pct>=100,ahead=aheadBehind>=0;
     return (
-      <div key={goal.id} style={{marginBottom:12}}>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:3}}>
-          <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,color:'var(--ink)'}}>{exName(goal.exerciseId)}</span>
-          <div style={{display:'flex',gap:8,alignItems:'center'}}>
-            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-light)'}}>{actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}</span>
-            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:ahead?'var(--accent)':'var(--red)'}}>
-              {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs target
+      <div key={goal.id} style={{
+        padding:'10px 12px', marginBottom:8,
+        background:'white', borderRadius:'var(--radius-sm)',
+        border:`1px solid ${done?'var(--gold)':ahead?'var(--accent)':'var(--border)'}`,
+        boxShadow:'0 1px 3px var(--shadow)',
+      }}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+          <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:700,color:'var(--ink)'}}>{exName(goal.exerciseId)}</span>
+          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-light)',fontWeight:600}}>{actual.toLocaleString()} / {goal.target.toLocaleString()} {goal.unit}</span>
+            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,
+              padding:'1px 5px',borderRadius:3,
+              background:ahead?'var(--accent-light)':'rgba(220,74,58,0.1)',
+              color:ahead?'var(--accent)':'var(--red)'}}>
+              {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))}
             </span>
             {done&&<span>🎉</span>}
           </div>
         </div>
-        <div className="fitness-goal-bar-bg" style={{position:'relative',height:8,borderRadius:4}}>
-          <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,background:'rgba(0,0,0,0.08)',borderRadius:4,zIndex:0}}/>
+        <div className="fitness-goal-bar-bg" style={{position:'relative',height:7,borderRadius:4}}>
+          <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,background:'rgba(0,0,0,0.07)',borderRadius:4,zIndex:0}}/>
           <div className={`fitness-goal-bar-fill ${done?'done':''}`} style={{width:`${Math.min(100,pct)}%`,height:'100%',borderRadius:4,position:'relative',zIndex:1}}/>
         </div>
-        <div style={{display:'flex',justifyContent:'space-between',marginTop:3,gap:8}}>
+        <div style={{display:'flex',justifyContent:'space-between',marginTop:4,gap:8}}>
           <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
-            Should be at: <b style={{color:ahead?'var(--accent)':'var(--red)'}}>{targetPace.toLocaleString()}</b>
+            Should be: <b style={{color:ahead?'var(--accent)':'var(--red)'}}>{goal.unit==='sessions'?Math.round(targetPace):targetPace.toLocaleString()}</b>
           </span>
-          <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',fontStyle:'italic'}}>
-            On pace for: <b style={{color:'var(--ink)',fontStyle:'normal'}}>{expectedAtPace.toLocaleString()}</b> / {goal.target.toLocaleString()}
+          <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
+            On pace for: <b style={{color:'var(--ink)'}}>{goal.unit==='sessions'?Math.round(expectedAtPace):expectedAtPace.toLocaleString()}</b> / {goal.target.toLocaleString()}
           </span>
         </div>
       </div>
@@ -5945,15 +7229,44 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   }
 
   // ── Exercise block renderer ──────────────────────────────────────────────
-  function renderExerciseBlock(dk, ex) {
+  function renderExerciseBlock(dk, ex, isDayView) {
     const stats=exStats(ex);
     const libEx=fitnessExercises.find(e=>e.id===ex.exerciseId);
     const isCardio=libEx?.category==='Cardio';
+    const isDropTarget = isDayView && dragOverExId===ex.id && dragEx?.exId!==ex.id;
     return (
-      <div key={ex.id} className="workout-card">
+      <div key={ex.id}
+        style={{position:'relative'}}
+        onDragOver={isDayView ? e=>{e.preventDefault();setDragOverExId(ex.id);} : undefined}
+        onDragLeave={isDayView ? ()=>setDragOverExId(null) : undefined}
+        onDrop={isDayView ? e=>{
+          e.preventDefault();
+          if(dragEx?.exId) reorderExercises(dk, dragEx.exId, ex.id);
+          setDragEx(null); setDragOverExId(null);
+        } : undefined}>
+        {/* Drop indicator line above */}
+        {isDropTarget && (
+          <div style={{position:'absolute',top:-6,left:0,right:0,height:3,
+            background:'var(--accent)',borderRadius:2,zIndex:10,
+            boxShadow:'0 0 0 2px var(--accent-light)'}}/>
+        )}
+        <div className="workout-card">
         <div className="workout-card-header">
+          {isDayView && (
+            <span
+              draggable={true}
+              onDragStart={e=>{e.stopPropagation();setDragEx({exId:ex.id,fromDk:dk,exerciseId:ex.exerciseId});}}
+              onDragEnd={()=>{setDragEx(null);setDragOverExId(null);}}
+              title="Drag to reorder"
+              style={{cursor:'grab',color:'var(--ink-faint)',fontSize:14,padding:'0 4px 0 0',
+                lineHeight:1,flexShrink:0,opacity:0.4,userSelect:'none'}}
+              onMouseEnter={e=>e.currentTarget.style.opacity='0.9'}
+              onMouseLeave={e=>e.currentTarget.style.opacity='0.4'}>
+              ⣿
+            </span>
+          )}
           <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:'var(--accent)',flex:1}}>{exName(ex.exerciseId)}</span>
-          {stats.done>0&&<span className="fitness-stat-pill">{stats.done}/{stats.total} sets{stats.volume>0&&` · ${stats.volume.toLocaleString()} ${stats.hasWeight?'lbs':'reps'}`}</span>}
+          {stats.done>0&&<span className="fitness-stat-pill">{stats.done}/{stats.total} sets{stats.totalReps>0&&` · ${stats.totalReps} reps`}{stats.hasWeight&&stats.volume>0&&` · ${stats.volume.toLocaleString()} lbs`}</span>}
           <button onClick={()=>deleteExercise(dk,ex.id)}
             style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 2px',lineHeight:1,opacity:0.5}}>✕</button>
         </div>
@@ -5961,24 +7274,39 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:2}}>
             <span className="set-num"></span>
             {isCardio?(<><span className="set-label" style={{width:60,textAlign:'center'}}>Dist (mi)</span>
-              <span className="set-label" style={{width:60,textAlign:'center',marginLeft:6}}>Time (min)</span>
+              <span className="set-label" style={{width:32,textAlign:'center',marginLeft:6}}>Min</span>
+              <span style={{width:10,flexShrink:0}}/>
+              <span className="set-label" style={{width:32,textAlign:'center'}}>Sec</span>
               <span className="set-label" style={{width:56,textAlign:'center',marginLeft:6}}>min/mi</span></>)
             :(<><span className="set-label" style={{width:52,textAlign:'center'}}>Reps</span>
               <span className="set-label" style={{width:52,textAlign:'center',marginLeft:18}}>Weight</span></>)}
             <span className="set-label" style={{marginLeft:'auto',marginRight:2}}>Done</span>
           </div>
           {ex.sets.map((set,si)=>{
-            const dist=parseFloat(set.dist)||0,time=parseFloat(set.time)||0;
-            const pace=(dist>0&&time>0)?(time/dist).toFixed(2):null;
+            const dist=parseFloat(set.dist)||0,timeDec=parseTimeInput(set.time);
+            const pace=(dist>0&&timeDec>0)?formatPace(timeDec/dist):null;
             return (
               <div key={set.id} className={`set-row ${set.done?'done':''}`}>
                 <span className="set-num">{si+1}</span>
                 {isCardio?(<>
                   <input type="number" min="0" step="0.01" className="set-input" placeholder="—" value={set.dist||''}
                     onChange={e=>updateSet(dk,ex.id,set.id,{dist:e.target.value})} style={{width:60,opacity:set.done?0.6:1}}/>
-                  <input type="number" min="0" step="0.1" className="set-input" placeholder="—" value={set.time||''}
-                    onChange={e=>updateSet(dk,ex.id,set.id,{time:e.target.value})} style={{width:60,marginLeft:6,opacity:set.done?0.6:1}}/>
-                  <span className="set-label" style={{width:56,textAlign:'center',fontWeight:pace?700:400,color:pace?'var(--accent)':'var(--ink-faint)',fontSize:pace?11:9}}>{pace||'—'}</span>
+                  {(()=>{
+                    const tp=(set.time||'').split(':');
+                    const tMins=tp[0]||''; const tSecs=tp.length>1?tp[1]:'';
+                    return (<>
+                      <input type="number" min="0" inputMode="numeric" className="set-input" placeholder="0"
+                        value={tMins}
+                        onChange={e=>{const s=tSecs!==''?':'+tSecs:''; updateSet(dk,ex.id,set.id,{time:e.target.value+s});}}
+                        style={{width:32,marginLeft:6,textAlign:'center',opacity:set.done?0.6:1}}/>
+                      <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:'var(--ink-faint)',flexShrink:0}}>:</span>
+                      <input type="number" min="0" max="59" inputMode="numeric" className="set-input" placeholder="00"
+                        value={tSecs}
+                        onChange={e=>{const m=tMins||'0'; updateSet(dk,ex.id,set.id,{time:m+':'+e.target.value});}}
+                        style={{width:32,textAlign:'center',opacity:set.done?0.6:1}}/>
+                    </>);
+                  })()}
+                  <span className="set-label" style={{width:56,textAlign:'center',fontWeight:pace?700:400,color:pace?'var(--gold)':'var(--ink-faint)',fontSize:pace?11:9}}>{pace||'—'}</span>
                 </>):(<>
                   <input type="number" min="0" className="set-input" placeholder="—" value={set.reps||''}
                     onChange={e=>updateSet(dk,ex.id,set.id,{reps:e.target.value})} style={{opacity:set.done?0.6:1}}/>
@@ -6000,6 +7328,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             </button>
           </div>
         </div>
+      </div>
       </div>
     );
   }
@@ -6124,25 +7453,40 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
 
       {/* MAIN */}
       <div className="fitness-main">
-        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
-          <div style={{flex:1,minWidth:0}}>
-            <div className="fitness-day-label">
-              {fitView==='day'?`${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()].slice(0,3)} ${selectedDate.getDate()}, ${viewYear}`
-               :fitView==='week'?`Week of ${MONTHS[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()}`
-               :fitView==='month'?`${MONTHS[viewMonth]} ${viewYear}`
-               :String(viewYear)}
-            </div>
+        {/* View tabs row — full width on mobile */}
+        <div className="fitness-view-tabs" style={{alignSelf:'stretch'}}>
+          {['day','week','month','year'].map(v=>(
+            <button key={v} className={`fitness-view-tab ${fitView===v?'active':''}`}
+              onClick={()=>setFitView(v)} style={{flex:1}}>
+              {v.charAt(0).toUpperCase()+v.slice(1)}
+            </button>
+          ))}
+        </div>
+        {/* Date nav + add button row */}
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <button className="nav-arrow" style={{flexShrink:0}} onClick={()=>{
+            if(fitView==='day') setSelectedDate(d=>addDays(d,-1));
+            else if(fitView==='week') setSelectedDate(d=>addDays(d,-7));
+            else if(fitView==='month') setSelectedDate(d=>new Date(d.getFullYear(),d.getMonth()-1,1));
+            else setSelectedDate(d=>new Date(d.getFullYear()-1,0,1));
+          }}>‹</button>
+          <div className="fitness-day-label" style={{flex:1,fontSize:14}}>
+            {fitView==='day'?`${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()].slice(0,3)} ${selectedDate.getDate()}, ${viewYear}`
+             :fitView==='week'?`${MONTHS[weekStart.getMonth()].slice(0,3)} ${weekStart.getDate()} – ${MONTHS[addDays(weekStart,6).getMonth()].slice(0,3)} ${addDays(weekStart,6).getDate()}`
+             :fitView==='month'?`${MONTHS[viewMonth]} ${viewYear}`
+             :String(viewYear)}
           </div>
-          <div className="fitness-view-tabs">
-            {['day','week','month','year'].map(v=>(
-              <button key={v} className={`fitness-view-tab ${fitView===v?'active':''}`} onClick={()=>setFitView(v)}>
-                {v.charAt(0).toUpperCase()+v.slice(1)}
-              </button>
-            ))}
-          </div>
+          <button className="nav-arrow" style={{flexShrink:0}} onClick={()=>{
+            if(fitView==='day') setSelectedDate(d=>addDays(d,1));
+            else if(fitView==='week') setSelectedDate(d=>addDays(d,7));
+            else if(fitView==='month') setSelectedDate(d=>new Date(d.getFullYear(),d.getMonth()+1,1));
+            else setSelectedDate(d=>new Date(d.getFullYear()+1,0,1));
+          }}>›</button>
           {fitView==='day'&&(
             <button onClick={()=>setShowExPicker({dk:dateKey})}
-              style={{background:'var(--accent)',color:'white',border:'none',borderRadius:'var(--radius-md)',padding:'7px 16px',cursor:'pointer',fontSize:12,fontWeight:600,fontFamily:"'DM Sans',sans-serif",flexShrink:0}}>
+              style={{background:'var(--accent)',color:'white',border:'none',borderRadius:'var(--radius-md)',
+                padding:'7px 14px',cursor:'pointer',fontSize:12,fontWeight:600,
+                fontFamily:"'DM Sans',sans-serif",flexShrink:0}}>
               + Exercise
             </button>
           )}
@@ -6154,7 +7498,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           return (
             <div style={{display:'flex',flexDirection:'column',gap:12}}>
               {exs.length===0&&<div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)',fontSize:13,fontStyle:'italic'}}>No exercises logged.<br/><span style={{fontSize:11}}>Tap "+ Exercise" to start.</span></div>}
-              {exs.map(ex=>renderExerciseBlock(dateKey,ex))}
+              {exs.map(ex=>renderExerciseBlock(dateKey,ex,true))}
             </div>
           );
         })()}
@@ -6165,15 +7509,35 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             {weekDays.map(d=>{
               const dk=fmt(d),isToday=isSameDay(d,today);
               const dayExs=getDayExercises(dk);
+              const isDragOver=dragOverDk===dk;
               return (
-                <div key={dk} className={`fitness-week-col ${isToday?'today':''}`} onClick={()=>{setSelectedDate(d);setFitView('day');}}>
+                <div key={dk} className={`fitness-week-col ${isToday?'today':''} ${isDragOver?'drag-over':''}`}
+                  onClick={()=>{if(!dragEx){setSelectedDate(d);setFitView('day');}}}
+                  onDragOver={e=>{e.preventDefault();setDragOverDk(dk);}}
+                  onDragLeave={()=>setDragOverDk(null)}
+                  onDrop={e=>{
+                    e.preventDefault();
+                    if(dragEx && dragEx.fromDk!==dk){moveExercise(dragEx.fromDk,dk,dragEx.exId);}
+                    setDragEx(null);setDragOverDk(null);
+                  }}>
                   <div className="fitness-week-col-hdr">
                     <div className="fitness-week-col-day">{DAYS[d.getDay()].slice(0,3)}</div>
                     <div className="fitness-week-col-date">{d.getDate()}</div>
                   </div>
                   <div className="fitness-week-col-body">
-                    {dayExs.map(ex=><div key={ex.id} className="fitness-week-workout-pill" title={exName(ex.exerciseId)}>{exName(ex.exerciseId)}</div>)}
-                    {dayExs.length===0&&<div style={{fontSize:9,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px 0',textAlign:'center'}}>Rest</div>}
+                    {dayExs.map(ex=>{
+                      const libEx=fitnessExercises.find(e=>e.id===ex.exerciseId);
+                      const isCardio=libEx?.category==='Cardio';
+                      return (
+                        <div key={ex.id} className={`fitness-week-workout-pill${isCardio?' cardio':''}`} title={exName(ex.exerciseId)}
+                          draggable={true}
+                          onDragStart={e=>{e.stopPropagation();setDragEx({exId:ex.id,fromDk:dk,exerciseId:ex.exerciseId});}}
+                          onDragEnd={()=>{setDragEx(null);setDragOverDk(null);}}>
+                          {exName(ex.exerciseId)}
+                        </div>
+                      );
+                    })}
+                    {dayExs.length===0&&<div style={{fontSize:9,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px 0',textAlign:'center'}}>{isDragOver?'Drop here':'Rest'}</div>}
                     <button className="fitness-week-add" onClick={e=>{e.stopPropagation();setShowExPicker({dk});}}>+ Add</button>
                   </div>
                 </div>
@@ -6184,12 +7548,18 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             const pStart=periodStart('week',selectedDate),pEnd=periodEnd('week',selectedDate);
             const wGoals=getGoalsForPeriod('week',pStart,pEnd);
             if(!wGoals.length) return null;
+            const isCurrentWeek=fmt(getWeekStart(today))===fmt(getWeekStart(selectedDate));
+            const elapsedPct=isCurrentWeek?Math.round((weekDays.filter(d=>d<=today).length/7)*100):
+              selectedDate<today?100:0;
             return (
               <div style={{background:'var(--paper)',borderRadius:'var(--radius-md)',border:'1px solid var(--border)',padding:'12px 16px',marginTop:4}}>
-                <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8}}>
-                  Weekly Goals — {Math.round((weekDays.filter(d=>d<=today).length/7)*100)}% of week elapsed
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                  <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>
+                    Weekly Goals — {elapsedPct}% of week elapsed
+                  </span>
+                  <button className="add-btn" onClick={()=>setShowGoalManager(true)} title="Manage goals">+</button>
                 </div>
-                {wGoals.map(goal=>renderGoalBar(goal,today,false))}
+                {wGoals.map(goal=>renderGoalBar(goal,selectedDate,false))}
               </div>
             );
           })()}
@@ -6208,16 +7578,30 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                 const isToday=isSameDay(d,today),isPast=d<today&&!isToday;
                 const dayExs=getDayExercises(dk);
                 return (
-                  <div key={dk} className={`fitness-month-cell ${isToday?'today':''}`}
+                  <div key={dk} className={`fitness-month-cell ${isToday?'today':''} ${dragOverDk===dk?'drag-over':''}`}
                     style={{opacity:isPast?0.6:1,background:isPast&&dayExs.length===0?'var(--cream)':undefined}}
-                    onClick={()=>{setSelectedDate(d);setFitView('day');}}>
+                    onClick={()=>{if(!dragEx){setSelectedDate(d);setFitView('day');}}}
+                    onDragOver={e=>{e.preventDefault();setDragOverDk(dk);}}
+                    onDragLeave={()=>setDragOverDk(null)}
+                    onDrop={e=>{
+                      e.preventDefault();
+                      if(dragEx && dragEx.fromDk!==dk){moveExercise(dragEx.fromDk,dk,dragEx.exId);}
+                      setDragEx(null);setDragOverDk(null);
+                    }}>
                     <div className="fitness-month-cell-num">{i+1}</div>
                     <div style={{marginTop:3}}>
-                      {dayExs.map(ex=>(
-                        <div key={ex.id} className="fitness-week-workout-pill" style={{fontSize:9,padding:'1px 4px',marginBottom:1}} title={exName(ex.exerciseId)}>
-                          {exName(ex.exerciseId)}
-                        </div>
-                      ))}
+                      {dayExs.map(ex=>{
+                        const libEx=fitnessExercises.find(e=>e.id===ex.exerciseId);
+                        const isCardio=libEx?.category==='Cardio';
+                        return (
+                          <div key={ex.id} className={`fitness-week-workout-pill${isCardio?' cardio':''}`} style={{fontSize:9,padding:'1px 4px',marginBottom:1}} title={exName(ex.exerciseId)}
+                            draggable={true}
+                            onDragStart={e=>{e.stopPropagation();setDragEx({exId:ex.id,fromDk:dk,exerciseId:ex.exerciseId});}}
+                            onDragEnd={()=>{setDragEx(null);setDragOverDk(null);}}>
+                            {exName(ex.exerciseId)}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -6228,12 +7612,18 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             const pStart=periodStart('month',selectedDate),pEnd=periodEnd('month',selectedDate);
             const mGoals=getGoalsForPeriod('month',pStart,pEnd);
             if(!mGoals.length) return null;
+            const isCurrentMonth=viewYear===today.getFullYear()&&viewMonth===today.getMonth();
+            const monthElapsedPct=isCurrentMonth?Math.round(Math.min(today.getDate(),daysInMonth)/daysInMonth*100):
+              selectedDate<today?100:0;
             return (
               <div style={{background:'var(--paper)',borderRadius:'var(--radius-md)',border:'1px solid var(--border)',padding:'12px 16px',marginTop:12}}>
-                <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:8}}>
-                  Monthly Goals — {Math.round(Math.min(today.getDate(),daysInMonth)/daysInMonth*100)}% of month elapsed
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+                  <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.06em'}}>
+                    Monthly Goals — {monthElapsedPct}% of month elapsed
+                  </span>
+                  <button className="add-btn" onClick={()=>setShowGoalManager(true)} title="Manage goals">+</button>
                 </div>
-                {mGoals.map(goal=>renderGoalBar(goal,today,false))}
+                {mGoals.map(goal=>renderGoalBar(goal,selectedDate,false))}
               </div>
             );
           })()}
@@ -6243,19 +7633,25 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
         {fitView==='year'&&(()=>{
           const pStart=periodStart('year',selectedDate),pEnd=periodEnd('year',selectedDate);
           const yGoals=getGoalsForPeriod('year',pStart,pEnd);
-          const dayOfYear=Math.floor((today-new Date(viewYear,0,1))/86400000)+1;
           const totalDaysInYear=365+(viewYear%4===0?1:0);
-          const yearPct=Math.round((dayOfYear/totalDaysInYear)*100);
+          const isCurrentYear=viewYear===today.getFullYear();
+          const isFutureYear=viewYear>today.getFullYear();
+          const dayOfYear=isCurrentYear?Math.floor((today-new Date(viewYear,0,1))/86400000)+1:
+            isFutureYear?0:totalDaysInYear;
+          const yearPct=isCurrentYear?Math.round((dayOfYear/totalDaysInYear)*100):isFutureYear?0:100;
           return (
             <div style={{display:'flex',flexDirection:'column',gap:16}}>
-              <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>{viewYear} · {yearPct}% elapsed · {dayOfYear} of {totalDaysInYear} days</div>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <div style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>{viewYear} · {yearPct}% elapsed · {dayOfYear} of {totalDaysInYear} days</div>
+                <button className="add-btn" onClick={()=>setShowGoalManager(true)} title="Manage goals">+</button>
+              </div>
               {yGoals.length===0&&(
                 <div style={{textAlign:'center',padding:'40px 20px',color:'var(--ink-faint)',fontSize:13,fontStyle:'italic'}}>
-                  No yearly goals set.<br/><span style={{fontSize:11}}>Click + in the sidebar to add one.</span>
+                  No yearly goals set.<br/><span style={{fontSize:11}}>Tap + above to add one.</span>
                 </div>
               )}
               {yGoals.map(goal=>{
-                const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal,today);
+                const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal,selectedDate);
                 const pct=Math.min(100,(actual/goal.target)*100),done=pct>=100,ahead=aheadBehind>=0;
                 // Build monthly breakdown
                 const monthlyData=Array.from({length:12},(_,mi)=>{
@@ -6471,6 +7867,8 @@ function GoalManager({ goals, exercises, onAddVersion, onEdit, onEnd, onDelete, 
                               <option value="reps">Reps</option>
                               <option value="sets">Sets</option>
                               <option value="volume">Volume (lbs)</option>
+                              <option value="distance">Distance (mi)</option>
+                              <option value="sessions">Sessions</option>
                             </select>
                           </div>
                           <div style={{display:'flex',gap:6,alignItems:'center'}}>
@@ -6556,6 +7954,8 @@ function GoalManager({ goals, exercises, onAddVersion, onEdit, onEnd, onDelete, 
                   <option value="reps">Reps</option>
                   <option value="sets">Sets</option>
                   <option value="volume">Volume (lbs)</option>
+                  <option value="distance">Distance (mi)</option>
+                  <option value="sessions">Sessions</option>
                 </select>
               </div>
               <div style={{display:'flex',gap:6}}>
@@ -6781,6 +8181,9 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   const bodyRef = useRef(null);
   const titleRef = useRef(null);
   const debounceRef = useRef(null);
+  // Always-current ref to selectedId so flush fn closure never goes stale
+  const selectedIdRef = useRef(selectedId);
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
   const [wordCount, setWordCount] = useState(0);
   const [showNewMenu, setShowNewMenu] = useState(null); // null=closed, 'top'=top-level, folderId=folder menu
   const [expandedFolders, setExpandedFolders] = useState({});
@@ -6795,6 +8198,51 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   const [dragOverId, setDragOverId] = useState(null);
   const [folderHoverTarget, setFolderHoverTarget] = useState(null);
   const folderHoverTimer = useRef(null);
+
+  // Register a synchronous body flush function so App can call it before any Drive save.
+  // This writes the current editor HTML directly to localStorage immediately, bypassing
+  // the 300ms debounce. Called by beforeunload, visibilitychange, and doc switching.
+  useEffect(() => {
+    _bodyFlushRef.fn = () => {
+      if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null; }
+      const id = selectedIdRef.current;
+      if (!id || !bodyRef.current) return;
+      const html = bodyRef.current.innerHTML;
+      const now = new Date().toISOString();
+      // Write directly to localStorage synchronously so beforeunload/beacon picks it up
+      try {
+        const stored = localStorage.getItem('pagesData');
+        const pages = stored ? JSON.parse(stored) : [];
+        const updated = pages.map(d => d.id === id ? {...d, body: html, lastModified: now} : d);
+        localStorage.setItem('pagesData', JSON.stringify(updated));
+      } catch {}
+      // Also update React state so the save effect triggers a Drive sync
+      setPagesData(p => p.map(d => d.id === id ? {...d, body: html, lastModified: now} : d));
+    };
+    return () => { _bodyFlushRef.fn = null; };
+  }, []); // eslint-disable-line — setPagesData is stable
+
+  // Flush body when switching documents so the previous doc's last keystrokes aren't lost
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+        const id = selectedIdRef.current;
+        if (id && bodyRef.current) {
+          const html = bodyRef.current.innerHTML;
+          const now = new Date().toISOString();
+          try {
+            const stored = localStorage.getItem('pagesData');
+            const pages = stored ? JSON.parse(stored) : [];
+            const updated = pages.map(d => d.id === id ? {...d, body: html, lastModified: now} : d);
+            localStorage.setItem('pagesData', JSON.stringify(updated));
+          } catch {}
+          setPagesData(p => p.map(d => d.id === id ? {...d, body: html, lastModified: now} : d));
+        }
+      }
+    };
+  }, [selectedId]); // cleanup runs with OLD selectedId before switching to new one
 
   function countWords(text) {
     return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
@@ -6837,8 +8285,8 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     const id = 'doc_' + Date.now();
     const now = new Date().toISOString();
     const siblings = pagesData.filter(d => (d.folderId || null) === (folderId || null));
-    const maxOrder = siblings.reduce((m, d) => Math.max(m, d.order ?? 0), -1);
-    const newDoc = { id, title: '', body: '', createdAt: now, lastModified: now, folderId: folderId || null, order: maxOrder + 1, tasks: [] };
+    const minOrder = siblings.reduce((m, d) => Math.min(m, d.order ?? 0), 0);
+    const newDoc = { id, title: '', body: '', createdAt: now, lastModified: now, folderId: folderId || null, order: minOrder - 1, tasks: [] };
     setPagesData(p => [...p, newDoc]);
     setSelectedId(id);
     setMobileView('editor');
@@ -7159,8 +8607,8 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
           blockEl.textContent = '';
           bodyRef.current.focus();
           document.execCommand('insertUnorderedList');
-          // Don't let the debounce save stale HTML
-          setTimeout(() => { if (bodyRef.current && selectedId) updateDoc(selectedId, { body: bodyRef.current.innerHTML }); }, 0);
+          // Don't let the debounce save stale HTML — use ref so closure is always current
+          setTimeout(() => { if (bodyRef.current && selectedIdRef.current) updateDoc(selectedIdRef.current, { body: bodyRef.current.innerHTML }); }, 0);
           return;
         }
       }
@@ -7170,7 +8618,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       if (bodyRef.current && selectedId) {
         updateDoc(selectedId, { body: bodyRef.current.innerHTML });
       }
-    }, 800);
+    }, 300);
   }
 
   useEffect(() => {
