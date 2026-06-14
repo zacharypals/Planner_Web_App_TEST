@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.10.0 -->
+<!-- LP Planner v3.10.1 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -5079,6 +5079,7 @@ function MonthlyView({date, selected, goals, completions, onDayClick, today, qty
                 const done = (completions[dk]||[]).includes(g.id);
                 const qtyRaw = qty ? (qty[dk]||{})[g.id] : null;
                 const qtyVal = qtyRaw != null ? qtyTotal(qtyRaw) : 0;
+                const liNotes = qtyRaw ? normalizeQty(qtyRaw).map(li=>li.note).filter(Boolean).join(', ') : '';
                 const notesVal = notes ? (notes[dk]||{})[g.id] || '' : '';
                 const noteLines = notesVal.split('\n').slice(0,4).filter(l=>l.trim());
                 if (!done && !qtyVal && !noteLines.length) return null;
@@ -5086,6 +5087,7 @@ function MonthlyView({date, selected, goals, completions, onDayClick, today, qty
                 return (
                   <div style={{marginTop:2,padding:'1px 3px'}}>
                     {qtyDisplay && <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:g.color,fontWeight:700,lineHeight:1.3}}>{qtyDisplay}</div>}
+                    {liNotes && <div style={{fontSize:8,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)',lineHeight:1.3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{liNotes}</div>}
                     {noteLines.map((l,i)=>(
                       <div key={i} style={{fontSize:8,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)',lineHeight:1.3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{l}</div>
                     ))}
@@ -5125,6 +5127,7 @@ function WeeklyHabitView({date, selected, goals, completions, today, onDayClick,
                   const isSingle = goals.length === 1;
                   const qtyRaw = (isSingle && qty) ? (qty[dk]||{})[g.id] : null;
                   const qtyVal = qtyRaw != null ? qtyTotal(qtyRaw) : 0;
+                  const liNotes = qtyRaw ? normalizeQty(qtyRaw).map(li=>li.note).filter(Boolean).join(', ') : '';
                   const notesVal = (isSingle && notes) ? (notes[dk]||{})[g.id] || '' : '';
                   const noteLines = notesVal.split('\n').slice(0,4).filter(l=>l.trim());
                   return (
@@ -5142,6 +5145,9 @@ function WeeklyHabitView({date, selected, goals, completions, today, onDayClick,
                     }}>
                       {isSingle && !!qtyVal && (
                         <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:done?'white':g.color,lineHeight:1.3}}>{(g.qtyMode||'qty')==='$'?'$':''}{qtyVal}</div>
+                      )}
+                      {isSingle && liNotes && (
+                        <div style={{fontSize:9,fontFamily:"'DM Sans',sans-serif",color:done?'rgba(255,255,255,0.85)':'var(--ink-light)',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{liNotes}</div>
                       )}
                       {isSingle && noteLines.map((l,li)=>(
                         <div key={li} style={{fontSize:9,fontFamily:"'DM Sans',sans-serif",color:done?'rgba(255,255,255,0.85)':'var(--ink-light)',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{l}</div>
@@ -6757,7 +6763,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.1</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
