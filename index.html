@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.10.2 -->
+<!-- LP Planner v3.13.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -14,9 +14,9 @@
 <title>Weekly Planner & Habit Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.5/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 
 <style>
@@ -418,11 +418,20 @@
   }
   /* Set rows */
   .set-row {
-    display: flex; align-items: center; gap: 6px;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
     padding: 4px 0; border-bottom: 1px solid rgba(0,0,0,0.04);
   }
   .set-row:last-child { border-bottom: none; }
   .set-row.done { opacity: 0.55; }
+  .set-row-main { display: flex; align-items: center; gap: 6px; width: 100%; }
+  .set-note-input {
+    width: 100%; font-family: 'DM Sans', sans-serif; font-size: 11px;
+    border: none; border-top: 1px solid rgba(0,0,0,0.05); border-radius: 0;
+    padding: 2px 4px 3px 26px; background: transparent; color: var(--ink-light);
+    outline: none; margin-top: 0;
+  }
+  .set-note-input::placeholder { color: var(--ink-faint); font-style: italic; }
+  .set-note-input:focus { background: rgba(45,107,74,0.04); }
   .set-num {
     font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-faint);
     width: 18px; flex-shrink: 0; text-align: right;
@@ -586,7 +595,8 @@
   .task-title-input {
     flex: 1; background: transparent; border: none; outline: none;
     font-size: 11px; font-weight: 500; font-family: 'DM Sans', sans-serif;
-    cursor: text;
+    cursor: text; resize: none; overflow: hidden; white-space: pre-wrap;
+    word-break: break-word; line-height: 1.3; display: block; padding: 0;
   }
   .task-expand-btn {
     background: none; border: none; cursor: pointer; font-size: 10px;
@@ -1678,6 +1688,149 @@
     .mobile-day-view, .mobile-sheet, .mobile-sheet-overlay,
     .mobile-fab, .mobile-bottom-nav { display: none !important; }
   }
+
+  /* ═══════════════════════════════════════════════════════════════
+     v3.13.0 LOOK REFRESH — layout & component styling borrowed from
+     Finance Pal. Colors and fonts are unchanged. Everything for the
+     refresh lives in this block so it can be tuned or removed in one place.
+     ═══════════════════════════════════════════════════════════════ */
+  :root {
+    --card-border: 1px solid var(--border);
+    --card-shadow: 0 1px 3px rgba(44,36,24,0.07);
+  }
+
+  /* ── Top bar: soft translucent tabs, ghost buttons ── */
+  .nav-tab {
+    text-transform: none; letter-spacing: 0.01em; font-size: 14px;
+    padding: 8px 14px; color: rgba(255,255,255,0.75);
+  }
+  .nav-tab:hover { background: rgba(255,255,255,0.10); color: #fff; }
+  .nav-tab.active { background: rgba(255,255,255,0.18); color: #fff; font-weight: 600; }
+  .auth-btn, .auth-btn.sync {
+    border: none; background: rgba(255,255,255,0.14); color: #fff;
+    padding: 6px 12px; font-size: 13px;
+  }
+  .auth-btn:hover, .auth-btn.sync:hover { background: rgba(255,255,255,0.24); color: #fff; border: none; }
+  .auth-btn.danger:hover { background: rgba(255,255,255,0.24); }
+
+  /* ── Desktop: content floats as cards on the cream page ── */
+  @media (min-width: 768px) {
+    .nav-bar { height: 56px; padding: 0 20px; }
+    .main-content, .fitness-layout { padding: 16px; gap: 16px; }
+
+    /* Sidebars become cards (toggle strip lives inside the card) */
+    .sidebar-wrap, .pages-sidebar-wrap, .fitness-sidebar {
+      background: var(--paper); border: var(--card-border);
+      border-radius: var(--radius-lg); box-shadow: var(--card-shadow); overflow: hidden;
+    }
+    .sidebar-wrap > .sidebar, .pages-sidebar-wrap > .pages-sidebar { box-shadow: none; }
+    .sidebar-toggle-strip, .pages-toggle-strip {
+      border-right: none; border-left: 1px solid var(--border); background: var(--paper);
+    }
+    .pages-sidebar-wrap > .pages-sidebar { border-right: none; }
+    .fitness-sidebar { border-right: var(--card-border); }
+
+    /* Weekly planner: calendar + review as two stacked cards */
+    .weekly-main-panel { gap: 16px; }
+    .weekly-calendar {
+      height: calc(100vh - 56px - 32px - 112px);
+      background: var(--paper); border: var(--card-border);
+      border-radius: var(--radius-lg); box-shadow: var(--card-shadow);
+    }
+    .cal-grid { column-gap: 0; }
+    .cal-header-cell { border-radius: 0; border-right: 1px solid rgba(255,255,255,0.12); }
+    .cal-grid > .cal-header-cell:nth-child(7) { border-right: none; }
+    .cal-day { border-right: 1px solid var(--border); }
+    .cal-day:last-child { border-right: none; }
+    .week-review {
+      margin: 0; border: var(--card-border); border-radius: var(--radius-lg);
+      box-shadow: var(--card-shadow);
+    }
+
+    /* Habit tracker & Pages main areas are cards */
+    .habit-main, .pages-main {
+      background: var(--paper); border: var(--card-border);
+      border-radius: var(--radius-lg); box-shadow: var(--card-shadow);
+    }
+    .pages-doc-header { box-shadow: none; border-bottom: 1px solid var(--border); background: transparent; }
+
+    /* Monthly calendar card */
+    .monthly-cal-wrap {
+      background: var(--paper); border: var(--card-border);
+      border-radius: var(--radius-lg); box-shadow: var(--card-shadow);
+      padding: 16px 20px 20px; margin: 0;
+    }
+  }
+
+  /* ── Monthly calendar: clean table grid instead of floating tiles ── */
+  .monthly-cal-header { column-gap: 0; }
+  .monthly-cal-grid {
+    gap: 1px; background: var(--border); border: 1px solid var(--border);
+    border-radius: var(--radius-md); overflow: hidden;
+  }
+  .monthly-cell { border-radius: 0; box-shadow: none; }
+  .monthly-cell:hover { box-shadow: none; }
+  .monthly-cell.empty { background: var(--cream); }
+
+  /* ── Segmented control (Habit view switcher) ── */
+  .view-tabs {
+    display: inline-flex; gap: 2px; padding: 3px;
+    background: var(--cream); border-radius: var(--radius-sm);
+  }
+  .view-tab {
+    border: none; background: transparent; border-radius: 6px;
+    padding: 5px 12px; color: var(--ink-light);
+  }
+  .view-tab:hover:not(.active) { background: transparent; color: var(--ink); }
+  .view-tab.active {
+    background: var(--paper); color: var(--ink); font-weight: 600;
+    box-shadow: 0 1px 3px rgba(44,36,24,0.12);
+  }
+
+  /* ── Chips ── */
+  .goal-filter-chip {
+    border-radius: 999px; border-width: 1px; font-size: 12px; padding: 4px 12px;
+    background: var(--paper);
+  }
+
+  /* ── Buttons, inputs, text areas ── */
+  .btn, .modal-btn { border-radius: var(--radius-md); font-weight: 600; padding: 9px 16px; }
+  .btn-secondary, .modal-btn.secondary { background: var(--cream); border: 1px solid transparent; color: var(--ink); }
+  .btn-secondary:hover, .modal-btn.secondary:hover { background: var(--cream); border-color: var(--border); }
+  .sidebar-textarea, .modal-input, .modal-textarea, .review-textarea, .pages-body {
+    background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  }
+  .pages-body { border-radius: var(--radius-md); }
+  .sidebar-textarea:focus, .modal-input:focus, .modal-textarea:focus,
+  .review-textarea:focus, .pages-body:focus {
+    border-color: var(--accent); box-shadow: 0 0 0 3px rgba(45,107,74,0.12);
+  }
+
+  /* ── Modals & popovers: same card language ── */
+  .modal, .modal-box, .people-picker-modal, .task-ctx-menu {
+    border: var(--card-border); border-radius: var(--radius-lg);
+  }
+
+  /* ── Mobile ── */
+  @media (max-width: 767px) {
+    .mobile-bottom-nav { box-shadow: none; border-top: 1px solid var(--border); }
+    .mobile-bottom-nav-btn { font-size: 11px; color: var(--ink-light); }
+    .mobile-bottom-nav-btn.active { color: var(--accent); font-weight: 600; }
+    .mobile-day-nav { box-shadow: none; border-bottom: 1px solid var(--border); }
+    .mobile-week-dots { box-shadow: none; border-top: 1px solid var(--border); margin-top: auto; }
+    .mobile-day-tasks {
+      flex: 0 1 auto; margin: 12px; padding: 12px;
+      background: var(--paper); border: var(--card-border);
+      border-radius: var(--radius-lg); box-shadow: var(--card-shadow);
+    }
+    .monthly-cal-wrap {
+      background: var(--paper); border: var(--card-border); border-radius: var(--radius-lg);
+      box-shadow: var(--card-shadow); margin: 10px; padding: 10px 8px 12px;
+      min-width: 0; /* let all 7 days fit inside the card on phones */
+    }
+    .monthly-cal-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .monthly-event-chip .chip-time { display: none; } /* narrow cells: show the title, not the time */
+  }
 </style>
 </head>
 <body>
@@ -1733,7 +1886,12 @@ function normalizeQty(val) {
 }
 // Sums a LineItem[] (or legacy value) to a number for display/rollup
 function qtyTotal(val) {
-  if (Array.isArray(val)) return val.reduce((s,li) => s + (parseFloat(li.amount)||0), 0);
+  if (Array.isArray(val)) {
+    const sum = val.reduce((s,li) => s + (parseFloat(li.amount)||0), 0);
+    // Round away binary floating-point drift (e.g. 0.1+0.2=0.30000000000000004)
+    // while preserving legitimate precision beyond 2 decimals.
+    return Math.round((sum + Number.EPSILON) * 1e6) / 1e6;
+  }
   const n = parseFloat(val);
   return isNaN(n) ? 0 : n;
 }
@@ -2363,6 +2521,15 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     sessionStorage.setItem('lp_mobileDayIndex', String(next));
     return next;
   });
+  const [swipeNav, setSwipeNav] = useState(() => {
+    const v = localStorage.getItem('lp_weeklySwipeNav');
+    return v === null ? false : v === 'true';
+  });
+  const toggleSwipeNav = () => setSwipeNav(v => {
+    const next = !v;
+    localStorage.setItem('lp_weeklySwipeNav', String(next));
+    return next;
+  });
   const [sheetOpen, setSheetOpen] = useState(false);
   const [showPeoplePicker, setShowPeoplePicker] = useState(false);
   const [showRepeatCleanup, setShowRepeatCleanup] = useState(false);
@@ -2503,11 +2670,11 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       setTasks(dayKey, t => {
         const idx = t.findIndex(x=>x.id===afterId);
         const next = [...t];
-        next.splice(idx+1, 0, {id, title:'', details:'', done:false, expanded:false, colorIndex: idx+1});
+        next.splice(idx+1, 0, {id, title:'', details:'', done:false, expanded:false, colorIndex: pickTaskColorIndex(t)});
         return next;
       });
     } else {
-      setTasks(dayKey, t => [...t, {id, title:'', details:'', done:false, expanded:false, colorIndex: t.length}]);
+      setTasks(dayKey, t => [...t, {id, title:'', details:'', done:false, expanded:false, colorIndex: pickTaskColorIndex(t)}]);
     }
   }
   function updateTask(dayKey, id, patch) {
@@ -2675,20 +2842,34 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   function moveTaskBetweenDays(fromDayKey, toDayKey, taskId, targetId) {
     // Capture task reference for calendar sync (needs to happen outside updater)
     const taskForSync = getTasks(fromDayKey).find(t => t.id === taskId);
-    setWD(w => {
-      const allTasks = w.tasks || {};
-      const srcList = allTasks[fromDayKey] || [];
+    // NOTE: weekData is keyed by week-start date, then by day within that week.
+    // fromDayKey and toDayKey can belong to DIFFERENT weeks (e.g. reschedule
+    // across a week boundary), so each day must be resolved to its own week key
+    // and both written. Writing everything under the currently-displayed week
+    // (the old bug) silently stranded the task under a day-string that the
+    // destination week never looks up, making it appear to vanish.
+    const emptyWeek = () => ({ proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} });
+    const fromWk = fmt(getWeekStart(parseLocal(fromDayKey) || new Date(fromDayKey)));
+    const toWk = fmt(getWeekStart(parseLocal(toDayKey) || new Date(toDayKey)));
+    setWeekData(allWD => {
+      const fromWD = allWD[fromWk] || emptyWeek();
+      const srcList = (fromWD.tasks || {})[fromDayKey] || [];
       // Find task from FRESH state — if already moved (double-fire guard), bail out
       const task = srcList.find(t => t.id === taskId);
-      if (!task) return w;
+      if (!task) return allWD;
       const srcTasks = srcList.filter(t => t.id !== taskId);
-      const dstList = allTasks[toDayKey] || [];
+      const nextFromWD = { ...fromWD, tasks: { ...fromWD.tasks, [fromDayKey]: srcTasks } };
+      // If destination is the same week, chain off nextFromWD so the removal isn't lost
+      const toWD = toWk === fromWk ? nextFromWD : (allWD[toWk] || emptyWeek());
+      const dstList = (toWD.tasks || {})[toDayKey] || [];
       // If task somehow already in destination, bail out (idempotency guard)
-      if (dstList.some(t => t.id === taskId)) return w;
+      if (dstList.some(t => t.id === taskId)) return allWD;
       const dstTasks = [...dstList];
       const insertAt = targetId ? dstTasks.findIndex(t => t.id === targetId) : dstTasks.length;
       dstTasks.splice(insertAt === -1 ? dstTasks.length : insertAt, 0, task);
-      return { ...w, tasks: { ...allTasks, [fromDayKey]: srcTasks, [toDayKey]: dstTasks } };
+      const nextToWD = { ...toWD, tasks: { ...toWD.tasks, [toDayKey]: dstTasks } };
+      if (toWk === fromWk) return { ...allWD, [fromWk]: nextToWD };
+      return { ...allWD, [fromWk]: nextFromWD, [toWk]: nextToWD };
     });
     // Sync date change to Google Calendar
     if (taskForSync?.isEvent && taskForSync?.gcalId && getToken()) {
@@ -2902,7 +3083,19 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                             else moveTaskBetweenDays(dragging.dayKey, dk, dragging.id, task.id);
                           }
                           setDragging(null); setDragOver(null);
-                        }} />
+                        }}
+                        onReschedule={(toDayKey)=>{
+                          moveTaskBetweenDays(dk,toDayKey,task.id,null);
+                          if(task.expanded) updateTask(toDayKey,task.id,{expanded:false});
+                          // If it's a project task, also update scheduledDate in pagesData
+                          if(task.isProjectTask && task.projectDocId && setPagesData) {
+                            setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : {
+                              ...doc, tasks: (doc.tasks||[]).map(t => t.id===task.id ? {...t, scheduledDate:toDayKey} : t)
+                            }));
+                          }
+                        }}
+                        weekDays={weekDays}
+                        currentDayKey={dk} />
                     ))}
                     <button className="add-task-btn" onClick={()=>addTask(dk)}>+</button>
                     <DayNote dayKey={dk} note={getDayNote(dk)} onChange={note=>setDayNote(dk,note)} />
@@ -2936,15 +3129,21 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           () => setMobileDayIndex(i => { if(i===0){setWeekStart(ws=>addDays(ws,-7));return 6;} return i-1; })
         );
         return (
-      <div className="mobile-day-view" {...swipe}>
+      <div className="mobile-day-view" {...(swipeNav ? swipe : {})}>
         <div className="mobile-day-nav">
           <button className="nav-arrow" onClick={()=>setMobileDayIndex(i=>{
             if(i===0){setWeekStart(ws=>addDays(ws,-7));return 6;}
             return i-1;
           })}>‹</button>
-          <div style={{textAlign:'center'}}>
-            <div className="mobile-day-label">{DAYS[mobileDayDate.getDay()]}</div>
-            <div className="mobile-day-date">{MONTHS[mobileDayDate.getMonth()].slice(0,3)} {mobileDayDate.getDate()}</div>
+          <div style={{display:'flex',alignItems:'center',gap:10}}>
+            <div style={{textAlign:'center'}}>
+              <div className="mobile-day-label">{DAYS[mobileDayDate.getDay()]}</div>
+              <div className="mobile-day-date">{MONTHS[mobileDayDate.getMonth()].slice(0,3)} {mobileDayDate.getDate()}</div>
+            </div>
+            <button onClick={toggleSwipeNav} title={swipeNav ? 'Swipe navigation on — tap to disable' : 'Swipe navigation off — tap to enable'}
+              style={{background:'none',border:'none',cursor:'pointer',fontSize:16,opacity:swipeNav?1:0.35,padding:'2px 4px',lineHeight:1}}>
+              👆
+            </button>
           </div>
           <button className="nav-arrow" onClick={()=>setMobileDayIndex(i=>{
             if(i===6){setWeekStart(ws=>addDays(ws,7));return 0;}
@@ -3001,6 +3200,17 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         </div>
         {/* Week dot row */}
         <div className="mobile-week-dots">
+          <button
+            onClick={()=>{setWeekStart(getWeekStart(today));setMobileDayIndex(today.getDay());}}
+            title="Jump to today"
+            style={{
+              height:28,padding:'0 10px',borderRadius:14,border:'1.5px solid var(--border)',
+              background:'none',fontSize:11,fontFamily:"'DM Mono',monospace",fontWeight:500,
+              color:'var(--ink-light)',cursor:'pointer',display:'flex',alignItems:'center',
+              marginRight:4,
+            }}>
+            Today
+          </button>
           {weekDays.map((d,i)=>(
             <button key={i}
               className={`mobile-week-dot ${i===mobileDayIndex?'active':''} ${isSameDay(d,today)?'today':''}`}
@@ -3576,13 +3786,19 @@ const TASK_COLORS = [
   '#fff3cd', // warm yellow
   '#cce5ff', // sky blue
   '#e2d9f3', // soft lavender
-  '#fde8d0', // peach
-  '#c9f0f7', // mint
-  '#fce4ec', // rose
-  '#dbeafe', // periwinkle
-  '#fef9c3', // lemon
-  '#ffe4cc', // apricot
-  '#e0f2fe', // powder blue
+  '#ffdab3', // apricot orange
+  '#b2f2e5', // seafoam teal
+  '#f3d9fa', // orchid lilac
+  '#c8e6c9', // leaf green
+  '#ffccbc', // coral
+  '#b3e5fc', // cyan sky
+  '#f0e68c', // pastel olive
+  '#e1bee7', // soft plum
+  '#ffe0b2', // marigold
+  '#b2dfdb', // teal mist
+  '#d7ccc8', // warm taupe
+  '#c5cae9', // periwinkle indigo
+  '#ffcdd2', // watermelon
 ];
 const EVENT_COLORS = [
   '#fce7f3', // soft pink
@@ -3591,19 +3807,35 @@ const EVENT_COLORS = [
   '#d1fae5', // seafoam
   '#fef3c7', // champagne
   '#ffedd5', // cantaloupe
-  '#f0fdf4', // pale mint
-  '#fdf4ff', // whisper purple
-  '#e0f2fe', // ice blue
-  '#fefce8', // cream yellow
-  '#ffe4e6', // blush
-  '#ecfdf5', // aqua mist
+  '#e0f7fa', // ice cyan
+  '#f3e5f5', // orchid mist
+  '#dcedc8', // spring green
+  '#ffe0e0', // watermelon pink
+  '#e8eaf6', // periwinkle indigo
+  '#fff9c4', // butter yellow
+  '#d7ccc8', // warm taupe
+  '#b2ebf2', // aqua
+  '#f8bbd0', // rose
+  '#c8e6c9', // mint leaf
 ];
+// Picks a color index not already used by other tasks the same day, so
+// colors don't visibly repeat until every palette slot is taken; falls
+// back to random once the day genuinely has more tasks than colors.
+function pickTaskColorIndex(existingTasks) {
+  const used = new Set((existingTasks||[]).map(t => t.colorIndex ?? 0));
+  for (let i = 0; i < TASK_COLORS.length; i++) {
+    if (!used.has(i)) return i;
+  }
+  return Math.floor(Math.random() * TASK_COLORS.length);
+}
 function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
   const textareaRef = useRef();
+  const titleTextareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
   const [mobileConfirming, setMobileConfirming] = useState(false);
   const [showColors, setShowColors] = useState(false);
   const [repeatOpen, setRepeatOpen] = useState(false);
+  const [rescheduleWeekOffset, setRescheduleWeekOffset] = useState(0);
   const longPressTimer = useRef(null);
 
   // Auto-grow textarea
@@ -3613,6 +3845,19 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
       textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
     }
   }, [task.details, task.expanded]);
+
+  // Auto-grow title textarea so wrapped titles are fully visible
+  useEffect(() => {
+    if (titleTextareaRef.current) {
+      titleTextareaRef.current.style.height = 'auto';
+      titleTextareaRef.current.style.height = titleTextareaRef.current.scrollHeight + 'px';
+    }
+  }, [task.title]);
+
+  // Reset reschedule week preview whenever the card collapses
+  useEffect(() => {
+    if (!task.expanded) setRescheduleWeekOffset(0);
+  }, [task.expanded]);
 
   // Cancel confirm if mouse leaves card
   function handleMouseLeave() { setConfirming(false); }
@@ -3698,21 +3943,22 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
           style={{borderColor: task.done ? '#2d5a3d' : undefined, color: task.done ? '#2d5a3d' : undefined, background: task.done ? '#e8f0eb' : undefined}}
           onClick={()=>onUpdate({done:!task.done})} />
         <div style={{flex:1,minWidth:0}}>
-          <input
-            ref={el=>{if(titleRef)titleRef(el);}}
+          <textarea
+            ref={el=>{titleTextareaRef.current=el; if(titleRef)titleRef(el);}}
             className="task-title-input"
             placeholder={task.isEvent ? 'Event…' : 'Task…'}
             autoCapitalize="sentences"
+            rows={1}
             value={task.title}
-            onChange={e=>{let v=e.target.value; if(task.title===''&&v.length===1) v=v.toUpperCase(); onUpdate({title:v});}}
+            onChange={e=>{let v=e.target.value.replace(/\n/g,''); if(task.title===''&&v.length===1) v=v.toUpperCase(); onUpdate({title:v});}}
             onBlur={()=>{
               if(onBlurSync && task.isEvent) onBlurSync();
               if(deleteIfEmpty) deleteIfEmpty();
             }}
             onKeyDown={e=>{
-              if(e.key==='Enter' && !task.isEvent && !task.isProjectTask){
+              if(e.key==='Enter'){
                 e.preventDefault();
-                if(onEnterKey) onEnterKey();
+                if(!task.isEvent && !task.isProjectTask && onEnterKey) onEnterKey();
               }
             }}
             onClick={e=>e.stopPropagation()}
@@ -3855,34 +4101,77 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
               </div>
             </div>
           )}
-          {/* ── Reschedule (mobile only) ── */}
-          {onReschedule && weekDays && (
-            <div style={{paddingTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',marginTop:6}} onClick={e=>e.stopPropagation()}>
-              <div style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:5}}>📅 Reschedule:</div>
-              <div style={{display:'flex',gap:4}}>
-                {weekDays.map((d,i)=>{
-                  const dk = fmt(d);
-                  const isCurrentDay = dk === currentDayKey;
-                  return (
-                    <button key={i}
-                      onClick={e=>{ e.stopPropagation(); if(!isCurrentDay) onReschedule(dk); }}
-                      style={{
-                        width:30, height:30, borderRadius:'50%', border:'1.5px solid',
-                        borderColor: isCurrentDay ? 'var(--accent)' : 'var(--border)',
-                        background: isCurrentDay ? 'var(--accent)' : 'white',
-                        color: isCurrentDay ? 'white' : 'var(--ink-light)',
-                        fontFamily:"'DM Mono',monospace", fontSize:10, fontWeight:600,
-                        cursor: isCurrentDay ? 'default' : 'pointer',
-                        display:'flex', alignItems:'center', justifyContent:'center',
-                        transition:'all 0.12s', flexShrink:0,
-                      }}>
-                      {DAYS[d.getDay()].slice(0,1)}
-                    </button>
-                  );
-                })}
+          {/* ── Reschedule (pick a day, incl. other weeks) ── */}
+          {onReschedule && weekDays && (() => {
+            const previewDays = rescheduleWeekOffset === 0
+              ? weekDays
+              : weekDays.map(d => addDays(d, rescheduleWeekOffset * 7));
+            const rangeStart = previewDays[0], rangeEnd = previewDays[6];
+            const sameMonth = rangeStart.getMonth() === rangeEnd.getMonth();
+            const weekLabel = sameMonth
+              ? `${MONTHS[rangeStart.getMonth()].slice(0,3)} ${rangeStart.getDate()}–${rangeEnd.getDate()}`
+              : `${MONTHS[rangeStart.getMonth()].slice(0,3)} ${rangeStart.getDate()} – ${MONTHS[rangeEnd.getMonth()].slice(0,3)} ${rangeEnd.getDate()}`;
+            const today = new Date(); today.setHours(0,0,0,0);
+            return (
+              <div style={{paddingTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',marginTop:6}} onClick={e=>e.stopPropagation()}>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',rowGap:3,marginBottom:5}}>
+                  <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",whiteSpace:'nowrap'}}>📅 Move to:</div>
+                  <div style={{display:'flex',alignItems:'center',gap:3}}>
+                    {rescheduleWeekOffset !== 0 && (
+                      <button onClick={e=>{e.stopPropagation();setRescheduleWeekOffset(0);}}
+                        style={{background:'none',border:'none',cursor:'pointer',fontSize:8,
+                                color:'var(--accent)',fontFamily:"'DM Mono',monospace",
+                                textDecoration:'underline',padding:'0 2px',whiteSpace:'nowrap'}}>
+                        This week
+                      </button>
+                    )}
+                    <button onClick={e=>{e.stopPropagation();setRescheduleWeekOffset(o=>o-1);}}
+                      style={{background:'none',border:'1px solid var(--border)',borderRadius:3,
+                              cursor:'pointer',fontSize:9,color:'var(--ink-light)',flexShrink:0,
+                              width:15,height:15,lineHeight:1,padding:0}}>‹</button>
+                    <span style={{fontSize:8,color:'var(--ink)',fontFamily:"'DM Mono',monospace",
+                                  fontWeight:600,textAlign:'center',whiteSpace:'nowrap'}}>
+                      {weekLabel}
+                    </span>
+                    <button onClick={e=>{e.stopPropagation();setRescheduleWeekOffset(o=>o+1);}}
+                      style={{background:'none',border:'1px solid var(--border)',borderRadius:3,
+                              cursor:'pointer',fontSize:9,color:'var(--ink-light)',flexShrink:0,
+                              width:15,height:15,lineHeight:1,padding:0}}>›</button>
+                  </div>
+                </div>
+                <div style={{display:'flex',gap:2,width:'100%'}}>
+                  {previewDays.map((d,i)=>{
+                    const dk = fmt(d);
+                    const isCurrentDay = rescheduleWeekOffset === 0 && dk === currentDayKey;
+                    const isToday = d.getTime() === today.getTime();
+                    return (
+                      <button key={i}
+                        onClick={e=>{
+                          e.stopPropagation();
+                          if (isCurrentDay) return;
+                          onReschedule(dk);
+                          setRescheduleWeekOffset(0);
+                        }}
+                        title={`${DAYS[d.getDay()]} ${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}`}
+                        style={{
+                          flex:'1 1 0', minWidth:0, height:30, borderRadius:6, border:'1.5px solid',
+                          borderColor: isCurrentDay ? 'var(--accent)' : (isToday ? 'var(--gold)' : 'var(--border)'),
+                          background: isCurrentDay ? 'var(--accent)' : 'white',
+                          color: isCurrentDay ? 'white' : 'var(--ink-light)',
+                          fontFamily:"'DM Mono',monospace", fontSize:8, fontWeight:600,
+                          cursor: isCurrentDay ? 'default' : 'pointer',
+                          display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                          gap:1, transition:'all 0.12s', padding:0, overflow:'hidden',
+                        }}>
+                        <span>{DAYS[d.getDay()].slice(0,1)}</span>
+                        <span style={{fontSize:8,opacity:isCurrentDay?0.9:0.7}}>{d.getDate()}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* ── Repeat ── */}
           {!task.isProjectTask && (
@@ -4451,14 +4740,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
       </div>{/* end sidebar-wrap */}
 
       {/* MAIN */}
-      {(() => {
-        const habitSwipe = useSwipe(
-          () => setSelectedDate(d => addDays(d, view==='daily'?1:view==='weekly'?7:view==='monthly'?31:365)),
-          () => setSelectedDate(d => addDays(d, view==='daily'?-1:view==='weekly'?-7:view==='monthly'?-31:-365)),
-          100
-        );
-        return (
-      <div className="habit-main" {...habitSwipe}>
+      <div className="habit-main">
         <div className="habit-header-row">
           <div className="view-tabs">
             {['daily','weekly','monthly','yearly'].map(v=>(
@@ -4569,7 +4851,6 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
         {view==='daily' && <DailyView date={selectedDate} goals={displayGoals} completions={completions}
           onToggle={(gid)=>toggleCompletion(gid,fmt(selectedDate))} />}
       </div>
-      );})()}
 
       {/* Mobile FAB + sheet for countdowns */}
       <div className={`mobile-sheet-overlay ${sheetOpen?'open':''}`} onClick={()=>setSheetOpen(false)} />
@@ -4654,35 +4935,35 @@ function QtySection({ goal, items, getQty, setGoalQty, addQtyEntry, removeQtyEnt
         </span>
         {items.length > 0 && (
           <button onClick={e=>{e.stopPropagation();setShowItems(s=>!s);}}
-            style={{fontSize:10,color:'var(--ink-faint)',background:'none',border:'none',cursor:'pointer',padding:'0 2px',lineHeight:1}}>
+            style={{fontSize:14,color:'var(--ink-faint)',background:'none',border:'none',cursor:'pointer',padding:'2px 4px',lineHeight:1}}>
             {showItems ? '▲' : `▾ ${items.length} item${items.length>1?'s':''}`}
           </button>
         )}
       </div>
       {/* Line items list */}
       {showItems && items.length > 0 && (
-        <div style={{display:'flex',flexDirection:'column',gap:3,paddingLeft:4,borderLeft:'2px solid var(--border)'}}>
+        <div style={{display:'flex',flexDirection:'column',gap:4,paddingLeft:4,borderLeft:'2px solid var(--border)'}}>
           {items.map(li => (
-            <div key={li.id} style={{display:'flex',alignItems:'center',gap:4,fontSize:11}}>
+            <div key={li.id} style={{display:'flex',alignItems:'center',gap:6,fontSize:13}}>
               {editingId===li.id ? (
                 <>
                   <input type="number" min="0" step="any" inputMode="decimal" value={editAmount}
                     onChange={e=>setEditAmount(e.target.value)}
-                    style={{width:54,fontSize:11,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:3,padding:'1px 4px',background:'white',color:'var(--ink)',outline:'none'}}
+                    style={{width:60,fontSize:13,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:3,padding:'2px 5px',background:'white',color:'var(--ink)',outline:'none'}}
                     autoFocus />
                   <input type="text" value={editNote} onChange={e=>setEditNote(e.target.value)}
                     placeholder="note…"
-                    style={{flex:1,fontSize:11,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:3,padding:'1px 4px',background:'white',color:'var(--ink)',outline:'none',minWidth:0}}
+                    style={{flex:1,fontSize:13,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:3,padding:'2px 5px',background:'white',color:'var(--ink)',outline:'none',minWidth:0}}
                     onKeyDown={e=>{if(e.key==='Enter')commitEdit();if(e.key==='Escape')setEditingId(null);}} />
-                  <button onClick={commitEdit} style={{fontSize:10,background:'var(--accent)',color:'white',border:'none',borderRadius:3,padding:'1px 5px',cursor:'pointer',fontFamily:"'DM Mono',monospace",flexShrink:0}}>✓</button>
+                  <button onClick={commitEdit} style={{fontSize:14,background:'var(--accent)',color:'white',border:'none',borderRadius:4,padding:'3px 8px',cursor:'pointer',fontFamily:"'DM Mono',monospace",flexShrink:0}}>✓</button>
                 </>
               ) : (
                 <>
                   <span style={{fontFamily:"'DM Mono',monospace",fontWeight:700,color:'var(--ink)',flexShrink:0}}>{prefix}{li.amount}</span>
                   {li.note && <span style={{fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{li.note}</span>}
                   {!li.note && <span style={{flex:1}}/>}
-                  <button onClick={()=>startEdit(li)} style={{fontSize:10,background:'none',border:'none',cursor:'pointer',color:'var(--ink-faint)',padding:'0 2px',flexShrink:0}} title="Edit">✎</button>
-                  <button onClick={()=>removeQtyEntry(goal.id,li.id)} style={{fontSize:11,background:'none',border:'none',cursor:'pointer',color:'var(--ink-faint)',padding:'0 2px',flexShrink:0}} title="Remove">✕</button>
+                  <button onClick={()=>startEdit(li)} style={{fontSize:16,background:'none',border:'none',cursor:'pointer',color:'var(--ink-faint)',padding:'2px 4px',flexShrink:0,lineHeight:1}} title="Edit">✎</button>
+                  <button onClick={()=>removeQtyEntry(goal.id,li.id)} style={{fontSize:16,background:'none',border:'none',cursor:'pointer',color:'var(--ink-faint)',padding:'2px 4px',flexShrink:0,lineHeight:1}} title="Remove">✕</button>
                 </>
               )}
             </div>
@@ -6433,8 +6714,18 @@ function App() {
       if (now - lastDriveCheckRef.current < 30000) return; // max once per 30s
       lastDriveCheckRef.current = now;
       try {
-        const token = getToken();
-        if (!token) return;
+        let token = getToken();
+        if (!token) {
+          // Access token silently expires (~55min) on a tab left open and idle.
+          // getToken() just returns null in that case — without refreshing here,
+          // this background check would go permanently silent on a long-lived idle
+          // tab and would never notice another device's changes. Refresh once and
+          // retry; if refresh fails, bail quietly and let the normal save-path 401
+          // handling surface a "sign in again" prompt on the user's next action.
+          await new Promise(resolve => requestTokenSilent(() => resolve(), () => resolve()));
+          token = getToken();
+          if (!token) return;
+        }
         // Fetch just the modifiedTime — tiny request, no full file download
         const metaRes = await fetch(
           `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=modifiedTime`,
@@ -6493,9 +6784,20 @@ function App() {
     }
     window.addEventListener('beforeunload', handleBeforeUnload);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Periodic freshness check even while the tab stays continuously focused.
+    // Without this, a device left open and active (never backgrounded, so
+    // visibilitychange never fires) will never learn that another device saved
+    // newer data to Drive — and its next own save would blindly overwrite Drive
+    // with its stale in-memory snapshot, silently discarding the other device's
+    // changes. checkAndRefreshFromDrive already no-ops if a local save is
+    // pending/in-flight, so this is safe to run on a fixed interval.
+    const driveCheckInterval = setInterval(() => {
+      if (document.visibilityState === 'visible') checkAndRefreshFromDrive();
+    }, 30000);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(driveCheckInterval);
     };
   }, [flushSave, driveFileId, authUser]);
 
@@ -6765,7 +7067,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.10.2</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.13.0</span>
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -6857,17 +7159,17 @@ function App() {
 
       {/* Mobile bottom nav — only visible on phones via CSS */}
       <div className="mobile-bottom-nav">
-        <button className={`mobile-bottom-nav-btn ${page==='planner'?'active':''}`} onClick={()=>setPage('planner')}>
-          <span className="icon">📅</span>Week
-        </button>
         <button className={`mobile-bottom-nav-btn ${page==='monthly'?'active':''}`} onClick={()=>setPage('monthly')}>
           <span className="icon">🗓</span>Month
+        </button>
+        <button className={`mobile-bottom-nav-btn ${page==='pages'?'active':''}`} onClick={()=>setPage('pages')}>
+          <span className="icon">📝</span>Pages
         </button>
         <button className={`mobile-bottom-nav-btn ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>
           <span className="icon">✓</span>Habits
         </button>
-        <button className={`mobile-bottom-nav-btn ${page==='pages'?'active':''}`} onClick={()=>setPage('pages')}>
-          <span className="icon">📝</span>Pages
+        <button className={`mobile-bottom-nav-btn ${page==='planner'?'active':''}`} onClick={()=>setPage('planner')}>
+          <span className="icon">📅</span>Week
         </button>
         <button className={`mobile-bottom-nav-btn ${page==='fitness'?'active':''}`} onClick={()=>setPage('fitness')}>
           <span className="icon">💪</span>Fitness
@@ -6900,6 +7202,18 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const [showLibManager, setShowLibManager] = useState(false);
   const [showGoalManager, setShowGoalManager] = useState(false);
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
+  const [collapsedExIds, setCollapsedExIds] = useState(()=>new Set());
+  function toggleExCollapsed(exId) {
+    setCollapsedExIds(prev=>{
+      const next=new Set(prev);
+      if(next.has(exId)) next.delete(exId); else next.add(exId);
+      return next;
+    });
+  }
+
+  const pendingSetFocus = useRef(null); // key: `${dk}-${exId}-${setId}`
+  const setFirstInputRefs = useRef({}); // key -> DOM input element
+  const touchDragActiveRef = useRef(false); // true while a touch-based exercise drag (mobile) is in progress
 
   const dateKey = fmt(selectedDate);
   const weekStart = getWeekStart(selectedDate);
@@ -7091,9 +7405,17 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   function updateSet(dk, exId, setId, patch) {
     setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:e.sets.map(s=>s.id!==setId?s:{...s,...patch})}));
   }
-  function addSet(dk, exId) {
-    setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:[...e.sets,{id:'s'+Date.now(),reps:'',weight:'',dist:'',time:'',done:false}]}));
+  function addSet(dk, exId, focusAfter) {
+    const newId = 's'+Date.now();
+    setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:[...e.sets,{id:newId,reps:'',weight:'',dist:'',time:'',note:'',done:false}]}));
+    if (focusAfter) pendingSetFocus.current = `${dk}-${exId}-${newId}`;
   }
+  useEffect(() => {
+    if (pendingSetFocus.current) {
+      const el = setFirstInputRefs.current[pendingSetFocus.current];
+      if (el) { el.focus(); pendingSetFocus.current = null; }
+    }
+  });
   function deleteSet(dk, exId, setId) {
     setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:e.sets.filter(s=>s.id!==setId)}));
   }
@@ -7242,9 +7564,11 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     const libEx=fitnessExercises.find(e=>e.id===ex.exerciseId);
     const isCardio=libEx?.category==='Cardio';
     const isDropTarget = isDayView && dragOverExId===ex.id && dragEx?.exId!==ex.id;
+    const isCollapsed = isDayView && collapsedExIds.has(ex.id);
     return (
       <div key={ex.id}
-        style={{position:'relative'}}
+        data-ex-id={ex.id}
+        style={{position:'relative',opacity:(isDayView&&dragEx?.exId===ex.id)?0.45:1}}
         onDragOver={isDayView ? e=>{e.preventDefault();setDragOverExId(ex.id);} : undefined}
         onDragLeave={isDayView ? ()=>setDragOverExId(null) : undefined}
         onDrop={isDayView ? e=>{
@@ -7259,26 +7583,65 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             boxShadow:'0 0 0 2px var(--accent-light)'}}/>
         )}
         <div className="workout-card">
-        <div className="workout-card-header">
+        <div className="workout-card-header"
+          onClick={isDayView ? ()=>toggleExCollapsed(ex.id) : undefined}
+          style={isDayView ? {cursor:'pointer'} : undefined}>
           {isDayView && (
             <span
               draggable={true}
               onDragStart={e=>{e.stopPropagation();setDragEx({exId:ex.id,fromDk:dk,exerciseId:ex.exerciseId});}}
               onDragEnd={()=>{setDragEx(null);setDragOverExId(null);}}
+              onClick={e=>e.stopPropagation()}
+              onPointerDown={e=>{
+                if(e.pointerType!=='touch') return;
+                e.stopPropagation();
+                e.preventDefault();
+                touchDragActiveRef.current=true;
+                try{ e.currentTarget.setPointerCapture(e.pointerId); }catch(err){}
+                setDragEx({exId:ex.id,fromDk:dk,exerciseId:ex.exerciseId});
+              }}
+              onPointerMove={e=>{
+                if(e.pointerType!=='touch'||!touchDragActiveRef.current) return;
+                e.preventDefault();
+                const el=document.elementFromPoint(e.clientX,e.clientY);
+                const tile=el&&el.closest('[data-ex-id]');
+                setDragOverExId(tile?tile.getAttribute('data-ex-id'):null);
+              }}
+              onPointerUp={e=>{
+                if(e.pointerType!=='touch'||!touchDragActiveRef.current) return;
+                e.preventDefault();
+                touchDragActiveRef.current=false;
+                if(dragEx?.exId && dragOverExId && dragOverExId!==dragEx.exId){
+                  reorderExercises(dk, dragEx.exId, dragOverExId);
+                }
+                setDragEx(null); setDragOverExId(null);
+              }}
+              onPointerCancel={()=>{
+                touchDragActiveRef.current=false;
+                setDragEx(null); setDragOverExId(null);
+              }}
               title="Drag to reorder"
               style={{cursor:'grab',color:'var(--ink-faint)',fontSize:14,padding:'0 4px 0 0',
-                lineHeight:1,flexShrink:0,opacity:0.4,userSelect:'none'}}
+                lineHeight:1,flexShrink:0,opacity:0.4,userSelect:'none',WebkitUserSelect:'none',
+                WebkitTouchCallout:'none',touchAction:'none'}}
               onMouseEnter={e=>e.currentTarget.style.opacity='0.9'}
               onMouseLeave={e=>e.currentTarget.style.opacity='0.4'}>
               ⣿
             </span>
           )}
+          {isDayView && (
+            <span title={isCollapsed?'Expand':'Collapse'}
+              style={{fontSize:10,color:'var(--ink-faint)',flexShrink:0,transition:'transform 0.15s ease',
+                transform:isCollapsed?'rotate(-90deg)':'rotate(0deg)',display:'inline-block',userSelect:'none'}}>
+              ▾
+            </span>
+          )}
           <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:'var(--accent)',flex:1}}>{exName(ex.exerciseId)}</span>
           {stats.done>0&&<span className="fitness-stat-pill">{stats.done}/{stats.total} sets{stats.totalReps>0&&` · ${stats.totalReps} reps`}{stats.hasWeight&&stats.volume>0&&` · ${stats.volume.toLocaleString()} lbs`}</span>}
-          <button onClick={()=>deleteExercise(dk,ex.id)}
+          <button onClick={e=>{e.stopPropagation();deleteExercise(dk,ex.id);}}
             style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 2px',lineHeight:1,opacity:0.5}}>✕</button>
         </div>
-        <div className="exercise-block">
+        {!isCollapsed && <div className="exercise-block">
           <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:2}}>
             <span className="set-num"></span>
             {isCardio?(<><span className="set-label" style={{width:60,textAlign:'center'}}>Dist (mi)</span>
@@ -7293,12 +7656,18 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           {ex.sets.map((set,si)=>{
             const dist=parseFloat(set.dist)||0,timeDec=parseTimeInput(set.time);
             const pace=(dist>0&&timeDec>0)?formatPace(timeDec/dist):null;
+            const focusKey=`${dk}-${ex.id}-${set.id}`;
+            function handleEnter(e) {
+              if (e.key==='Enter') { e.preventDefault(); addSet(dk, ex.id, true); }
+            }
             return (
               <div key={set.id} className={`set-row ${set.done?'done':''}`}>
+                <div className="set-row-main">
                 <span className="set-num">{si+1}</span>
                 {isCardio?(<>
                   <input type="number" min="0" step="0.01" className="set-input" placeholder="—" value={set.dist||''}
-                    onChange={e=>updateSet(dk,ex.id,set.id,{dist:e.target.value})} style={{width:60,opacity:set.done?0.6:1}}/>
+                    ref={el=>setFirstInputRefs.current[focusKey]=el}
+                    onChange={e=>updateSet(dk,ex.id,set.id,{dist:e.target.value})} onKeyDown={handleEnter} style={{width:60,opacity:set.done?0.6:1}}/>
                   {(()=>{
                     const tp=(set.time||'').split(':');
                     const tMins=tp[0]||''; const tSecs=tp.length>1?tp[1]:'';
@@ -7306,36 +7675,42 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                       <input type="number" min="0" inputMode="numeric" className="set-input" placeholder="0"
                         value={tMins}
                         onChange={e=>{const s=tSecs!==''?':'+tSecs:''; updateSet(dk,ex.id,set.id,{time:e.target.value+s});}}
+                        onKeyDown={handleEnter}
                         style={{width:32,marginLeft:6,textAlign:'center',opacity:set.done?0.6:1}}/>
                       <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:'var(--ink-faint)',flexShrink:0}}>:</span>
                       <input type="number" min="0" max="59" inputMode="numeric" className="set-input" placeholder="00"
                         value={tSecs}
                         onChange={e=>{const m=tMins||'0'; updateSet(dk,ex.id,set.id,{time:m+':'+e.target.value});}}
+                        onKeyDown={handleEnter}
                         style={{width:32,textAlign:'center',opacity:set.done?0.6:1}}/>
                     </>);
                   })()}
                   <span className="set-label" style={{width:56,textAlign:'center',fontWeight:pace?700:400,color:pace?'var(--gold)':'var(--ink-faint)',fontSize:pace?11:9}}>{pace||'—'}</span>
                 </>):(<>
                   <input type="number" min="0" className="set-input" placeholder="—" value={set.reps||''}
-                    onChange={e=>updateSet(dk,ex.id,set.id,{reps:e.target.value})} style={{opacity:set.done?0.6:1}}/>
+                    ref={el=>setFirstInputRefs.current[focusKey]=el}
+                    onChange={e=>updateSet(dk,ex.id,set.id,{reps:e.target.value})} onKeyDown={handleEnter} style={{opacity:set.done?0.6:1}}/>
                   <span className="set-label">×</span>
                   <input type="number" min="0" className="set-input" placeholder="—" value={set.weight||''}
-                    onChange={e=>updateSet(dk,ex.id,set.id,{weight:e.target.value})} style={{opacity:set.done?0.6:1}}/>
+                    onChange={e=>updateSet(dk,ex.id,set.id,{weight:e.target.value})} onKeyDown={handleEnter} style={{opacity:set.done?0.6:1}}/>
                   <span className="set-label">lbs</span>
                 </>)}
                 <div className={`set-check ${set.done?'done':''}`} onClick={()=>updateSet(dk,ex.id,set.id,{done:!set.done})}/>
                 <button onClick={()=>deleteSet(dk,ex.id,set.id)}
                   style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',opacity:0.35,marginLeft:2,lineHeight:1}}>✕</button>
+                </div>
+                <input type="text" className="set-note-input" placeholder="note…" value={set.note||''}
+                  onChange={e=>updateSet(dk,ex.id,set.id,{note:e.target.value})}/>
               </div>
             );
           })}
           <div style={{paddingTop:6}}>
-            <button onClick={()=>addSet(dk,ex.id)}
+            <button onClick={()=>addSet(dk,ex.id,true)}
               style={{background:'none',border:'1px solid var(--border)',borderRadius:4,cursor:'pointer',fontSize:10,color:'var(--ink-light)',padding:'2px 8px',fontFamily:"'DM Sans',sans-serif"}}>
               + Set
             </button>
           </div>
-        </div>
+        </div>}
       </div>
       </div>
     );
