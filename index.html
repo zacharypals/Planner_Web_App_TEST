@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v3.13.0 -->
+<!-- LP Planner v4.0.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1898,19 +1898,22 @@ function qtyTotal(val) {
 function genLiId() { return 'li'+Date.now()+Math.random().toString(36).slice(2,7); }
 
 // ─────────────────────────────────────────────
-// GOOGLE AUTH + DRIVE + CALENDAR ENGINE
+// CONFIG — the only values that differ between the TEST app and the live app
 // ─────────────────────────────────────────────
-const CLIENT_ID = '1050376914317-d9al0irmqsmhkq334rffqg30mbtlguuf.apps.googleusercontent.com';
-const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar';
-const DRIVE_FILE_NAME = 'planner-data.json';
-const REDIRECT_URI = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
-// !! Update this after deploying your Cloudflare Worker !!
-const WORKER_URL = 'https://planner-auth.plannertracker.workers.dev';
+const APP_CONFIG = {
+  API_URL: 'https://planner-api.plannertracker.workers.dev',   // printed by `wrangler deploy`
+  CLIENT_ID: '1050376914317-d9al0irmqsmhkq334rffqg30mbtlguuf.apps.googleusercontent.com',
+  REDIRECT_URI: 'https://zacharypals.github.io/Planner_Web_App_TEST/oauth.html',
+  // Every app on zacharypals.github.io shares ONE localStorage, so each app needs its own prefix.
+  STORAGE_PREFIX: 'lpt_',
+  ENV_LABEL: 'TEST',   // shown next to the version; set to '' for the live app
+};
+// drive.file stays for now so the Phase 4 "Import from Google Drive" can read planner-data.json.
+const SCOPES = 'openid email profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/drive.file';
 
-let _loadingFromDrive = false;
 let _lastCalSyncMs = 0; // timestamp of last auto calendar sync — throttles to once per 5 min
-// Pages body flush: PagesView registers a synchronous flush fn here so App can
-// call it before any Drive save (beforeunload, visibilitychange, manual sync).
+// Pages body flush: PagesView registers a synchronous flush fn here so pending editor text
+// is written to local storage before a sync (tab hidden, page closing, sign-out).
 const _bodyFlushRef = { fn: null };
 // Debounce timers for calendar sync — keyed by task id
 const _calSyncTimers = {};
@@ -1919,185 +1922,642 @@ function debouncedCalSync(id, fn, delay = 2500) {
   _calSyncTimers[id] = setTimeout(() => { delete _calSyncTimers[id]; fn(); }, delay);
 }
 
-// Token in localStorage — persists across tab closes, auto-expires after ~1hr
+// ── Namespaced localStorage ──
+function lsKey(k) { return APP_CONFIG.STORAGE_PREFIX + k; }
+function lsGet(k) { try { return localStorage.getItem(lsKey(k)); } catch { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(lsKey(k), v); return true; } catch (e) { console.warn('localStorage write failed', k, e && e.name); return false; } }
+function lsDel(k) { try { localStorage.removeItem(lsKey(k)); } catch {} }
+
+// ── Session (issued by planner-api) and profile ──
+function getSession() { return lsGet('session'); }
+function setSession(t) { lsSet('session', t); }
+function clearSession() { lsDel('session'); }
+function getSavedEmail() { return lsGet('email') || ''; }
+function saveEmail(email) { lsSet('email', email); }
+function clearEmail() { lsDel('email'); }
+function readProfile() { try { return JSON.parse(lsGet('profile') || 'null'); } catch { return null; } }
+function saveProfile(p) { lsSet('profile', JSON.stringify(p)); }
+
+// ── Google access token (Calendar only). Handed out by the Worker; never a refresh token. ──
 function getToken() {
-  try {
-    const t = localStorage.getItem('plannerToken');
-    const exp = parseInt(localStorage.getItem('plannerTokenExp') || '0');
-    if (t && Date.now() < exp) return t;
-    if (t) { localStorage.removeItem('plannerToken'); localStorage.removeItem('plannerTokenExp'); }
-  } catch {}
+  const t = lsGet('gtoken');
+  const exp = parseInt(lsGet('gtoken_exp') || '0', 10);
+  if (t && Date.now() < exp - 2 * 60 * 1000) return t;
   return null;
 }
-function setToken(token, expiresIn) {
+function setToken(token, expiresAtMs) { lsSet('gtoken', token); lsSet('gtoken_exp', String(expiresAtMs || (Date.now() + 3300 * 1000))); }
+function clearToken() { lsDel('gtoken'); lsDel('gtoken_exp'); }
+
+class ApiError extends Error {
+  constructor(status, code, message) { super(message || code); this.status = status; this.code = code; }
+  get isAuth() { return this.status === 401 || (this.status === 403 && this.code === 'not_allowed'); }
+}
+
+async function api(path, { method = 'GET', body, keepalive } = {}) {
+  const session = getSession();
+  if (!session) throw new ApiError(401, 'no_session', 'Not signed in');
+  const headers = { Authorization: 'Bearer ' + session };
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  let res;
   try {
-    localStorage.setItem('plannerToken', token);
-    // 5min buffer so we refresh before it actually expires
-    localStorage.setItem('plannerTokenExp', String(Date.now() + ((expiresIn||3600) - 300) * 1000));
-  } catch {}
-}
-function clearToken() {
-  try { localStorage.removeItem('plannerToken'); localStorage.removeItem('plannerTokenExp'); } catch {}
-}
-function getSavedEmail() {
-  try { return localStorage.getItem('plannerAuthEmail') || ''; } catch { return ''; }
-}
-function saveEmail(email) {
-  try { localStorage.setItem('plannerAuthEmail', email); } catch {}
-}
-function clearEmail() {
-  try { localStorage.removeItem('plannerAuthEmail'); } catch {}
-}
-
-// ── OAuth2 Authorization Code Flow ──
-// Opens a popup → Google redirects to oauth.html with ?code=...
-// oauth.html posts the code back → we send it to the Worker → get access+refresh tokens
-
-function requestToken(onSuccess, onError) {
-  const params = new URLSearchParams({
-    client_id: CLIENT_ID,
-    redirect_uri: REDIRECT_URI,
-    response_type: 'code',
-    scope: SCOPES + ' profile email',
-    access_type: 'offline',
-    prompt: 'select_account consent', // force consent to always get refresh_token
-    include_granted_scopes: 'true',
-  });
-  const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
-  const popup = window.open(authUrl, 'googleAuth', 'width=500,height=620,top=100,left=200');
-  if (!popup) { onError('Popup blocked'); return; }
-  let done = false;
-  function onMessage(e) {
-    if (e.origin !== 'https://zacharypals.github.io') return;
-    if (!e.data?.code && !e.data?.error) return;
-    if (done) return;
-    done = true;
-    window.removeEventListener('message', onMessage);
-    clearInterval(check);
-    if (e.data.error) { onError(e.data.error); return; }
-    // Exchange code for tokens via Worker
-    fetch(`${WORKER_URL}/exchange`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code: e.data.code, redirect_uri: REDIRECT_URI }),
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (data.error) { onError(data.error); return; }
-        setToken(data.access_token, data.expires_in || 3600);
-        onSuccess(data); // data includes email, name, picture
-      })
-      .catch(err => onError(err.message));
+    res = await fetch(APP_CONFIG.API_URL + path, {
+      method, headers, keepalive: !!keepalive, cache: 'no-store',
+      body: body === undefined ? undefined : (typeof body === 'string' ? body : JSON.stringify(body)),
+    });
+  } catch (e) {
+    throw new ApiError(0, 'network', navigator.onLine === false ? "You're offline" : 'Network error — check your connection');
   }
-  window.addEventListener('message', onMessage);
-  const check = setInterval(() => {
-    if (popup.closed) {
-      clearInterval(check);
-      if (!done) {
-        // Popup closed — but postMessage may have been queued just before close.
-        // Give it a 2-second grace period to arrive before removing the listener.
-        setTimeout(() => {
-          if (!done) { done = true; window.removeEventListener('message', onMessage); }
-        }, 2000);
+  let data = null;
+  try { data = await res.json(); } catch {}
+  if (!res.ok) {
+    const code = (data && data.error) || ('http_' + res.status);
+    const msg = code === 'doc_too_large' ? 'One item is too large to save (over 2 MB) — remove pasted images'
+      : res.status >= 500 ? 'Server error — will retry' : code;
+    throw new ApiError(res.status, code, msg);
+  }
+  return data;
+}
+
+// ── Sign-in: full-page redirect (works in the installed iPhone home-screen app, unlike popups) ──
+function startSignIn() {
+  _bodyFlushRef.fn?.();
+  try { Sync.captureAllFromStorage(); } catch {}
+  const bytes = new Uint8Array(16); crypto.getRandomValues(bytes);
+  const state = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  lsSet('oauth_state', JSON.stringify({ v: state, t: Date.now() }));
+  const params = new URLSearchParams({
+    client_id: APP_CONFIG.CLIENT_ID,
+    redirect_uri: APP_CONFIG.REDIRECT_URI,
+    response_type: 'code',
+    scope: SCOPES,
+    access_type: 'offline',
+    prompt: 'select_account consent', // consent → Google always returns a refresh token for Calendar
+    include_granted_scopes: 'true',
+    state,
+  });
+  window.location.assign('https://accounts.google.com/o/oauth2/v2/auth?' + params.toString());
+}
+
+const SIGNIN_ERRORS = {
+  not_allowed: "This Google account isn't set up for LP Planner.",
+  unverified_email: "Google didn't confirm this account's email address.",
+  state_mismatch: 'Sign-in took too long or was interrupted — please try again.',
+  access_denied: 'Sign-in was cancelled.',
+};
+
+// oauth.html forwards Google's reply here as  ./#lp_oauth=<query string>
+async function completeSignInFromRedirect() {
+  const m = window.location.hash.match(/^#lp_oauth=(.*)$/);
+  if (!m) return null;
+  history.replaceState(null, '', window.location.pathname + window.location.search);
+  const p = new URLSearchParams(decodeURIComponent(m[1]));
+  const fail = (code) => { const e = new Error(SIGNIN_ERRORS[code] || ('Sign-in failed (' + code + ')')); e.signIn = true; throw e; };
+  if (p.get('error')) fail(p.get('error'));
+  let expected = null;
+  try {
+    const saved = JSON.parse(lsGet('oauth_state') || 'null');
+    if (saved && Date.now() - saved.t < 10 * 60 * 1000) expected = saved.v;
+  } catch {}
+  lsDel('oauth_state');
+  if (!p.get('code') || !expected || p.get('state') !== expected) fail('state_mismatch');
+  let res, data = {};
+  try {
+    res = await fetch(APP_CONFIG.API_URL + '/auth/exchange', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: p.get('code'), redirect_uri: APP_CONFIG.REDIRECT_URI }),
+    });
+    data = await res.json().catch(() => ({}));
+  } catch { fail('network_error'); }
+  if (!res.ok || !data.session_token) fail(data.error || 'exchange_failed');
+  setSession(data.session_token);
+  saveEmail(data.email);
+  if (data.google_access_token) setToken(data.google_access_token, data.google_expires_at);
+  const profile = { name: data.name || data.email, email: data.email, picture: data.picture || null };
+  saveProfile(profile);
+  return profile;
+}
+
+// Google access token for Calendar: reuse the cached one, else ask the Worker.
+let _gTokenPromise = null;
+let _onGoogleReauth = null; // App sets this to show a "Reconnect Calendar" button
+let _googleReauthNeeded = false;
+async function ensureGoogleToken(force) {
+  const cached = getToken();
+  if (cached && !force) return cached;
+  if (!getSession() || _googleReauthNeeded) return cached;
+  if (_gTokenPromise) return _gTokenPromise;
+  _gTokenPromise = (async () => {
+    try {
+      const d = await api('/api/google-token', { method: 'POST' });
+      setToken(d.access_token, d.expires_at);
+      _onGoogleReauth?.(false);
+      return d.access_token;
+    } catch (e) {
+      if (e.code === 'google_reauth_required') { _googleReauthNeeded = true; _onGoogleReauth?.(true); }
+      return getToken();
+    } finally { _gTokenPromise = null; }
+  })();
+  return _gTokenPromise;
+}
+
+// ═══ SYNC ENGINE START ═══
+// Keeps the app's existing data shapes and stores them in D1 as small versioned documents.
+//   • Each collection (weekData, pagesData, …) is split into documents per SYNC_SPLITS.
+//   • Edits are diffed per document, queued in a persisted outbox, and sent ~1s later.
+//   • A save names the version it was based on; if another device got there first, the
+//     Worker returns its copy and the two are merged (this device wins only where both
+//     changed the same thing).
+//   • Other devices' changes arrive via /api/changes (on focus and every 30s).
+// To sync a new piece of state, create it with useSynced(key, init) — that's all.
+
+// How collections are split into documents. Anything not listed is one document.
+const SYNC_SPLITS = {
+  weekData: 'map',          // one doc per week
+  fitnessLog: 'map',        // one doc per day
+  pagesData: 'list',        // one doc per page, plus a small order doc
+  habitCompletions: 'month', habitQty: 'month', habitNotes: 'month', habitMetrics: 'month',
+};
+const SYNC_DELETED = Symbol('deleted');   // sentinel for "document removed"
+const SYNC_NO_BASE = Symbol('nobase');    // sentinel for "base version content unknown"
+
+function syncIsObj(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+function syncHash(str) { // cyrb53
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761); h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36) + ':' + str.length;
+}
+function syncMonthOf(k) { return /^\d{4}-\d{2}/.test(k) ? k.slice(0, 7) : '_other'; }
+function syncListId(item, idx) {
+  return item && (typeof item.id === 'string' || typeof item.id === 'number') ? 'p:' + item.id : 'n:' + idx;
+}
+function syncSame(a, b) {   // cheap "nothing changed" check: same ref, or same children refs
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a), kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) if (a[k] !== b[k]) return false;
+  return true;
+}
+function syncEq(a, b) {
+  if (a === b) return true;
+  if (typeof a === 'symbol' || typeof b === 'symbol' || a === undefined || b === undefined) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+// Collection value → { docId: value }
+function syncSplit(coll, value) {
+  const mode = SYNC_SPLITS[coll] || 'whole';
+  const out = {};
+  if (mode === 'map') {
+    if (syncIsObj(value)) for (const k of Object.keys(value)) out[k] = value[k];
+  } else if (mode === 'month') {
+    if (syncIsObj(value)) for (const k of Object.keys(value)) { const m = syncMonthOf(k); (out[m] || (out[m] = {}))[k] = value[k]; }
+  } else if (mode === 'list') {
+    const arr = Array.isArray(value) ? value : [];
+    const seen = new Set(), order = [];
+    arr.forEach((item, idx) => {
+      let id = syncListId(item, idx);
+      if (seen.has(id)) id = 'n:' + idx;
+      seen.add(id); order.push(id); out[id] = item;
+    });
+    out.__order = order;
+  } else {
+    out._ = value === undefined ? null : value;
+  }
+  return out;
+}
+
+// { docId: value } → collection value
+function syncJoin(coll, docs) {
+  const mode = SYNC_SPLITS[coll] || 'whole';
+  if (mode === 'map') return { ...docs };
+  if (mode === 'month') { const out = {}; for (const id of Object.keys(docs)) if (syncIsObj(docs[id])) Object.assign(out, docs[id]); return out; }
+  if (mode === 'list') {
+    const order = Array.isArray(docs.__order) ? docs.__order : [];
+    const used = new Set(), out = [];
+    for (const id of order) if (id in docs && id !== '__order' && !used.has(id)) { used.add(id); out.push(docs[id]); }
+    for (const id of Object.keys(docs)) if (id !== '__order' && !used.has(id)) out.push(docs[id]);
+    return out;
+  }
+  return docs._;
+}
+
+// Arrays whose items all have unique ids (tasks, habits, exercises…) merge item by item.
+function syncIdArray(a) {
+  if (!Array.isArray(a)) return null;
+  const m = new Map();
+  for (const it of a) {
+    if (!syncIsObj(it) || (typeof it.id !== 'string' && typeof it.id !== 'number') || m.has(it.id)) return null;
+    m.set(it.id, it);
+  }
+  return m;
+}
+
+// Three-way merge of JSON values. base = last version both sides agreed on (or SYNC_NO_BASE).
+// Where both sides changed the same thing, `local` (this device's edit) wins.
+function syncMerge3(base, local, remote) {
+  if (syncEq(local, remote)) return local;
+  const hasBase = base !== SYNC_NO_BASE;
+  if (hasBase) {
+    if (syncEq(local, base)) return remote;
+    if (syncEq(remote, base)) return local;
+  }
+  if (syncIsObj(local) && syncIsObj(remote) && (!hasBase || base === undefined || syncIsObj(base))) {
+    const b = hasBase && syncIsObj(base) ? base : null;
+    const out = {};
+    const keys = new Set([...Object.keys(remote), ...Object.keys(local)]);
+    for (const k of keys) {
+      const inL = k in local, inR = k in remote, inB = !!b && k in b;
+      if (inL && inR) out[k] = syncMerge3(b ? (inB ? b[k] : undefined) : SYNC_NO_BASE, local[k], remote[k]);
+      else if (inL) { if (!(inB && syncEq(local[k], b[k]))) out[k] = local[k]; }      // remote removed an untouched key
+      else if (inR) { if (!(inB && syncEq(remote[k], b[k]))) out[k] = remote[k]; }    // local removed an untouched key
+    }
+    return out;
+  }
+  const L = syncIdArray(local), R = syncIdArray(remote);
+  const B = (!hasBase || base === undefined) ? new Map() : syncIdArray(base);
+  if (L && R && B) {
+    const bm = B;
+    const out = [];
+    const pick = (id) => {
+      const inL = L.has(id), inR = R.has(id), inB = bm.has(id);
+      if (inL && inR) return syncMerge3(inB ? bm.get(id) : SYNC_NO_BASE, L.get(id), R.get(id));
+      if (inL) return inB && syncEq(L.get(id), bm.get(id)) ? SYNC_DELETED : L.get(id);
+      return inB && syncEq(R.get(id), bm.get(id)) ? SYNC_DELETED : R.get(id);
+    };
+    const done = new Set();
+    for (const it of local) { done.add(it.id); const v = pick(it.id); if (v !== SYNC_DELETED) out.push(v); }
+    remote.forEach((it, idx) => {      // remote-only items keep their position relative to neighbours
+      if (done.has(it.id)) return;
+      done.add(it.id);
+      const v = pick(it.id); if (v === SYNC_DELETED) return;
+      const prev = idx > 0 ? remote[idx - 1].id : null;
+      const at = prev == null ? 0 : out.findIndex(x => x.id === prev) + 1;
+      out.splice(at > 0 ? at : (prev == null ? 0 : out.length), 0, v);
+    });
+    return out;
+  }
+  return local;
+}
+
+const Sync = {
+  reg: {},            // coll → { set, init }
+  base: {},           // coll → docId → { v, j (json text) | null, h, del }
+  outbox: {},         // coll → docId → { b, j (json text | null = delete), h }
+  seen: {},           // coll → docId → last value captured (reference check)
+  cursor: 0,
+  email: '',
+  ready: false,
+  offline: false,
+  flushing: false,
+  pulling: false,
+  inflight: new Set(),
+  failures: 0,
+  flushTimer: null,
+  retryTimer: null,
+  onStatus: null,     // App: ({kind:'saving'|'saved'|'merged'|'error'|'idle', message})
+  onAuthLost: null,   // App: session expired / revoked
+
+  register(coll, init, set) { if (!this.reg[coll]) this.reg[coll] = { init, set }; else this.reg[coll].set = set; },
+  status(kind, message) { this.onStatus?.({ kind, message }); },
+  key(c, i) { return c + '\u0000' + i; },
+  pendingCount() { let n = 0; for (const c in this.outbox) n += Object.keys(this.outbox[c]).length; return n; },
+
+  persist() {
+    const vers = {};
+    for (const c in this.base) { vers[c] = {}; for (const i in this.base[c]) { const b = this.base[c][i]; vers[c][i] = [b.v, b.del ? 'x' : b.h]; } }
+    lsSet('sync_meta', JSON.stringify({ email: this.email, cursor: this.cursor, vers }));
+    lsSet('sync_outbox', JSON.stringify(this.outbox));
+  },
+  persistOutbox() {
+    if (!lsSet('sync_outbox', JSON.stringify(this.outbox))) {
+      this.status('error', "This browser's storage is full — changes will upload while the app stays open");
+    }
+  },
+
+  setBase(c, i, v, j, del) {
+    (this.base[c] || (this.base[c] = {}))[i] = del ? { v, j: null, h: 'x', del: true } : { v, j, h: syncHash(j) };
+  },
+  baseVal(c, i, forVersion) {
+    const b = this.base[c] && this.base[c][i];
+    if (!b || b.v !== forVersion) return SYNC_NO_BASE;
+    if (b.del) return undefined;
+    if (b.j == null) return SYNC_NO_BASE;
+    try { return JSON.parse(b.j); } catch { return SYNC_NO_BASE; }
+  },
+  // Outbox entry: { b: base version, bj: base content (json text; null = didn't exist), j: new content (null = delete), h }
+  setOutbox(c, i, j) {
+    const box = this.outbox[c] || (this.outbox[c] = {});
+    const prev = box[i];
+    const entry = { b: 0, j, h: j === null ? 'x' : syncHash(j) };
+    if (prev) { entry.b = prev.b; if ('bj' in prev) entry.bj = prev.bj; }
+    else {
+      const bs = this.base[c] && this.base[c][i];
+      entry.b = bs ? bs.v : 0;
+      if (!bs || bs.del) entry.bj = null; else if (bs.j != null) entry.bj = bs.j;
+    }
+    box[i] = entry;
+  },
+  rebase(ob, v, j) { ob.b = v; ob.bj = j; },   // the queued edit now builds on server version v (content j)
+  obBase(c, i, ob) {
+    if (ob && 'bj' in ob) { if (ob.bj === null) return undefined; try { return JSON.parse(ob.bj); } catch { return SYNC_NO_BASE; } }
+    return this.baseVal(c, i, ob ? ob.b : 0);
+  },
+  dropOutbox(c, i) { if (this.outbox[c]) { delete this.outbox[c][i]; if (!Object.keys(this.outbox[c]).length) delete this.outbox[c]; } },
+
+  // Diff a collection's current value against what the server has; queue changed documents.
+  capture(coll, value) {
+    if (!this.ready || !this.reg[coll]) return;
+    const docs = syncSplit(coll, value);
+    const seen = this.seen[coll] || (this.seen[coll] = {});
+    const base = this.base[coll] || {};
+    let changed = false;
+    for (const id of Object.keys(docs)) {
+      const dv = docs[id];
+      if (id in seen && syncSame(seen[id], dv)) continue;
+      seen[id] = dv;
+      const j = JSON.stringify(dv === undefined ? null : dv);
+      const h = syncHash(j);
+      const ob = this.outbox[coll] && this.outbox[coll][id];
+      const known = ob ? ob.h : (base[id] && !base[id].del ? base[id].h : null);
+      if (known === h) continue;
+      this.setOutbox(coll, id, j); changed = true;
+    }
+    const ids = new Set([...Object.keys(base), ...Object.keys(this.outbox[coll] || {})]);
+    for (const id of ids) {
+      if (id in docs) continue;
+      delete seen[id];
+      const ob = this.outbox[coll] && this.outbox[coll][id];
+      if (ob && ob.j === null) continue;
+      const b = base[id];
+      if ((!b || b.del) && ob && !this.inflight.has(this.key(coll, id))) { this.dropOutbox(coll, id); changed = true; continue; }
+      if ((b && !b.del) || ob) { this.setOutbox(coll, id, null); changed = true; }
+    }
+    if (changed) { this.persistOutbox(); this.scheduleFlush(); }
+  },
+
+  // Used when the page is being hidden/closed: React may not have re-rendered yet, but every
+  // setter has already written its value to localStorage.
+  captureAllFromStorage() {
+    if (!this.ready) return;
+    for (const coll of Object.keys(this.reg)) {
+      const s = lsGet(coll);
+      if (s == null) continue;
+      try { this.capture(coll, JSON.parse(s)); } catch {}
+    }
+  },
+
+  scheduleFlush(delay = 1200) {
+    clearTimeout(this.flushTimer);
+    this.status('saving');
+    this.flushTimer = setTimeout(() => this.flush(), delay);
+  },
+
+  async flush({ keepalive = false, manual = false } = {}) {
+    clearTimeout(this.flushTimer);
+    if (manual) { clearTimeout(this.retryTimer); this.failures = 0; }
+    if (!this.ready || !getSession()) return;
+    if (this.flushing) { this.flushAgain = true; return; }
+    const items = [];
+    for (const c in this.outbox) for (const i in this.outbox[c]) items.push({ c, i, e: this.outbox[c][i] });
+    if (!items.length) { this.status('idle'); return; }
+    this.flushing = true;
+    this.flushAgain = false;
+    this.status('saving');
+    try {
+      // Chunks: ≤ 50 docs and ~800 KB each (keepalive requests are capped at 64 KB by browsers).
+      const limit = keepalive ? 60000 : 800000;
+      let chunk = [], size = 0;
+      const chunks = [];
+      for (const it of items) {
+        const len = (it.e.j ? it.e.j.length : 0) + 100;
+        if (chunk.length && (chunk.length >= 50 || size + len > limit)) { chunks.push(chunk); chunk = []; size = 0; }
+        chunk.push(it); size += len;
+      }
+      if (chunk.length) chunks.push(chunk);
+      let merged = false;
+      for (const ch of chunks) {
+        const sent = ch.map(it => ({ c: it.c, i: it.i, b: it.e.b, j: it.e.j, h: it.e.h }));
+        const body = JSON.stringify({ docs: sent.map(s => s.j === null ? { c: s.c, i: s.i, b: s.b, x: 1 } : { c: s.c, i: s.i, b: s.b, j: s.j }) });
+        const ka = keepalive && body.length < 63000;
+        sent.forEach(s => this.inflight.add(this.key(s.c, s.i)));
+        let res;
+        try { res = await api('/api/docs', { method: 'PUT', body, keepalive: ka }); }
+        finally { sent.forEach(s => this.inflight.delete(this.key(s.c, s.i))); }
+        const byKey = new Map(sent.map(s => [this.key(s.c, s.i), s]));
+        for (const r of res.results || []) {
+          const s = byKey.get(this.key(r.c, r.i));
+          if (!s) continue;
+          if (r.ok) {
+            this.setBase(s.c, s.i, r.v, s.j, s.j === null);
+            const cur = this.outbox[s.c] && this.outbox[s.c][s.i];
+            if (cur && cur.h === s.h && cur.b === s.b) this.dropOutbox(s.c, s.i);
+            else if (cur) this.rebase(cur, r.v, s.j);   // edited again while saving — next save builds on this version
+          } else if (r.conflict) {
+            merged = this.resolveConflict(s, r) || merged;
+          }
+        }
+        this.persist();
+      }
+      this.failures = 0;
+      this.status(merged ? 'merged' : (this.pendingCount() ? 'saving' : 'saved'));
+    } catch (e) {
+      if (e.isAuth) { this.flushing = false; this.status('idle'); this.onAuthLost?.(e); return; }
+      this.failures++;
+      const waits = [2, 5, 10, 20, 30, 60];
+      const wait = waits[Math.min(this.failures - 1, waits.length - 1)] * 1000;
+      if (this.failures >= 2 || e.code === 'doc_too_large' || navigator.onLine === false) this.status('error', e.message);
+      clearTimeout(this.retryTimer);
+      this.retryTimer = setTimeout(() => this.flush(), wait);
+      this.flushing = false;
+      return;
+    }
+    this.flushing = false;
+    if (this.flushAgain || this.pendingCount()) this.scheduleFlush(300);
+  },
+
+  // Another device saved this document first: merge both edits, apply locally, queue the result.
+  resolveConflict(sent, r) {
+    const { c, i } = sent;
+    const cur = (this.outbox[c] && this.outbox[c][i]) || { b: sent.b, j: sent.j, h: sent.h };
+    const local = cur.j === null ? SYNC_DELETED : JSON.parse(cur.j);
+    const remote = r.x ? SYNC_DELETED : r.d;
+    const merged = syncMerge3(this.obBase(c, i, cur), local, remote);
+    const remoteJ = r.x ? null : JSON.stringify(r.d);
+    this.setBase(c, i, r.v, remoteJ, !!r.x);
+    if (syncEq(merged, remote)) this.dropOutbox(c, i);
+    else {
+      const j = merged === SYNC_DELETED ? null : JSON.stringify(merged);
+      (this.outbox[c] || (this.outbox[c] = {}))[i] = { b: r.v, bj: remoteJ, j, h: j === null ? 'x' : syncHash(j) };
+    }
+    if (!syncEq(merged, local)) this.apply(c, { [i]: merged });
+    return !syncEq(merged, local);
+  },
+
+  // Write specific documents into React state without touching anything else.
+  apply(coll, changes) {
+    const r = this.reg[coll];
+    if (!r) return;
+    const mode = SYNC_SPLITS[coll] || 'whole';
+    const seen = this.seen[coll] || (this.seen[coll] = {});
+    for (const id of Object.keys(changes)) { if (changes[id] === SYNC_DELETED) delete seen[id]; else seen[id] = changes[id]; }
+    r.set(prev => {
+      if (mode === 'whole') { const v = changes._; return v === SYNC_DELETED || v === undefined ? r.init : v; }
+      if (mode === 'map' || mode === 'month') {
+        const next = { ...(syncIsObj(prev) ? prev : {}) };
+        for (const id of Object.keys(changes)) {
+          const v = changes[id];
+          if (mode === 'map') { if (v === SYNC_DELETED) delete next[id]; else next[id] = v; }
+          else {
+            for (const k of Object.keys(next)) if (syncMonthOf(k) === id) delete next[k];
+            if (v !== SYNC_DELETED && syncIsObj(v)) Object.assign(next, v);
+          }
+        }
+        return next;
+      }
+      // list
+      const docs = syncSplit(coll, prev);
+      for (const id of Object.keys(changes)) { if (changes[id] === SYNC_DELETED) delete docs[id]; else docs[id] = changes[id]; }
+      return syncJoin(coll, docs);
+    });
+  },
+
+  // First load on sign-in / app open. Server is the truth; this device's unsent edits are layered on top.
+  async start(email) {
+    this.email = email;
+    let meta = null;
+    try { meta = JSON.parse(lsGet('sync_meta') || 'null'); } catch {}
+    if (meta && meta.email !== email) { this.wipeLocal(); meta = null; }
+    try { this.outbox = meta ? (JSON.parse(lsGet('sync_outbox') || '{}') || {}) : {}; } catch { this.outbox = {}; }
+
+    let data;
+    try {
+      data = await api('/api/docs');
+    } catch (e) {
+      if (e.isAuth || !meta) throw e;
+      // Offline, but this device has synced before: work from the local copy and catch up later.
+      this.base = {};
+      for (const c in (meta.vers || {})) for (const i in meta.vers[c]) {
+        const [v, h] = meta.vers[c][i];
+        (this.base[c] || (this.base[c] = {}))[i] = h === 'x' ? { v, j: null, h: 'x', del: true } : { v, j: null, h };
+      }
+      this.cursor = meta.cursor || 0;
+      for (const coll of Object.keys(this.reg)) { const s = lsGet(coll); this.seen[coll] = {}; try { if (s != null) this.seenFrom(coll, JSON.parse(s)); } catch {} }
+      this.ready = true; this.offline = true;
+      this.status('error', e.message);
+      return { offline: true };
+    }
+
+    this.base = {};
+    const server = {};
+    for (const d of data.docs || []) {
+      const j = JSON.stringify(d.d);
+      this.setBase(d.c, d.i, d.v, j);
+      (server[d.c] || (server[d.c] = {}))[d.i] = d.d;
+    }
+    // Layer unsent local edits on top of the server copy.
+    for (const c of Object.keys(this.outbox)) {
+      for (const i of Object.keys(this.outbox[c])) {
+        const ob = this.outbox[c][i];
+        const sb = this.base[c] && this.base[c][i];
+        const sv = sb ? server[c][i] : SYNC_DELETED;
+        const local = ob.j === null ? SYNC_DELETED : JSON.parse(ob.j);
+        const merged = (sb ? sb.v : 0) === ob.b ? local : syncMerge3(this.obBase(c, i, ob), local, sv);
+        if (syncEq(merged, sv) || (merged === SYNC_DELETED && !sb)) { this.dropOutbox(c, i); continue; }
+        this.rebase(ob, sb ? sb.v : 0, sb ? sb.j : null);
+        ob.j = merged === SYNC_DELETED ? null : JSON.stringify(merged); ob.h = ob.j === null ? 'x' : syncHash(ob.j);
+        const s = server[c] || (server[c] = {});
+        if (merged === SYNC_DELETED) delete s[i]; else s[i] = merged;
       }
     }
-  }, 500); // check every 500ms instead of 1000ms for faster detection
-}
-
-// Silent refresh via Worker — no popup, no user interaction needed
-async function requestTokenSilent(onSuccess, onError) {
-  const email = getSavedEmail();
-  if (!email) { onError('no_email'); return; }
-  if (WORKER_URL.includes('YOUR_SUBDOMAIN')) { onError('worker_not_configured'); return; }
-  try {
-    const res = await fetch(`${WORKER_URL}/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    const data = await res.json();
-    if (!res.ok || data.error) { onError(data.error || 'refresh_failed'); return; }
-    setToken(data.access_token, data.expires_in || 3600);
-    onSuccess(data);
-  } catch (e) {
-    onError(e.message);
-  }
-}
-
-// ── DRIVE HELPERS ──
-async function driveRequest(url, opts = {}) {
-  const token = getToken();
-  if (!token) throw new Error('Not authenticated');
-  const res = await fetch(url, {
-    ...opts,
-    headers: { 'Authorization': `Bearer ${token}`, ...(opts.headers || {}) },
-  });
-  if (!res.ok) {
-    let detail = '';
-    try { const j = await res.clone().json(); detail = j?.error?.message || j?.error?.status || ''; } catch {}
-    console.error('Drive API error', res.status, detail, url);
-    throw new Error(`Drive error ${res.status}${detail ? ': ' + detail : ''}`);
-  }
-  return res;
-}
-
-async function findOrCreateDriveFile() {
-  // Search for existing file
-  const search = await driveRequest(
-    `https://www.googleapis.com/drive/v3/files?q=name='${DRIVE_FILE_NAME}'+and+trashed=false&spaces=drive&fields=files(id,name)`
-  );
-  const data = await search.json();
-  if (data.files && data.files.length > 0) return data.files[0].id;
-  // Create new file with empty data
-  const meta = { name: DRIVE_FILE_NAME, mimeType: 'application/json' };
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(meta)], { type: 'application/json' }));
-  form.append('file', new Blob([JSON.stringify({})], { type: 'application/json' }));
-  const create = await driveRequest(
-    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-    { method: 'POST', body: form }
-  );
-  const created = await create.json();
-  return created.id;
-}
-
-async function loadFromDrive() {
-  const fileId = await findOrCreateDriveFile();
-  const res = await driveRequest(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
-  );
-  const text = await res.text();
-  let data = {};
-  try { data = JSON.parse(text); } catch {}
-
-  // Multi-device conflict detection:
-  // If we have a local _lp_savedAt that is NEWER than what's in Drive,
-  // it means this device made changes that were never uploaded (e.g. network drop,
-  // or another device saved over them). Warn before overwriting.
-  const driveSavedAt = data._savedAt || null;
-  const localSavedAt = (() => { try { return localStorage.getItem('_lp_savedAt'); } catch { return null; } })();
-
-  let conflict = false;
-  if (driveSavedAt && localSavedAt && localSavedAt > driveSavedAt) {
-    // Local is newer than Drive — possible data loss
-    conflict = true;
-  }
-
-  return { data, fileId, driveSavedAt, localSavedAt, conflict };
-}
-
-async function saveToDrive(fileId, allData) {
-  const payload = { ...allData, _savedAt: new Date().toISOString() };
-  await driveRequest(
-    `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
-    {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+    this.cursor = data.cursor || 0;
+    this.seen = {};
+    for (const coll of Object.keys(this.reg)) {
+      const docs = server[coll];
+      const value = docs && Object.keys(docs).length ? syncJoin(coll, docs) : this.reg[coll].init;
+      this.seenFrom(coll, value);
+      this.reg[coll].set(value);
     }
-  );
-  // Record when we last successfully saved so multi-device conflict detection works
-  try { localStorage.setItem('_lp_savedAt', payload._savedAt); } catch {}
+    this.ready = true; this.offline = false;
+    this.persist();
+    if (this.pendingCount()) this.scheduleFlush(500); else this.status('idle');
+    return { offline: false, values: Object.fromEntries(Object.keys(this.reg).map(c => [c, server[c] ? syncJoin(c, server[c]) : this.reg[c].init])) };
+  },
+  seenFrom(coll, value) { const docs = syncSplit(coll, value); this.seen[coll] = { ...docs }; },
+
+  // Fetch what other devices changed since our cursor.
+  async pull() {
+    if (!this.ready || this.pulling || !getSession()) return;
+    this.pulling = true;
+    let merged = false;
+    try {
+      let more = true;
+      while (more) {
+        const r = await api('/api/changes?since=' + this.cursor);
+        const changes = {};
+        for (const d of r.docs || []) {
+          const b = this.base[d.c] && this.base[d.c][d.i];
+          if (b && b.v >= d.v) continue;                          // our own save, or older
+          if (this.inflight.has(this.key(d.c, d.i))) continue;     // the in-flight save will report a conflict
+          const remote = d.x ? SYNC_DELETED : d.d;
+          const ob = this.outbox[d.c] && this.outbox[d.c][d.i];
+          let value = remote;
+          if (ob) {
+            const local = ob.j === null ? SYNC_DELETED : JSON.parse(ob.j);
+            value = syncMerge3(this.obBase(d.c, d.i, ob), local, remote);
+            if (syncEq(value, remote)) this.dropOutbox(d.c, d.i);
+            else {
+              this.rebase(ob, d.v, d.x ? null : JSON.stringify(d.d));
+              ob.j = value === SYNC_DELETED ? null : JSON.stringify(value); ob.h = ob.j === null ? 'x' : syncHash(ob.j);
+            }
+            if (!syncEq(value, local)) merged = true; else value = local;
+          }
+          this.setBase(d.c, d.i, d.v, d.x ? null : JSON.stringify(d.d), !!d.x);
+          (changes[d.c] || (changes[d.c] = {}))[d.i] = value;
+        }
+        for (const c of Object.keys(changes)) this.apply(c, changes[c]);
+        this.cursor = r.cursor;
+        more = !!r.more;
+      }
+      this.offline = false;
+      this.persist();
+      if (merged) { this.status('merged'); this.scheduleFlush(300); }
+      else if (this.pendingCount() && !this.flushing && this.failures) this.flush();
+    } catch (e) {
+      if (e.isAuth) this.onAuthLost?.(e);
+    } finally { this.pulling = false; }
+  },
+
+  // Forget everything stored on this device for this app (sign-out / different account).
+  wipeLocal() {
+    for (const k of ['sync_meta', 'sync_outbox']) lsDel(k);
+    try {
+      const pre = APP_CONFIG.STORAGE_PREFIX;
+      const keep = new Set(['session', 'email', 'profile', 'gtoken', 'gtoken_exp', 'oauth_state'].map(k => pre + k));
+      // Collect first, then remove: browsers may reorder keys while items are being removed.
+      const doomed = [];
+      for (let n = 0; n < localStorage.length; n++) {
+        const k = localStorage.key(n);
+        if (k && k.startsWith(pre) && !keep.has(k)) doomed.push(k);
+      }
+      doomed.forEach(k => localStorage.removeItem(k));
+    } catch {}
+    this.base = {}; this.outbox = {}; this.seen = {}; this.cursor = 0; this.ready = false;
+  },
+};
+// ═══ SYNC ENGINE END ═══
+
+// Like useStorage, but synced to the server. The localStorage copy is an instant-start cache.
+function useSynced(key, init) {
+  const [val, set] = useStorage(lsKey(key), init);
+  Sync.register(key, init, set);
+  useEffect(() => { Sync.capture(key, val); }, [val]);
+  return [val, set];
 }
 
 // ── CALENDAR HELPERS ──
@@ -6377,233 +6837,93 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
 // ─────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────
-const ALL_STORAGE_KEYS = ['weekData','habitGoals','habitCompletions','habitMetrics','habitQty','habitNotes','monthlyGoals','navColor','calHeaderColor','pagesData','foldersData','weightTarget','calsTarget','peopleDirectory','fitnessLog','fitnessExercises','fitnessGoals','countdowns'];
+// Synced app data is created with useSynced(key, init) below; each one uploads and syncs itself.
 
 function App() {
   const [page, setPageRaw] = useState(() => sessionStorage.getItem('lp_page') || 'planner');
   const setPage = (p) => { sessionStorage.setItem('lp_page', p); setPageRaw(p); };
-  const [navColor, setNavColor] = useStorage('navColor', '#5c2d52');
-  const [calHeaderColor, setCalHeaderColor] = useStorage('calHeaderColor', '#7c3f6e');
-  const [weekData, setWeekData] = useStorage('weekData', {});
-  const [pagesData, setPagesData] = useStorage('pagesData', []); // [{id,title,body,createdAt,lastModified,folderId,order,tasks:[]}]
-  const [foldersData, setFoldersData] = useStorage('foldersData', []); // [{id,name,expanded,order}]
+  const [navColor, setNavColor] = useSynced('navColor', '#5c2d52');
+  const [calHeaderColor, setCalHeaderColor] = useSynced('calHeaderColor', '#7c3f6e');
+  const [weekData, setWeekData] = useSynced('weekData', {});
+  const [pagesData, setPagesData] = useSynced('pagesData', []); // [{id,title,body,createdAt,lastModified,folderId,order,tasks:[]}]
+  const [foldersData, setFoldersData] = useSynced('foldersData', []); // [{id,name,expanded,order}]
   const [selectedPagesId, setSelectedPagesIdRaw] = useState(() => sessionStorage.getItem('lp_selectedPagesId') || null);
   const setSelectedPagesId = (id) => { if(id) sessionStorage.setItem('lp_selectedPagesId', id); else sessionStorage.removeItem('lp_selectedPagesId'); setSelectedPagesIdRaw(id); };
-  const [habitGoals, setHabitGoals] = useStorage('habitGoals', [
+  const [habitGoals, setHabitGoals] = useSynced('habitGoals', [
     {id:'g1', name:'Daily Pages', color:'#2d5a3d'},
   ]);
-  const [habitCompletions, setHabitCompletions] = useStorage('habitCompletions', {});
-  const [habitMetrics, setHabitMetrics] = useStorage('habitMetrics', {}); // {[dateKey]: {weight:'', cals:''}}
-  const [habitQty, setHabitQty] = useStorage('habitQty', {}); // {[dateKey]: {[goalId]: qty}}
-  const [habitNotes, setHabitNotes] = useStorage('habitNotes', {}); // {[dateKey]: {[goalId]: notes}}
-  const [weightTarget, setWeightTarget] = useStorage('weightTarget', '');
-  const [calsTarget, setCalsTarget] = useStorage('calsTarget', '');
-  const [monthlyGoals, setMonthlyGoals] = useStorage('monthlyGoals', {});
-  const [peopleDirectory, setPeopleDirectory] = useStorage('peopleDirectory', []); // [{id, name}] — master list across weeks
-  const [fitnessLog, setFitnessLog] = useStorage('fitnessLog', {}); // {[dateKey]: [{id, name, exercises:[{id, exerciseId, sets:[{id,reps,weight,done}]}]}]}
-  const [fitnessExercises, setFitnessExercises] = useStorage('fitnessExercises', []); // [{id, name, category}] library
-  const [fitnessGoals, setFitnessGoals] = useStorage('fitnessGoals', []); // [{id, exerciseId, period, target, unit}]
-  const [countdowns, setCountdowns] = useStorage('countdowns', []); // [{id, title, startDate, endDate, color}]
+  const [habitCompletions, setHabitCompletions] = useSynced('habitCompletions', {});
+  const [habitMetrics, setHabitMetrics] = useSynced('habitMetrics', {}); // {[dateKey]: {weight:'', cals:''}}
+  const [habitQty, setHabitQty] = useSynced('habitQty', {}); // {[dateKey]: {[goalId]: qty}}
+  const [habitNotes, setHabitNotes] = useSynced('habitNotes', {}); // {[dateKey]: {[goalId]: notes}}
+  const [weightTarget, setWeightTarget] = useSynced('weightTarget', '');
+  const [calsTarget, setCalsTarget] = useSynced('calsTarget', '');
+  const [monthlyGoals, setMonthlyGoals] = useSynced('monthlyGoals', {});
+  const [peopleDirectory, setPeopleDirectory] = useSynced('peopleDirectory', []); // [{id, name}] — master list across weeks
+  const [fitnessLog, setFitnessLog] = useSynced('fitnessLog', {}); // {[dateKey]: [{id, name, exercises:[{id, exerciseId, sets:[{id,reps,weight,done}]}]}]}
+  const [fitnessExercises, setFitnessExercises] = useSynced('fitnessExercises', []); // [{id, name, category}] library
+  const [fitnessGoals, setFitnessGoals] = useSynced('fitnessGoals', []); // [{id, exerciseId, period, target, unit}]
+  const [countdowns, setCountdowns] = useSynced('countdowns', []); // [{id, title, startDate, endDate, color}]
 
-  // Auth state
+  // Auth & sync state
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
-  const [driveFileId, setDriveFileId] = useState(null);
-  const [saveStatus, setSaveStatus] = useState(''); // '', 'saving', 'saved', 'error'
+  const [saveStatus, setSaveStatus] = useState(''); // '', 'saving', 'saved', 'merged', 'ERR:<message>'
   const [saveRetrying, setSaveRetrying] = useState(false); // true while manual retry is in flight
-  const [authError, setAuthError] = useState(false); // true when session expired and silent refresh failed
-  const [authLoading, setAuthLoading] = useState(true); // true while silent session restore is in progress on mount
+  const [authError, setAuthError] = useState(false); // true when the session ended — edits wait on this device
+  const [authLoading, setAuthLoading] = useState(true); // true while session restore + first load is in progress on mount
+  const [signInError, setSignInError] = useState(''); // shown on the sign-in wall
+  const [loadError, setLoadError] = useState('');     // first load on this device failed (e.g. offline)
+  const [googleReauth, setGoogleReauth] = useState(false); // Calendar needs a fresh Google sign-in
   const [syncing, setSyncing] = useState(false);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const [pullDisplayY, setPullDisplayY] = useState(0);
   const pullStartY = useRef(0);
   const pullDeltaY = useRef(0);
   const pullActive = useRef(false);
-  const saveTimerRef = useRef(null);
-  const pendingSaveRef = useRef(false); // true while a save is debounced but not yet flushed
-  const saveInProgressRef = useRef(false); // true while a saveToDrive fetch is actually in flight
-  const lastDriveCheckRef = useRef(0); // timestamp of last Drive freshness check (multi-device sync)
+  const savedTimerRef = useRef(null);
 
-  // Load all data from Drive after sign-in
-  // Silently sync Google Calendar events after every Drive load so events are always
-  // current on app open without requiring a manual "Sync Calendar" tap.
-  // Uses currentWeekData (the freshly loaded Drive data) rather than the React state,
-  // which isn't re-rendered yet at the moment this is called.
-  // Throttled to once per 5 minutes so frequent Drive refreshes don't spam the API.
-  async function autoSyncCalendar(currentWeekData, fileId) {
-    if (!getToken()) return;
-    const now = Date.now();
-    if (now - _lastCalSyncMs < 5 * 60 * 1000) return; // at most once per 5 min
-    _lastCalSyncMs = now;
+  // Sync engine → UI. The error toast stays until a save actually succeeds.
+  useEffect(() => {
+    Sync.onStatus = ({ kind, message }) => {
+      if (kind === 'saving') { clearTimeout(savedTimerRef.current); setSaveStatus(s => s.startsWith('ERR:') ? s : 'saving'); }
+      else if (kind === 'saved' || kind === 'merged') {
+        clearTimeout(savedTimerRef.current);
+        setSaveStatus(kind); setAuthError(false);
+        savedTimerRef.current = setTimeout(() => setSaveStatus(''), kind === 'merged' ? 4000 : 2000);
+      }
+      else if (kind === 'error') { clearTimeout(savedTimerRef.current); setSaveStatus('ERR:' + (message || 'Sync failed')); }
+      else if (kind === 'idle') setSaveStatus(s => (s.startsWith('ERR:') && Sync.pendingCount()) ? s : (s === 'saved' || s === 'merged' ? s : ''));
+    };
+    Sync.onAuthLost = () => setAuthError(true);
+    _onGoogleReauth = (v) => setGoogleReauth(v);
+    return () => { Sync.onStatus = null; Sync.onAuthLost = null; _onGoogleReauth = null; };
+  }, []);
+
+  // Apply a Calendar pull without clobbering edits made while it ran: only the weeks the
+  // pull actually changed are replaced. The sync engine then uploads just those weeks.
+  function applyCalendarResult(before, after) {
+    const changed = {};
+    for (const wk of Object.keys(after)) if (JSON.stringify(after[wk]) !== JSON.stringify(before[wk])) changed[wk] = after[wk];
+    if (Object.keys(changed).length) setWeekData(prev => ({ ...prev, ...changed }));
+  }
+
+  // Silently pull new Google Calendar events after the first load so events are current on
+  // app open without tapping "Sync Calendar". Throttled to once per 5 minutes.
+  async function autoSyncCalendar(currentWeekData) {
+    if (Date.now() - _lastCalSyncMs < 5 * 60 * 1000) return;
+    if (!(await ensureGoogleToken())) return;
+    _lastCalSyncMs = Date.now();
     try {
       const result = await pullNewFromCalendar(currentWeekData);
       if (!result || (result.added === 0 && result.updated === 0)) return;
-      setWeekData(result.newWeekData);
-      // Immediately persist the merged calendar events to Drive so they survive the next reload.
-      // We pass fileId directly because driveFileId React state isn't set yet at this point.
-      if (fileId) {
-        const allData = { weekData: result.newWeekData };
-        ALL_STORAGE_KEYS.filter(k => k !== 'weekData').forEach(k => {
-          try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
-        });
-        saveToDrive(fileId, allData).catch(e => console.log('Auto-sync Drive save failed:', e?.message));
-      }
+      applyCalendarResult(currentWeekData, result.newWeekData);
       console.log(`Auto calendar sync: ${result.added} added, ${result.updated} updated`);
     } catch (e) {
       console.log('Auto calendar sync skipped:', e?.message);
     }
   }
 
-  async function loadAllFromDrive(forceOverwrite) {
-    _loadingFromDrive = true;
-    setSaveStatus('saving');
-    try {
-      const { data, fileId, conflict, driveSavedAt, localSavedAt } = await loadFromDrive();
-
-      // Warn about multi-device conflict before overwriting local data
-      if (conflict && !forceOverwrite) {
-        _loadingFromDrive = false;
-        setSaveStatus('');
-        const msg = `⚠️ Conflict detected: this device has local changes from ${new Date(localSavedAt).toLocaleString()} that are newer than Drive (${new Date(driveSavedAt).toLocaleString()}).\n\nLoad from Drive anyway? (Your local changes will be lost)\n\nClick Cancel to keep local data (Drive will be overwritten on next save).`;
-        if (!window.confirm(msg)) {
-          // User wants to keep local — trigger a save to push local → Drive
-          setDriveFileId(fileId);
-          return;
-        }
-      }
-      ALL_STORAGE_KEYS.forEach(k => {
-        if (data[k] !== undefined) {
-          try { localStorage.setItem(k, JSON.stringify(data[k])); } catch {}
-        }
-      });
-      if (data.weekData) setWeekData(data.weekData);
-      if (data.navColor) setNavColor(data.navColor);
-      if (data.calHeaderColor) setCalHeaderColor(data.calHeaderColor);
-      if (data.habitGoals) setHabitGoals(data.habitGoals);
-      if (data.habitCompletions) setHabitCompletions(data.habitCompletions);
-      if (data.habitMetrics) setHabitMetrics(data.habitMetrics);
-      if (data.habitQty) setHabitQty(data.habitQty);
-      if (data.habitNotes) setHabitNotes(data.habitNotes);
-      if (data.weightTarget !== undefined) setWeightTarget(data.weightTarget);
-      if (data.calsTarget !== undefined) setCalsTarget(data.calsTarget);
-      if (data.monthlyGoals) setMonthlyGoals(data.monthlyGoals);
-      if (data.pagesData) setPagesData(data.pagesData);
-      if (data.foldersData) setFoldersData(data.foldersData);
-      if (data.peopleDirectory) setPeopleDirectory(data.peopleDirectory);
-      if (data.fitnessLog) setFitnessLog(data.fitnessLog);
-      if (data.fitnessExercises) setFitnessExercises(data.fitnessExercises);
-      if (data.fitnessGoals) setFitnessGoals(data.fitnessGoals);
-      if (data.countdowns) setCountdowns(data.countdowns);
-      setDriveFileId(fileId); // set last to arm the save effect
-      setAuthError(false);
-      setSaveStatus('saved');
-      setTimeout(() => { setSaveStatus(''); _loadingFromDrive = false; }, 2000);
-      // Auto-sync Google Calendar in background — non-blocking, silent
-      autoSyncCalendar(data.weekData || {}, fileId);
-    } catch (e) {
-      _loadingFromDrive = false;
-      const msg = e?.message || 'Unknown error';
-      console.error('Drive load failed:', msg);
-      setSaveStatus('ERR:' + msg);
-      setTimeout(() => setSaveStatus(''), 8000);
-    }
-  }
-
-  // Debounced save to Drive whenever data changes, with automatic token refresh on 401
-  const scheduleSave = useCallback((fid) => {
-    if (!fid || _loadingFromDrive) return;
-    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    pendingSaveRef.current = true;
-    setSaveStatus('saving');
-    saveTimerRef.current = setTimeout(async () => { // 1500ms debounce
-      pendingSaveRef.current = false;
-      saveInProgressRef.current = true; // Drive fetch is now in flight
-      const allData = {};
-      ALL_STORAGE_KEYS.forEach(k => {
-        try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
-      });
-      try {
-        await saveToDrive(fid, allData);
-        saveInProgressRef.current = false;
-        setAuthError(false);
-        setSaveStatus('saved');
-        setTimeout(() => setSaveStatus(''), 2000);
-      } catch (e) {
-        saveInProgressRef.current = false;
-        const msg = e?.message || 'Save failed';
-        const is401 = msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('not authenticated');
-        if (is401) {
-          setSaveStatus('saving');
-          requestTokenSilent(
-            async () => {
-              try {
-                await saveToDrive(fid, allData);
-                setAuthError(false);
-                setSaveStatus('saved');
-                setTimeout(() => setSaveStatus(''), 2000);
-              } catch (e2) {
-                setSaveStatus('ERR:' + (e2?.message || 'Save failed'));
-                // Don't auto-clear save errors — user must see them
-              }
-            },
-            () => {
-              clearToken();
-              setAuthError(true);
-              setSaveStatus('ERR:Session expired');
-            }
-          );
-        } else {
-          setSaveStatus('ERR:' + msg);
-          // Don't auto-clear save errors — user must see them
-        }
-      }
-    }, 1500);
-  }, []);
-
-  // Flush any pending save immediately — used by beforeunload and visibilitychange
-  const flushSave = useCallback(async () => {
-    if (!pendingSaveRef.current || !driveFileId || _loadingFromDrive) return;
-    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
-    pendingSaveRef.current = false;
-    const allData = {};
-    ALL_STORAGE_KEYS.forEach(k => {
-      try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
-    });
-    try {
-      await saveToDrive(driveFileId, allData);
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus(''), 2000);
-    } catch (e) {
-      // Surface the error — same treatment as scheduleSave failures
-      const msg = e?.message || 'Save failed';
-      const is401 = msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('not authenticated');
-      if (is401) {
-        requestTokenSilent(
-          async () => {
-            try {
-              await saveToDrive(driveFileId, allData);
-              setSaveStatus('saved');
-              setTimeout(() => setSaveStatus(''), 2000);
-            } catch (e2) {
-              setSaveStatus('ERR:' + (e2?.message || 'Save failed'));
-            }
-          },
-          () => {
-            clearToken();
-            setAuthError(true);
-            setSaveStatus('ERR:Session expired');
-          }
-        );
-      } else {
-        setSaveStatus('ERR:' + msg);
-      }
-    }
-  }, [driveFileId]);
-
-  // Watch for localStorage changes and trigger Drive save
-  useEffect(() => {
-    if (!driveFileId) return;
-    scheduleSave(driveFileId);
-  }, [weekData, navColor, calHeaderColor, habitGoals, habitCompletions, habitMetrics, habitQty, habitNotes, monthlyGoals, pagesData, foldersData, peopleDirectory, fitnessLog, fitnessExercises, fitnessGoals, countdowns, driveFileId]);
+  // Each useSynced() value syncs itself — there is no list of keys to keep in step anymore.
 
   // Fitness → Habit sync (runs at App level so it fires on ALL pages, not just Habit page)
   useEffect(() => {
@@ -6660,203 +6980,95 @@ function App() {
     if (newQty) setHabitQty(newQty);
   }, [fitnessLog, habitGoals]);
 
-  // On mount: restore session from localStorage token or silent Worker refresh
-  useEffect(() => {
-    async function tryRestoreSession() {
-      // Case 1: token still valid in localStorage — restore immediately
-      if (getToken()) {
-        try {
-          const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-            headers: { Authorization: `Bearer ${getToken()}` }
-          });
-          const user = await res.json();
-          if (user.email) {
-            setAuthUser({ name: user.name, email: user.email, picture: user.picture });
-            await loadAllFromDrive();
-            setAuthLoading(false);
-            return;
-          }
-        } catch {}
+  // On mount: finish a Google sign-in redirect if we're returning from one, then load data.
+  // authLoading must end on EVERY path — the sign-in wall (or the app) appears afterwards.
+  async function bootSession() {
+    setLoadError('');
+    try {
+      let profile = null;
+      try { profile = await completeSignInFromRedirect(); }
+      catch (e) { setSignInError(e.message); }
+      if (!getSession()) return;   // not signed in → sign-in wall
+      profile = profile || readProfile() || { name: getSavedEmail(), email: getSavedEmail(), picture: null };
+      const r = await Sync.start(getSavedEmail());
+      setAuthUser(profile);
+      setSignInError('');
+      setAuthError(false);
+      if (r && r.values) ensureGoogleToken().then(() => autoSyncCalendar(r.values.weekData || {}));
+    } catch (e) {
+      if (e && e.isAuth) {
+        clearSession();
+        setAuthUser(null);
+        setSignInError(e.code === 'not_allowed' ? SIGNIN_ERRORS.not_allowed : 'Your session ended — please sign in again.');
+      } else {
+        setLoadError((e && e.message) || 'Could not load your planner');
       }
-      // Case 2: no valid token — try silent Worker refresh if we have a saved email hint
-      const hint = getSavedEmail();
-      if (!hint) {
-        setAuthLoading(false); // no saved session at all — show sign-in wall immediately
-        return;
-      }
-      // Worker-based silent refresh
-      requestTokenSilent(
-        async (data) => {
-          // Silent refresh doesn't return user info — use saved email
-          const email = getSavedEmail();
-          setAuthUser({ name: email, email, picture: null }); // will be updated after Drive load
-          await loadAllFromDrive();
-          setAuthLoading(false);
-        },
-        (err) => {
-          console.log('Silent refresh failed:', err, '— user must sign in manually');
-          setAuthLoading(false); // silent refresh failed — show sign-in wall
-        }
-      );
+    } finally {
+      setAuthLoading(false);
     }
-    tryRestoreSession();
-  }, []);
+  }
+  useEffect(() => { bootSession(); }, []);
 
-  // Flush pending saves when tab is closed, refreshed, or hidden (mobile home button etc.)
-  // Also re-check Drive for newer data when tab becomes visible (multi-device sync).
+  // Keep devices in step: upload on hide/close, pull other devices' changes when the app comes
+  // back into view and every 30s while it's open, and keep the Calendar token fresh.
   useEffect(() => {
-    // Lightweight check: is Drive newer than our last save? If so, silently reload.
-    // Only runs when no local changes are pending, and at most once every 30 seconds.
-    async function checkAndRefreshFromDrive() {
-      if (!authUser || !driveFileId || _loadingFromDrive) return;
-      if (pendingSaveRef.current || saveInProgressRef.current) return; // local changes in flight — don't overwrite
-      const now = Date.now();
-      if (now - lastDriveCheckRef.current < 30000) return; // max once per 30s
-      lastDriveCheckRef.current = now;
-      try {
-        let token = getToken();
-        if (!token) {
-          // Access token silently expires (~55min) on a tab left open and idle.
-          // getToken() just returns null in that case — without refreshing here,
-          // this background check would go permanently silent on a long-lived idle
-          // tab and would never notice another device's changes. Refresh once and
-          // retry; if refresh fails, bail quietly and let the normal save-path 401
-          // handling surface a "sign in again" prompt on the user's next action.
-          await new Promise(resolve => requestTokenSilent(() => resolve(), () => resolve()));
-          token = getToken();
-          if (!token) return;
-        }
-        // Fetch just the modifiedTime — tiny request, no full file download
-        const metaRes = await fetch(
-          `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=modifiedTime`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (!metaRes.ok) return;
-        const { modifiedTime } = await metaRes.json();
-        const localSaved = localStorage.getItem('_lp_savedAt');
-        // If Drive modifiedTime is newer than our last successful save, reload
-        if (!modifiedTime || (localSaved && localSaved >= modifiedTime)) return;
-        // Drive is newer — reload silently (forceOverwrite=true: skip conflict dialog
-        // since we already verified no local changes are pending above)
-        await loadAllFromDrive(true);
-      } catch {} // silently ignore — don't surface network errors as UI noise
+    if (!authUser) return;
+    function flushNow() {
+      _bodyFlushRef.fn?.();          // pending Pages text → storage
+      Sync.captureAllFromStorage();  // React may not have re-rendered the latest keystrokes yet
+      Sync.flush({ keepalive: true });
     }
-
-    function handleBeforeUnload(e) {
-      // Always flush any pending Pages body save synchronously first
-      _bodyFlushRef.fn?.();
-      // Send keepalive if a save is debounced (pendingSaveRef) OR if a Drive fetch is
-      // mid-flight (saveInProgressRef) — the in-flight fetch will be cancelled by the
-      // browser on unload, so we need the keepalive to rescue the data.
-      if ((pendingSaveRef.current || saveInProgressRef.current) && driveFileId) {
-        const allData = {};
-        ALL_STORAGE_KEYS.forEach(k => {
-          try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
-        });
-        allData._savedAt = new Date().toISOString();
-        try { localStorage.setItem('_lp_savedAt', allData._savedAt); } catch {}
-        const token = getToken();
-        if (token) {
-          // fetch with keepalive:true survives page unload AND supports auth headers.
-          // sendBeacon cannot send Authorization headers so Drive always rejected it with 401.
-          const beaconUrl = `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`;
-          fetch(beaconUrl, {
-            method: 'PATCH',
-            headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify(allData),
-            keepalive: true,
-          }).catch(() => {});
-        }
-        e.preventDefault();
-        e.returnValue = 'Saving your data…';
-        return e.returnValue;
-      }
+    function refreshGoogleSoon() {
+      const exp = parseInt(lsGet('gtoken_exp') || '0', 10);
+      if (!getToken() || exp - Date.now() < 4 * 60 * 1000) ensureGoogleToken(true);
     }
-    function handleVisibilityChange() {
-      if (document.visibilityState === 'hidden') {
-        // Flush any pending Pages body save to localStorage/state before Drive save
-        _bodyFlushRef.fn?.();
-        if (pendingSaveRef.current) flushSave();
-      } else if (document.visibilityState === 'visible') {
-        // Tab came back into focus — check if another device saved to Drive while we were away
-        checkAndRefreshFromDrive();
-      }
+    function onVisibility() {
+      if (document.visibilityState === 'hidden') flushNow();
+      else { Sync.pull(); refreshGoogleSoon(); }
     }
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    // Periodic freshness check even while the tab stays continuously focused.
-    // Without this, a device left open and active (never backgrounded, so
-    // visibilitychange never fires) will never learn that another device saved
-    // newer data to Drive — and its next own save would blindly overwrite Drive
-    // with its stale in-memory snapshot, silently discarding the other device's
-    // changes. checkAndRefreshFromDrive already no-ops if a local save is
-    // pending/in-flight, so this is safe to run on a fixed interval.
-    const driveCheckInterval = setInterval(() => {
-      if (document.visibilityState === 'visible') checkAndRefreshFromDrive();
+    function onOnline() { Sync.flush({ manual: true }); Sync.pull(); }
+    window.addEventListener('pagehide', flushNow);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('online', onOnline);
+    const poll = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      Sync.pull();
+      refreshGoogleSoon();
     }, 30000);
     return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearInterval(driveCheckInterval);
+      window.removeEventListener('pagehide', flushNow);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('online', onOnline);
+      clearInterval(poll);
     };
-  }, [flushSave, driveFileId, authUser]);
+  }, [authUser]);
 
-  function handleSignIn() {
-    requestToken(
-      async (data) => {
-        // Worker returns name/email/picture directly from userinfo
-        setAuthUser({ name: data.name||data.email, email: data.email, picture: data.picture||null });
-        saveEmail(data.email);
-        await loadAllFromDrive();
-      },
-      (err) => { console.error('Auth error:', err); alert('Sign-in failed: ' + err); }
-    );
-  }
+  function handleSignIn() { startSignIn(); }
 
-  function handleSignOut() {
-    const email = getSavedEmail();
-    clearToken();
-    clearEmail();
-    setAuthUser(null); setDriveFileId(null); setSaveStatus('');
-    // Tell Worker to delete the stored refresh token
-    if (email && !WORKER_URL.includes('YOUR_SUBDOMAIN')) {
-      fetch(`${WORKER_URL}/revoke`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      }).catch(() => {});
-    }
+  async function handleSignOut() {
+    _bodyFlushRef.fn?.();
+    Sync.captureAllFromStorage();
+    if (Sync.pendingCount()) await Sync.flush({ manual: true });
+    if (Sync.pendingCount() && !window.confirm("Some changes haven't uploaded yet (no connection?).\n\nSigning out removes them from this device. Sign out anyway?")) return;
+    try { await api('/auth/logout', { method: 'POST' }); } catch {}
+    Sync.wipeLocal();
+    clearSession(); clearEmail(); clearToken(); lsDel('profile');
+    window.location.reload();
   }
 
   async function handleSyncCalendar() {
-    if (!getToken()) { alert('Please sign in first.'); return; }
     setSyncing(true);
+    if (!(await ensureGoogleToken())) {
+      setSyncing(false);
+      alert("Google Calendar isn't connected right now.\n\nTap \"Reconnect Calendar\" (or sign out and back in), then try again.");
+      return;
+    }
     try {
       const result = await pullNewFromCalendar(weekData);
       if (!result) {
         alert('Calendar sync failed: could not reach Google Calendar.\n\nMake sure:\n1. Google Calendar API is enabled in Cloud Console\n2. You signed in and approved Calendar access on the consent screen\n3. Try signing out and back in');
       } else if (result.added > 0 || result.updated > 0) {
-        setWeekData(result.newWeekData);
-        // Save to Drive immediately — don't rely on the 1500ms debounce.
-        // setWeekData queues a React state update; localStorage may not yet reflect it
-        // when the debounce or beforeunload handler fires, causing synced events to be lost.
-        // We save here explicitly using result.newWeekData directly to avoid that race.
-        if (driveFileId && !_loadingFromDrive) {
-          if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
-          pendingSaveRef.current = false;
-          const allData = { weekData: result.newWeekData };
-          ALL_STORAGE_KEYS.filter(k => k !== 'weekData').forEach(k => {
-            try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
-          });
-          try {
-            await saveToDrive(driveFileId, allData);
-            setSaveStatus('saved');
-            setTimeout(() => setSaveStatus(''), 2000);
-          } catch (saveErr) {
-            console.error('Sync Drive save failed:', saveErr?.message);
-            // Don't alert here — the data is in state/localStorage; debounce will retry
-          }
-        }
+        applyCalendarResult(weekData, result.newWeekData);   // only the changed weeks; the sync engine uploads them
         const parts = [];
         if (result.added > 0) {
           // Build human-readable date labels so the user knows where to navigate
@@ -6894,16 +7106,17 @@ function App() {
         const html = await res.text();
         const deployedMatch = html.match(/LP Planner v([\d.]+)/);
         if (deployedMatch && deployedMatch[1] !== RUNNING_VERSION) {
-          // New version detected — sync data then hard-reload
-          if (authUser && driveFileId) await loadAllFromDrive();
+          // New version detected — upload anything pending, then hard-reload
+          if (authUser) { _bodyFlushRef.fn?.(); Sync.captureAllFromStorage(); await Sync.flush({ manual: true }); }
           window.location.reload(true);
           return;
         }
       } catch (e) {
-        // Network issue checking version — continue with Drive sync only
+        // Network issue checking version — continue with data sync only
       }
-      if (authUser && driveFileId) {
-        await loadAllFromDrive();
+      if (authUser) {
+        await Sync.pull();
+        await Sync.flush({ manual: true });
       }
     } finally {
       setPullRefreshing(false);
@@ -6914,9 +7127,10 @@ function App() {
   const errDetail = isErr ? saveStatus.slice(4) : '';
   const saveLabel = saveStatus === 'saving' ? '↑ Saving…'
     : saveStatus === 'saved' ? '✓ Saved'
+    : saveStatus === 'merged' ? '⇄ Merged'
     : isErr ? '✗ Save error'
     : '';
-  const saveClass = isErr ? 'error' : saveStatus;
+  const saveClass = isErr ? 'error' : (saveStatus === 'merged' ? 'saved' : saveStatus);
 
   return (
     <div className="app">
@@ -6933,66 +7147,24 @@ function App() {
         }}>
           <div style={{display:'flex',flexDirection:'column',gap:3,minWidth:0}}>
             <span style={{fontWeight:700,fontSize:13}}>
-              {authError ? '⚠️ Session expired — changes are not saving' : '⚠️ Changes not saved to Drive'}
+              {authError ? '⚠️ Signed out — your changes are waiting on this device' : '⚠️ Changes not synced yet'}
             </span>
             {!authError && errDetail && (
               <span style={{fontSize:11,opacity:0.7,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{errDetail}</span>
             )}
-            {!authError && (
-              <span style={{fontSize:11,opacity:0.6}}>Your data is safe locally — tap Retry to save to Drive.</span>
-            )}
+            <span style={{fontSize:11,opacity:0.6}}>
+              {authError ? 'Sign in again to upload them.' : 'Your changes are saved on this device and will upload automatically — or tap Retry.'}
+            </span>
           </div>
           <button
             disabled={saveRetrying}
             onClick={async () => {
               if (authError) {
-                // Session expired — re-open sign-in
-                setAuthError(false);
-                requestToken(
-                  async (data) => {
-                    try {
-                      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${getToken()}` } });
-                      const user = await res.json();
-                      if (user.email) { setAuthUser({ name: user.name, email: user.email, picture: user.picture }); saveEmail(user.email); }
-                    } catch {}
-                    if (driveFileId) scheduleSave(driveFileId);
-                  },
-                  (err) => { setAuthError(true); setSaveStatus('ERR:Sign-in failed'); }
-                );
+                // Session ended — sign in again (full-page redirect; queued edits are kept on this device)
+                startSignIn();
               } else {
-                // Normal save error — retry immediately
                 setSaveRetrying(true);
-                setSaveStatus('saving');
-                const allData = {};
-                ALL_STORAGE_KEYS.forEach(k => {
-                  try { const s = localStorage.getItem(k); if (s) allData[k] = JSON.parse(s); } catch {}
-                });
-                try {
-                  await saveToDrive(driveFileId, allData);
-                  setAuthError(false);
-                  setSaveStatus('saved');
-                  setTimeout(() => setSaveStatus(''), 2000);
-                } catch (e) {
-                  const msg = e?.message || 'Save failed';
-                  const is401 = msg.includes('401') || msg.toLowerCase().includes('unauthorized') || msg.toLowerCase().includes('not authenticated');
-                  if (is401) {
-                    requestTokenSilent(
-                      async () => {
-                        try {
-                          await saveToDrive(driveFileId, allData);
-                          setAuthError(false);
-                          setSaveStatus('saved');
-                          setTimeout(() => setSaveStatus(''), 2000);
-                        } catch (e2) {
-                          setSaveStatus('ERR:' + (e2?.message || 'Save failed'));
-                        }
-                      },
-                      () => { clearToken(); setAuthError(true); setSaveStatus('ERR:Session expired'); }
-                    );
-                  } else {
-                    setSaveStatus('ERR:' + msg);
-                  }
-                }
+                await Sync.flush({ manual: true });
                 setSaveRetrying(false);
               }
             }}
@@ -7022,7 +7194,7 @@ function App() {
           display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14,
         }}>
           <span style={{fontSize:32,color:'rgba(255,255,255,0.85)',display:'inline-block',animation:'spin 1.1s linear infinite'}}>↻</span>
-          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:'rgba(255,255,255,0.55)'}}>Restoring session…</span>
+          <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,color:'rgba(255,255,255,0.55)'}}>Loading your planner…</span>
         </div>
       )}
       {/* ── SIGN-IN WALL — blocks all app content; no data access or edits without signing in ── */}
@@ -7041,9 +7213,21 @@ function App() {
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:28,fontWeight:700,color:'rgba(255,255,255,0.95)',letterSpacing:'0.02em'}}>
               ✦ LP Planner
             </div>
-            <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:14,color:'rgba(255,255,255,0.75)',textAlign:'center',lineHeight:1.65}}>
-              Sign in with Google to access your planner. Your data is stored privately in your Google Drive and is only accessible when you're signed in.
-            </div>
+            {loadError ? (
+              <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:14,color:'rgba(255,255,255,0.8)',textAlign:'center',lineHeight:1.65}}>
+                Couldn't load your planner ({loadError}). Your data is safe — check your connection and try again.
+              </div>
+            ) : (
+              <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:14,color:'rgba(255,255,255,0.75)',textAlign:'center',lineHeight:1.65}}>
+                Sign in with Google to access your planner. Your data is stored privately in your LP Planner account and is only accessible when you're signed in.
+              </div>
+            )}
+            {signInError && !loadError && (
+              <div style={{background:'rgba(220,74,58,0.25)',border:'1px solid rgba(255,140,120,0.45)',borderRadius:10,padding:'10px 14px',
+                fontFamily:"'DM Sans',sans-serif",fontSize:13,color:'white',textAlign:'center',lineHeight:1.5,width:'100%'}}>
+                {signInError}
+              </div>
+            )}
             <div style={{
               background:'rgba(0,0,0,0.15)', borderRadius:10, padding:'12px 16px',
               border:'1px solid rgba(255,255,255,0.1)',
@@ -7052,7 +7236,7 @@ function App() {
             }}>
               🔒 Sign-in is required to protect your data. Without it, any changes you make locally can be silently overwritten the next time you log in.
             </div>
-            <button onClick={handleSignIn} style={{
+            <button onClick={loadError ? () => { setAuthLoading(true); bootSession(); } : handleSignIn} style={{
               background:'white', color:'#5c2d52', border:'none', borderRadius:10,
               padding:'13px 32px', fontFamily:"'DM Sans',sans-serif", fontWeight:700,
               fontSize:15, cursor:'pointer', width:'100%', letterSpacing:'0.01em',
@@ -7060,14 +7244,14 @@ function App() {
             }}
             onMouseOver={e=>e.currentTarget.style.transform='scale(1.02)'}
             onMouseOut={e=>e.currentTarget.style.transform='scale(1)'}>
-              Sign in with Google
+              {loadError ? 'Try again' : 'Sign in with Google'}
             </button>
           </div>
         </div>
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v3.13.0</span>
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.0.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -7081,6 +7265,9 @@ function App() {
           {saveLabel && <span className={`save-status ${saveClass || saveStatus}`}>{saveLabel}</span>}
           {authUser ? (
             <>
+              {googleReauth && (
+                <button className="auth-btn" onClick={startSignIn} title="Google needs you to sign in again before Calendar sync can work">Reconnect Calendar</button>
+              )}
               <button className="auth-btn sync" onClick={handleSyncCalendar} disabled={syncing} title="Pull new events from Google Calendar">
                 {syncing ? '↓ Syncing…' : '↓ Sync Calendar'}
               </button>
@@ -7202,13 +7389,11 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const [showLibManager, setShowLibManager] = useState(false);
   const [showGoalManager, setShowGoalManager] = useState(false);
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
-  const [collapsedExIds, setCollapsedExIds] = useState(()=>new Set());
-  function toggleExCollapsed(exId) {
-    setCollapsedExIds(prev=>{
-      const next=new Set(prev);
-      if(next.has(exId)) next.delete(exId); else next.add(exId);
-      return next;
-    });
+  // Collapsed/expanded state for Day-view exercise tiles is stored on the exercise
+  // itself (ex.collapsed in fitnessLog) so it survives tab switches, reloads, and
+  // syncs across devices with the rest of the log.
+  function toggleExCollapsed(dk, exId) {
+    setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e, collapsed:!e.collapsed}));
   }
 
   const pendingSetFocus = useRef(null); // key: `${dk}-${exId}-${setId}`
@@ -7564,7 +7749,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     const libEx=fitnessExercises.find(e=>e.id===ex.exerciseId);
     const isCardio=libEx?.category==='Cardio';
     const isDropTarget = isDayView && dragOverExId===ex.id && dragEx?.exId!==ex.id;
-    const isCollapsed = isDayView && collapsedExIds.has(ex.id);
+    const isCollapsed = isDayView && !!ex.collapsed;
     return (
       <div key={ex.id}
         data-ex-id={ex.id}
@@ -7584,7 +7769,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
         )}
         <div className="workout-card">
         <div className="workout-card-header"
-          onClick={isDayView ? ()=>toggleExCollapsed(ex.id) : undefined}
+          onClick={isDayView ? ()=>toggleExCollapsed(dk, ex.id) : undefined}
           style={isDayView ? {cursor:'pointer'} : undefined}>
           {isDayView && (
             <span
@@ -8582,7 +8767,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   const [folderHoverTarget, setFolderHoverTarget] = useState(null);
   const folderHoverTimer = useRef(null);
 
-  // Register a synchronous body flush function so App can call it before any Drive save.
+  // Register a synchronous body flush function so App can call it before any sync upload.
   // This writes the current editor HTML directly to localStorage immediately, bypassing
   // the 300ms debounce. Called by beforeunload, visibilitychange, and doc switching.
   useEffect(() => {
@@ -8592,14 +8777,14 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       if (!id || !bodyRef.current) return;
       const html = bodyRef.current.innerHTML;
       const now = new Date().toISOString();
-      // Write directly to localStorage synchronously so beforeunload/beacon picks it up
+      // Write directly to local storage synchronously so the hide/close upload picks it up
       try {
-        const stored = localStorage.getItem('pagesData');
+        const stored = lsGet('pagesData');
         const pages = stored ? JSON.parse(stored) : [];
         const updated = pages.map(d => d.id === id ? {...d, body: html, lastModified: now} : d);
-        localStorage.setItem('pagesData', JSON.stringify(updated));
+        lsSet('pagesData', JSON.stringify(updated));
       } catch {}
-      // Also update React state so the save effect triggers a Drive sync
+      // Also update React state so the sync engine sees the change
       setPagesData(p => p.map(d => d.id === id ? {...d, body: html, lastModified: now} : d));
     };
     return () => { _bodyFlushRef.fn = null; };
@@ -8616,10 +8801,10 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
           const html = bodyRef.current.innerHTML;
           const now = new Date().toISOString();
           try {
-            const stored = localStorage.getItem('pagesData');
+            const stored = lsGet('pagesData');
             const pages = stored ? JSON.parse(stored) : [];
             const updated = pages.map(d => d.id === id ? {...d, body: html, lastModified: now} : d);
-            localStorage.setItem('pagesData', JSON.stringify(updated));
+            lsSet('pagesData', JSON.stringify(updated));
           } catch {}
           setPagesData(p => p.map(d => d.id === id ? {...d, body: html, lastModified: now} : d));
         }

@@ -1,8 +1,8 @@
 {
-  "name": "Little-Pals Planner",
-  "short_name": "LP Planner",
-  "description": "Weekly planner, habit tracker, and monthly calendar",
-  "start_url": "/Planner_Web_App/",
+  "name": "LP Planner (Test)",
+  "short_name": "LP Test",
+  "description": "Weekly planner, habit tracker, and monthly calendar \u2014 D1 test build",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#3b1f5e",
   "theme_color": "#3b1f5e",
