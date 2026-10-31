@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.0.0 -->
+<!-- LP Planner v4.1.0 -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2103,6 +2103,11 @@ function syncSame(a, b) {   // cheap "nothing changed" check: same ref, or same 
   for (const k of ka) if (a[k] !== b[k]) return false;
   return true;
 }
+function syncCanon(v) {   // JSON with sorted object keys, for order-insensitive comparison
+  if (Array.isArray(v)) return '[' + v.map(syncCanon).join(',') + ']';
+  if (v && typeof v === 'object') return '{' + Object.keys(v).sort().filter(k => v[k] !== undefined).map(k => JSON.stringify(k) + ':' + syncCanon(v[k])).join(',') + '}';
+  return v === undefined ? 'null' : JSON.stringify(v);
+}
 function syncEq(a, b) {
   if (a === b) return true;
   if (typeof a === 'symbol' || typeof b === 'symbol' || a === undefined || b === undefined) return false;
@@ -2232,9 +2237,10 @@ const Sync = {
     const vers = {};
     for (const c in this.base) { vers[c] = {}; for (const i in this.base[c]) { const b = this.base[c][i]; vers[c][i] = [b.v, b.del ? 'x' : b.h]; } }
     lsSet('sync_meta', JSON.stringify({ email: this.email, cursor: this.cursor, vers }));
-    lsSet('sync_outbox', JSON.stringify(this.outbox));
+    if (!this.importing) lsSet('sync_outbox', JSON.stringify(this.outbox));
   },
   persistOutbox() {
+    if (this.importing) return;   // an import is re-runnable; don't fill browser storage with a full copy
     if (!lsSet('sync_outbox', JSON.stringify(this.outbox))) {
       this.status('error', "This browser's storage is full — changes will upload while the app stays open");
     }
@@ -2298,7 +2304,7 @@ const Sync = {
       if ((!b || b.del) && ob && !this.inflight.has(this.key(coll, id))) { this.dropOutbox(coll, id); changed = true; continue; }
       if ((b && !b.del) || ob) { this.setOutbox(coll, id, null); changed = true; }
     }
-    if (changed) { this.persistOutbox(); this.scheduleFlush(); }
+    if (changed) { this.persistOutbox(); if (!this.importing) this.scheduleFlush(); }
   },
 
   // Used when the page is being hidden/closed: React may not have re-rendered yet, but every
@@ -2363,12 +2369,14 @@ const Sync = {
           }
         }
         this.persist();
+        this.onChunk?.(sent.length);
       }
       this.failures = 0;
       this.status(merged ? 'merged' : (this.pendingCount() ? 'saving' : 'saved'));
     } catch (e) {
       if (e.isAuth) { this.flushing = false; this.status('idle'); this.onAuthLost?.(e); return; }
       this.failures++;
+      this.lastError = e.message;
       const waits = [2, 5, 10, 20, 30, 60];
       const wait = waits[Math.min(this.failures - 1, waits.length - 1)] * 1000;
       if (this.failures >= 2 || e.code === 'doc_too_large' || navigator.onLine === false) this.status('error', e.message);
@@ -2387,7 +2395,7 @@ const Sync = {
     const cur = (this.outbox[c] && this.outbox[c][i]) || { b: sent.b, j: sent.j, h: sent.h };
     const local = cur.j === null ? SYNC_DELETED : JSON.parse(cur.j);
     const remote = r.x ? SYNC_DELETED : r.d;
-    const merged = syncMerge3(this.obBase(c, i, cur), local, remote);
+    const merged = this.importing ? local : syncMerge3(this.obBase(c, i, cur), local, remote);   // an import replaces, never merges
     const remoteJ = r.x ? null : JSON.stringify(r.d);
     this.setBase(c, i, r.v, remoteJ, !!r.x);
     if (syncEq(merged, remote)) this.dropOutbox(c, i);
@@ -2486,13 +2494,63 @@ const Sync = {
     this.ready = true; this.offline = false;
     this.persist();
     if (this.pendingCount()) this.scheduleFlush(500); else this.status('idle');
-    return { offline: false, values: Object.fromEntries(Object.keys(this.reg).map(c => [c, server[c] ? syncJoin(c, server[c]) : this.reg[c].init])) };
+    return { offline: false, empty: !(data.docs || []).length, values: Object.fromEntries(Object.keys(this.reg).map(c => [c, server[c] ? syncJoin(c, server[c]) : this.reg[c].init])) };
   },
   seenFrom(coll, value) { const docs = syncSplit(coll, value); this.seen[coll] = { ...docs }; },
 
+  // Replace ALL of this person's data with `values` (a planner-data.json / backup object), upload it,
+  // then read everything back and compare. Collections missing from the file reset to their defaults.
+  async waitIdle() {   // wait (up to ~30s) for a save that's already running
+    for (let n = 0; this.flushing && n < 300; n++) await new Promise(r => setTimeout(r, 100));
+  },
+  importValue(values, coll) {
+    return values && Object.prototype.hasOwnProperty.call(values, coll) && values[coll] !== undefined ? values[coll] : this.reg[coll].init;
+  },
+  async importAll(values, onProgress) {
+    if (!this.ready || this.offline || !getSession()) throw new Error("You're offline — connect and try again");
+    await this.waitIdle();
+    await this.pull();
+    await this.waitIdle();
+    this.importing = true;
+    let total = 0;
+    try {
+      for (const coll of Object.keys(this.reg)) {
+        const v = this.importValue(values, coll);
+        this.capture(coll, v);
+        this.reg[coll].set(v);
+      }
+      total = this.pendingCount();
+      let done = 0;
+      onProgress?.(0, total);
+      this.onChunk = (n) => { done += n; onProgress?.(Math.min(done, total), total); };
+      for (let attempt = 0; this.pendingCount() && attempt < 6; attempt++) {
+        await this.waitIdle();
+        await this.flush({ manual: true });
+        if (this.pendingCount() && this.failures) throw new Error(this.lastError || 'Upload failed');
+      }
+      if (this.pendingCount()) throw new Error('Some items did not upload — try again');
+    } finally {
+      this.importing = false; this.onChunk = null;
+      clearTimeout(this.retryTimer);
+      this.persist();
+      if (this.pendingCount()) this.scheduleFlush(5000);
+    }
+    const data = await api('/api/docs');
+    const server = {};
+    for (const d of data.docs || []) (server[d.c] || (server[d.c] = {}))[d.i] = d.d;
+    const mismatches = [];
+    for (const coll of Object.keys(this.reg)) {
+      const got = server[coll] ? syncJoin(coll, server[coll]) : this.reg[coll].init;
+      if (syncCanon(got) !== syncCanon(this.importValue(values, coll))) mismatches.push(coll);
+    }
+    this.cursor = Math.max(this.cursor, data.cursor || 0);
+    this.persist();
+    return { changes: total, mismatches };
+  },
+
   // Fetch what other devices changed since our cursor.
   async pull() {
-    if (!this.ready || this.pulling || !getSession()) return;
+    if (!this.ready || this.pulling || this.importing || !getSession()) return;
     this.pulling = true;
     let merged = false;
     try {
@@ -2805,7 +2863,8 @@ function useStorage(key, init) {
   const set = useCallback(v => {
     setVal(prev => {
       const next = typeof v === 'function' ? v(prev) : v;
-      try { localStorage.setItem(key, JSON.stringify(next)); } catch {}
+      try { localStorage.setItem(key, JSON.stringify(next)); }
+      catch { try { localStorage.removeItem(key); } catch {} }   // never leave a stale copy behind
       return next;
     });
   }, [key]);
@@ -6835,6 +6894,224 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
 }
 
 // ─────────────────────────────────────────────
+// DATA & BACKUPS — import / restore from Google Drive, nightly backup status
+// ─────────────────────────────────────────────
+const MAX_DOC_BYTES = 1900000;
+
+async function driveListImportable() {
+  const token = await ensureGoogleToken();
+  if (!token) throw new Error('Google is not connected — tap "Reconnect Google" first');
+  const q = "trashed=false and (name='planner-data.json' or name contains 'lp-planner-backup-')";
+  const url = 'https://www.googleapis.com/drive/v3/files?' + new URLSearchParams({
+    q, orderBy: 'modifiedTime desc', pageSize: '60', fields: 'files(id,name,modifiedTime,size)',
+  }).toString();
+  const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
+  if (!res.ok) throw new Error(res.status === 403 ? 'Google Drive access not granted — tap "Reconnect Google" and allow Drive' : 'Could not list Drive files (' + res.status + ')');
+  const d = await res.json();
+  const files = (d.files || []).filter(f => f.name === 'planner-data.json' || /^lp-planner-backup-\d{4}-\d{2}-\d{2}\.json$/.test(f.name));
+  // The live app's file first, then backups newest first
+  return files.sort((a, b) => (a.name === 'planner-data.json' ? -1 : b.name === 'planner-data.json' ? 1 : (b.name > a.name ? 1 : -1)));
+}
+
+async function driveDownloadJson(id) {
+  const token = await ensureGoogleToken();
+  if (!token) throw new Error('Google is not connected');
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(id)}?alt=media`, { headers: { Authorization: 'Bearer ' + token } });
+  if (!res.ok) throw new Error('Could not download the file (' + res.status + ')');
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { throw new Error("That file isn't valid planner data"); }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error("That file isn't planner data");
+  return { data, bytes: text.length };
+}
+
+function summarizePlannerData(d) {
+  const keys = (o) => (o && typeof o === 'object' && !Array.isArray(o)) ? Object.keys(o) : [];
+  const len = (a) => Array.isArray(a) ? a.length : 0;
+  let tasks = 0;
+  for (const wk of keys(d.weekData)) for (const day of keys(d.weekData[wk] && d.weekData[wk].tasks)) tasks += len(d.weekData[wk].tasks[day]);
+  const known = Object.keys(Sync.reg).filter(k => k in d);
+  const tooBig = [];
+  for (const coll of known) {
+    const docs = syncSplit(coll, d[coll]);
+    for (const id of Object.keys(docs)) {
+      const n = JSON.stringify(docs[id] === undefined ? null : docs[id]).length;
+      if (n > MAX_DOC_BYTES) tooBig.push(`${coll} ${id.replace(/^p:/, '')} (${(n / 1e6).toFixed(1)} MB)`);
+    }
+  }
+  return {
+    known: known.length,
+    savedAt: d._backupAt || d._savedAt || null,
+    rows: [
+      ['Weeks', keys(d.weekData).length], ['Tasks & events', tasks], ['Pages', len(d.pagesData)],
+      ['Habits', len(d.habitGoals)], ['Days with habit check-offs', keys(d.habitCompletions).length],
+      ['Workout days', keys(d.fitnessLog).length], ['Exercises in library', len(d.fitnessExercises)],
+      ['Countdowns', len(d.countdowns)],
+    ],
+    tooBig,
+  };
+}
+
+function fileLabel(f) {
+  if (f.name === 'planner-data.json') return 'Live app data (planner-data.json)';
+  const m = f.name.match(/(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `Backup · ${MONTHS[parseInt(m[2], 10) - 1].slice(0, 3)} ${parseInt(m[3], 10)}, ${m[1]}` : f.name;
+}
+function fmtWhen(ms) {
+  if (!ms) return '';
+  const d = new Date(ms);
+  return d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function DataPanel({ me, refreshMe, suggestImport, onClose }) {
+  const [files, setFiles] = useState(null);
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const [picked, setPicked] = useState(null);     // { file, data, bytes, summary }
+  const [progress, setProgress] = useState(null); // { done, total }
+  const [result, setResult] = useState(null);
+  const driveOk = !me || me.drive_ok !== false;
+  const b = me && me.backup;
+
+  async function findFiles() {
+    setErr(''); setBusy('list'); setPicked(null); setResult(null);
+    try { setFiles(await driveListImportable()); }
+    catch (e) { setErr(e.message); }
+    setBusy('');
+  }
+  async function pick(f) {
+    setErr(''); setBusy('download:' + f.id); setResult(null);
+    try {
+      const { data, bytes } = await driveDownloadJson(f.id);
+      const summary = summarizePlannerData(data);
+      if (!summary.known) throw new Error("That file doesn't contain any planner data");
+      setPicked({ file: f, data, bytes, summary });
+    } catch (e) { setErr(e.message); }
+    setBusy('');
+  }
+  async function doImport() {
+    if (!picked) return;
+    if (picked.summary.tooBig.length) { setErr('Some items are over the 1.9 MB limit: ' + picked.summary.tooBig.join(', ')); return; }
+    if (!window.confirm(`Replace ALL data in this app with "${fileLabel(picked.file)}"?\n\nAnything in this app that isn't in that file will be removed. The file in Google Drive is not changed.`)) return;
+    setErr(''); setBusy('import'); setProgress({ done: 0, total: 0 });
+    try {
+      const r = await Sync.importAll(picked.data, (done, total) => setProgress({ done, total }));
+      setResult(r);
+    } catch (e) { setErr('Import stopped: ' + e.message + '. You can run it again safely.'); }
+    setBusy(''); setProgress(null);
+  }
+  async function backupNow() {
+    setErr(''); setBusy('backup');
+    try { await api('/api/backup', { method: 'POST' }); }
+    catch (e) { if (e.code === 'too_soon') setErr('A backup just ran — try again in a few seconds.'); }
+    await refreshMe();
+    setBusy('');
+  }
+
+  const box = { background: 'var(--cream)', borderRadius: 'var(--radius-md)', padding: '12px 14px', fontSize: 13, lineHeight: 1.5 };
+  const h = { fontFamily: "'Playfair Display',serif", fontSize: 15, fontWeight: 600, margin: '18px 0 8px' };
+  const small = { fontSize: 12, color: 'var(--ink-light)' };
+  const backupColor = !b ? 'var(--ink-light)' : b.status === 'ok' ? 'var(--accent)' : b.status === 'skipped_empty' ? 'var(--ink-light)' : 'var(--red)';
+  const backupText = !b ? 'No backup yet — the first one runs tonight.'
+    : b.status === 'ok' ? `✓ ${fmtWhen(b.at)} · ${b.file}`
+    : b.status === 'skipped_empty' ? `Skipped ${fmtWhen(b.at)} — nothing to back up yet`
+    : `✗ ${fmtWhen(b.at)} — ${b.error || 'failed'}`;
+
+  return (
+    <div className="modal-backdrop" onClick={busy === 'import' ? undefined : onClose}>
+      <div className="modal-box data-panel" onClick={e => e.stopPropagation()}
+        style={{ width: 'min(560px, 94vw)', maxHeight: '88vh', overflowY: 'auto' }}>
+        <div className="modal-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <span>Data &amp; backups</span>
+          {busy !== 'import' && <button className="modal-btn secondary" onClick={onClose} style={{ padding: '4px 10px' }}>Close</button>}
+        </div>
+
+        {!driveOk && (
+          <div style={{ ...box, background: '#fdf3dc', color: '#8a6200', marginTop: 8 }}>
+            Google Drive access isn't granted, so backups and imports can't run.
+            <div style={{ marginTop: 8 }}><button className="modal-btn primary" onClick={startSignIn}>Reconnect Google</button></div>
+          </div>
+        )}
+
+        <div style={h}>Nightly backup to Google Drive</div>
+        <div style={box}>
+          <div style={{ color: backupColor, fontWeight: 600 }}>{backupText}</div>
+          <div style={{ ...small, marginTop: 6 }}>
+            Runs every night around 3 AM into the <b>LP Planner Backups</b> folder in your Google Drive.
+            Keeps the last 7 days plus the 1st of each month for a year.
+          </div>
+          <button className="modal-btn primary" style={{ marginTop: 10 }} disabled={!!busy || !driveOk} onClick={backupNow}>
+            {busy === 'backup' ? 'Backing up…' : 'Back up now'}
+          </button>
+        </div>
+
+        <div style={h}>Import or restore from Google Drive</div>
+        {suggestImport && !result && (
+          <div style={{ ...box, background: 'var(--gold-light)', marginBottom: 10 }}>
+            This app is empty. Import your planner from Google Drive to get started — pick <b>Live app data</b> below.
+          </div>
+        )}
+        <div style={small}>Replaces everything in this app with the file you choose. The file itself is never changed.</div>
+        <button className="modal-btn secondary" style={{ marginTop: 10 }} disabled={!!busy || !driveOk} onClick={findFiles}>
+          {busy === 'list' ? 'Looking…' : files ? 'Refresh list' : 'Find files in Google Drive'}
+        </button>
+
+        {files && files.length === 0 && <div style={{ ...small, marginTop: 10 }}>No planner files found in your Drive.</div>}
+        {files && files.length > 0 && (
+          <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {files.map(f => (
+              <button key={f.id} disabled={!!busy} onClick={() => pick(f)}
+                style={{ textAlign: 'left', padding: '10px 12px', borderRadius: 'var(--radius-sm)', cursor: busy ? 'default' : 'pointer',
+                  border: picked && picked.file.id === f.id ? '1.5px solid var(--accent)' : '1px solid var(--border)',
+                  background: picked && picked.file.id === f.id ? 'var(--accent-light)' : 'var(--paper)', fontFamily: "'DM Sans',sans-serif" }}>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>{fileLabel(f)}</div>
+                <div style={small}>
+                  {busy === 'download:' + f.id ? 'Opening…' : `Saved ${fmtWhen(Date.parse(f.modifiedTime))} · ${Math.max(1, Math.round((+f.size || 0) / 1024))} KB`}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {picked && !result && (
+          <div style={{ ...box, marginTop: 12 }}>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>{fileLabel(picked.file)} contains:</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '2px 16px', fontSize: 13 }}>
+              {picked.summary.rows.map(([k, v]) => (<React.Fragment key={k}><span>{k}</span><span style={{ fontVariantNumeric: 'tabular-nums', textAlign: 'right' }}>{v}</span></React.Fragment>))}
+            </div>
+            {picked.summary.tooBig.length > 0 && (
+              <div style={{ color: 'var(--red)', marginTop: 8 }}>Too large to save (over 1.9 MB): {picked.summary.tooBig.join(', ')}. Remove pasted images from those first.</div>
+            )}
+            {progress ? (
+              <div style={{ marginTop: 10 }}>
+                <div style={{ height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${progress.total ? Math.round(100 * progress.done / progress.total) : 5}%`, background: 'var(--accent)', transition: 'width 0.2s' }} />
+                </div>
+                <div style={{ ...small, marginTop: 4 }}>Uploading {progress.done} of {progress.total}… keep the app open.</div>
+              </div>
+            ) : (
+              <button className="modal-btn primary" style={{ marginTop: 12, background: 'var(--red)' }} disabled={!!busy} onClick={doImport}>
+                Replace my data with this file
+              </button>
+            )}
+          </div>
+        )}
+
+        {result && (
+          <div style={{ ...box, marginTop: 12, background: result.mismatches.length ? '#fdf3dc' : 'var(--accent-light)' }}>
+            {result.mismatches.length === 0
+              ? <><b style={{ color: 'var(--accent)' }}>✓ Import complete and verified.</b> Everything in the app now matches the file ({result.changes} item{result.changes === 1 ? '' : 's'} uploaded).</>
+              : <><b>Imported, but these didn't match the file:</b> {result.mismatches.join(', ')}. Your data is still saved — tell Claude which ones so it can check.</>}
+          </div>
+        )}
+
+        {err && <div style={{ ...box, marginTop: 12, background: 'var(--red-light)', color: 'var(--red)' }}>{err}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // APP ROOT
 // ─────────────────────────────────────────────
 // Synced app data is created with useSynced(key, init) below; each one uploads and syncs itself.
@@ -6881,6 +7158,10 @@ function App() {
   const pullDeltaY = useRef(0);
   const pullActive = useRef(false);
   const savedTimerRef = useRef(null);
+  const [me, setMe] = useState(null);                 // /api/me: backup status, Drive/Calendar permission
+  const [showData, setShowData] = useState(false);    // Data & backups panel
+  const [suggestImport, setSuggestImport] = useState(false);
+  async function refreshMe() { try { setMe(await api('/api/me')); } catch {} }
 
   // Sync engine → UI. The error toast stays until a save actually succeeds.
   useEffect(() => {
@@ -6995,6 +7276,8 @@ function App() {
       setSignInError('');
       setAuthError(false);
       if (r && r.values) ensureGoogleToken().then(() => autoSyncCalendar(r.values.weekData || {}));
+      refreshMe();
+      if (r && r.empty) { setSuggestImport(true); setShowData(true); }   // brand-new account: offer the Drive import
     } catch (e) {
       if (e && e.isAuth) {
         clearSession();
@@ -7186,6 +7469,10 @@ function App() {
           </button>
         </div>
       )}
+      {showData && authUser && (
+        <DataPanel me={me} refreshMe={refreshMe} suggestImport={suggestImport}
+          onClose={() => { setShowData(false); setSuggestImport(false); }} />
+      )}
       {/* ── AUTH LOADING SCREEN — shown while silent session restore is in progress ── */}
       {authLoading && (
         <div style={{
@@ -7251,7 +7538,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.0.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.1.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -7272,6 +7559,9 @@ function App() {
                 {syncing ? '↓ Syncing…' : '↓ Sync Calendar'}
               </button>
               {authUser.picture && <img className="user-avatar" src={authUser.picture} alt={authUser.name} title={authUser.email} />}
+              <button className="auth-btn data-btn" onClick={() => { refreshMe(); setShowData(true); }} title="Backups and import from Google Drive">
+                ☁ Data{me && me.backup && me.backup.status !== 'ok' && me.backup.status !== 'skipped_empty' ? ' ⚠️' : ''}
+              </button>
               <button className="auth-btn danger" onClick={handleSignOut} title="Sign out">Sign out</button>
             </>
           ) : (

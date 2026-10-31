@@ -118,14 +118,16 @@ export async function authenticate(req, env) {
   return { user: { id: row.id, email: row.email, name: row.name, picture: row.picture } };
 }
 
-// Short-lived Google access token for Calendar calls made from the browser.
-export async function googleToken(env, user) {
-  const row = await env.DB.prepare('SELECT * FROM google_tokens WHERE user_id = ?').bind(user.id).first();
+// Google access for a user: a cached access token, or a fresh one from the stored refresh token.
+// Returns { token, expires_at, scope } or { error: 'google_reauth_required' | 'google_unavailable' }.
+export async function getGoogleAccess(env, userId) {
+  const row = await env.DB.prepare('SELECT * FROM google_tokens WHERE user_id = ?').bind(userId).first();
   const now = Date.now();
+  const scope = (row && row.scope) || '';
   if (row && row.access_enc && row.access_expires_at > now + ACCESS_MARGIN_MS) {
-    return json({ access_token: await decryptToken(env, row.access_enc, row.access_iv), expires_at: row.access_expires_at });
+    return { token: await decryptToken(env, row.access_enc, row.access_iv), expires_at: row.access_expires_at, scope };
   }
-  if (!row || !row.refresh_enc) return json({ error: 'google_reauth_required' }, 409);
+  if (!row || !row.refresh_enc) return { error: 'google_reauth_required' };
 
   const refreshToken = await decryptToken(env, row.refresh_enc, row.refresh_iv);
   const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -143,15 +145,28 @@ export async function googleToken(env, user) {
     if (tok.error === 'invalid_grant') {
       // Revoked or expired at Google — forget it so the app asks to reconnect.
       await env.DB.prepare('UPDATE google_tokens SET refresh_enc = NULL, refresh_iv = NULL, access_enc = NULL, access_iv = NULL, updated_at = ? WHERE user_id = ?')
-        .bind(now, user.id).run();
-      return json({ error: 'google_reauth_required' }, 409);
+        .bind(now, userId).run();
+      return { error: 'google_reauth_required' };
     }
     console.warn('Google refresh failed', res.status, tok.error);
-    return json({ error: 'google_unavailable' }, 502);
+    return { error: 'google_unavailable' };
   }
   const expiresAt = now + (Number(tok.expires_in) || 3600) * 1000;
   const acc = await encryptToken(env, tok.access_token);
   await env.DB.prepare('UPDATE google_tokens SET access_enc = ?, access_iv = ?, access_expires_at = ?, updated_at = ? WHERE user_id = ?')
-    .bind(acc.ct, acc.iv, expiresAt, now, user.id).run();
-  return json({ access_token: tok.access_token, expires_at: expiresAt });
+    .bind(acc.ct, acc.iv, expiresAt, now, userId).run();
+  return { token: tok.access_token, expires_at: expiresAt, scope: tok.scope || scope };
+}
+
+export async function googleScope(env, userId) {
+  const row = await env.DB.prepare('SELECT scope, refresh_enc FROM google_tokens WHERE user_id = ?').bind(userId).first();
+  return row && row.refresh_enc ? (row.scope || '') : '';
+}
+
+// Short-lived Google access token for Calendar/Drive calls made from the browser.
+export async function googleToken(env, user) {
+  const g = await getGoogleAccess(env, user.id);
+  if (g.error === 'google_reauth_required') return json({ error: g.error }, 409);
+  if (g.error) return json({ error: g.error }, 502);
+  return json({ access_token: g.token, expires_at: g.expires_at });
 }

@@ -1,8 +1,8 @@
-# LP Planner v4.0.0 (D1 test build) — setup
+# LP Planner v4.1.0 (D1 test build) — setup
 
 This build stores planner data in Cloudflare D1 through a new Worker, `planner-api`, instead of the Google Drive file. It runs only in **Planner_Web_App_TEST**. The live app, `planner-auth`, and your Drive file are not touched.
 
-The test app starts with **empty data**. Importing your Drive data is Phase 4, the next step.
+The test app starts with **empty data**. From v4.1.0, the **☁ Data** panel imports your Drive data and shows the nightly backups.
 
 All commands are PowerShell. Paths used:
 
@@ -11,6 +11,51 @@ All commands are PowerShell. Paths used:
 | Downloads | `C:\Users\slapc\OneDrive\Documents\Downloads` |
 | Local repo | `C:\Users\slapc\OneDrive\Documents\Personal\ProjectsVS\Planner_Tracker_D1` |
 | GitHub repo | https://github.com/zacharypals/Planner_Web_App_TEST |
+
+---
+
+## Updating to v4.1.0 (Drive import + nightly backups)
+
+Already set up with v4.0.0? These are the only steps. Run them in PowerShell.
+
+```powershell
+# 1) Unzip over the repo (this zip does not contain worker\wrangler.toml, so your database ID is safe)
+Expand-Archive -Path "C:\Users\slapc\OneDrive\Documents\Downloads\LP_Planner_v4.1.0_D1_test.zip" -DestinationPath "C:\Users\slapc\OneDrive\Documents\Personal\ProjectsVS\Planner_Tracker_D1" -Force
+
+cd "C:\Users\slapc\OneDrive\Documents\Personal\ProjectsVS\Planner_Tracker_D1\worker"
+
+# 2) Add the nightly schedule to wrangler.toml (ONE TIME ONLY — running it twice adds a duplicate block)
+Add-Content -Path wrangler.toml -Value "`n[triggers]`ncrons = [`"0 10 * * *`"]"
+Get-Content wrangler.toml -Tail 3        # should end with:  crons = ["0 10 * * *"]
+
+# 3) Add the backup-status columns to the database
+npx wrangler d1 migrations apply planner-db --remote
+
+# 4) Deploy the Worker. The output should list:  schedule: 0 10 * * *
+npx wrangler deploy
+
+# 5) Publish the app
+cd ..
+git add -A
+git commit -m "v4.1.0: Drive import/restore + nightly Drive backups (Worker 0.2.0)"
+git push
+```
+
+`0 10 * * *` is 10:00 UTC: 3 AM Pacific in summer, 2 AM in winter.
+
+Then, in the app (refresh until the nav bar shows **v4.1.0**), tap **☁ Data**:
+
+1. **Back up now**: the line above the button should turn green with today's file name, and a folder called **LP Planner Backups** appears in your Google Drive with that file in it.
+2. **Find files in Google Drive** → **Live app data (planner-data.json)**. Check the counts (weeks, tasks, pages, and so on), then tap **Replace my data with this file**. This replaces your test entries with your real data and should finish with "✓ Import complete and verified". The Drive file itself isn't changed.
+3. The next morning, check that **☁ Data** shows a new backup from around 3 AM. That confirms the nightly job runs on its own.
+
+If the panel says Google Drive access isn't granted, tap **Reconnect Google** and approve Drive.
+
+**Cloudflare's own safety net:** D1 keeps 7 days of history automatically on the free plan (Time Travel). Nothing to turn on. To roll the whole database back, for example to 8 AM Pacific on Nov 1:
+```powershell
+npx wrangler d1 time-travel restore planner-db --timestamp="2026-11-01T08:00:00-07:00"
+```
+That rewinds everyone's data, so treat it as a last resort. For one person's data, restoring a Drive backup through **☁ Data** is the normal route.
 
 ---
 
@@ -142,7 +187,7 @@ Later zips are applied the same way:
 Expand-Archive -Path "C:\Users\slapc\OneDrive\Documents\Downloads\<zip name>.zip" -DestinationPath "C:\Users\slapc\OneDrive\Documents\Personal\ProjectsVS\Planner_Tracker_D1" -Force
 ```
 
-From now on, update zips will **not** include `worker/wrangler.toml`, so your database ID is never overwritten. Worker changes are deployed with `npx wrangler deploy` from the `worker` folder. Schema changes come as numbered files in `worker/migrations/` and are applied with `npx wrangler d1 migrations apply planner-db --remote`.
+Update zips do **not** include `worker/wrangler.toml`, so your database ID is never overwritten. Worker changes are deployed with `npx wrangler deploy` from the `worker` folder. Schema changes come as numbered files in `worker/migrations/` and are applied with `npx wrangler d1 migrations apply planner-db --remote`.
 
 ## Things worth trying
 

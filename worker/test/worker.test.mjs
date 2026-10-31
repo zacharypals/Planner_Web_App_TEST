@@ -216,3 +216,150 @@ test('changes paging and cheap polling', async () => {
   const plan = env.DB.raw.prepare("EXPLAIN QUERY PLAN SELECT collection FROM docs WHERE user_id = 'x' AND seq > 5 ORDER BY seq").all();
   assert.ok(plan.some((p) => /idx_docs_user_seq/.test(p.detail)), JSON.stringify(plan));
 });
+
+// ── Backups ───────────────────────────────────────────────
+import { backupUser, runNightlyBackups, ptDate, assembleBackup } from '../src/backup.js';
+
+function userRow(env, email) { return env.DB.raw.prepare('SELECT id, email, backup_folder_id FROM users WHERE email = ?').get(email); }
+function driveOf(email) { return google.drives.get(email) || new Map(); }
+const backups = (email) => [...driveOf(email).values()].filter((f) => /^lp-planner-backup-/.test(f.name));
+
+test('backup: skipped when empty, written when there is data, same-day reruns update in place', async () => {
+  google.drives.clear();
+  const env = makeEnv();
+  const a = (await signIn(env, 'zach@example.com')).session_token;
+  let r = await call(env, 'POST', '/api/backup', { token: a });
+  assert.equal(r.data.status, 'skipped_empty');
+  assert.equal(backups('zach@example.com').length, 0);
+
+  await call(env, 'PUT', '/api/docs', { token: a, body: { docs: [
+    { c: 'navColor', i: '_', b: 0, j: '"#5c2d52"' },
+    { c: 'weekData', i: '2026-10-25', b: 0, j: '{"proverb":"p","tasks":{}}' },
+  ] } });
+  env.DB.raw.prepare('UPDATE users SET last_backup_at = 0').run();
+  r = await call(env, 'POST', '/api/backup', { token: a });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.status, 'ok');
+  const files = backups('zach@example.com');
+  assert.equal(files.length, 1);
+  assert.equal(files[0].name, `lp-planner-backup-${ptDate()}.json`);
+  const folder = [...driveOf('zach@example.com').values()].find((f) => f.folder);
+  assert.equal(folder.name, 'LP Planner Backups');
+  assert.deepEqual(files[0].parents, [folder.id]);
+  const body = JSON.parse(files[0].content);
+  assert.equal(body.navColor, '#5c2d52');
+  assert.deepEqual(body.weekData, { '2026-10-25': { proverb: 'p', tasks: {} } });
+
+  // Too soon → 429; later same day → updates the same file
+  assert.equal((await call(env, 'POST', '/api/backup', { token: a })).status, 429);
+  await call(env, 'PUT', '/api/docs', { token: a, body: { docs: [{ c: 'navColor', i: '_', b: 1, j: '"#000000"' }] } });
+  env.DB.raw.prepare('UPDATE users SET last_backup_at = 0').run();
+  await call(env, 'POST', '/api/backup', { token: a });
+  assert.equal(backups('zach@example.com').length, 1);
+  assert.equal(JSON.parse(backups('zach@example.com')[0].content).navColor, '#000000');
+
+  // Status shows on /api/me
+  const me = await call(env, 'GET', '/api/me', { token: a });
+  assert.equal(me.data.backup.status, 'ok');
+  assert.equal(me.data.drive_ok, true);
+});
+
+test('backup: retention keeps 7 days + the 1st of each month for a year; other files untouched', async () => {
+  const env = makeEnv();
+  const a = (await signIn(env, 'zach@example.com')).session_token;
+  await call(env, 'PUT', '/api/docs', { token: a, body: { docs: [{ c: 'navColor', i: '_', b: 0, j: '"#1"' }] } });
+  await backupUser(env, userRow(env, 'zach@example.com'));
+  const drive = driveOf('zach@example.com');
+  const folder = [...drive.values()].find((f) => f.folder);
+  const day = 86400000, now = Date.now();
+  const add = (name) => drive.set('x' + name, { id: 'x' + name, name, parents: [folder.id], content: '{}', modified: now });
+  const names = [];
+  for (let k = 1; k <= 40; k++) names.push(`lp-planner-backup-${ptDate(new Date(now - k * day))}.json`);
+  names.push('lp-planner-backup-2020-01-01.json', 'lp-planner-backup-2020-06-15.json', 'my notes.json');
+  names.forEach(add);
+  await backupUser(env, userRow(env, 'zach@example.com'));
+  const left = [...drive.values()].map((f) => f.name);
+  const today = ptDate(new Date(now));
+  for (const n of names) {
+    const d = (n.match(/(\d{4}-\d{2}-\d{2})/) || [])[1];
+    if (!d) { assert.ok(left.includes(n), 'non-backup file kept'); continue; }
+    const recent = d >= ptDate(new Date(now - 6 * day));
+    const monthly = d.endsWith('-01') && d >= ptDate(new Date(now - 12 * 31 * day));
+    assert.equal(left.includes(n), recent || monthly, `${n} kept=${left.includes(n)}`);
+  }
+  assert.ok(left.includes(`lp-planner-backup-${today}.json`));
+});
+
+test('backup: no Drive permission, revoked Google, Drive outage, deleted folder', async (t) => {
+  t.after(() => { google.driveFail = null; google.refreshOk = true; });
+  google.drives.clear();
+  const env = makeEnv();
+  const s = await call(env, 'POST', '/auth/exchange', { body: { code: 'code:zach@example.com:nodrive', redirect_uri: REDIRECT } });
+  const a = s.data.session_token;
+  await call(env, 'PUT', '/api/docs', { token: a, body: { docs: [{ c: 'navColor', i: '_', b: 0, j: '"#1"' }] } });
+  let r = await backupUser(env, userRow(env, 'zach@example.com'));
+  assert.equal(r.status, 'needs_drive');
+  assert.equal((await call(env, 'GET', '/api/me', { token: a })).data.drive_ok, false);
+
+  await signIn(env, 'zach@example.com');               // grants Drive
+  google.driveFail = (method) => method !== 'GET';
+  r = await backupUser(env, userRow(env, 'zach@example.com'));
+  assert.equal(r.status, 'error');
+  assert.match(r.error, /Drive 500/);
+  google.driveFail = null;
+
+  r = await backupUser(env, userRow(env, 'zach@example.com'));
+  assert.equal(r.status, 'ok');
+  // Folder deleted by the user → recreated
+  const drive = driveOf('zach@example.com');
+  for (const f of [...drive.values()]) drive.delete(f.id);
+  r = await backupUser(env, userRow(env, 'zach@example.com'));
+  assert.equal(r.status, 'ok');
+  assert.equal(backups('zach@example.com').length, 1);
+
+  env.DB.raw.prepare('UPDATE google_tokens SET access_expires_at = 0').run();
+  google.refreshOk = false;
+  r = await backupUser(env, userRow(env, 'zach@example.com'));
+  assert.equal(r.status, 'error');
+  assert.match(r.error, /sign in again/);
+  google.refreshOk = true;
+});
+
+test('nightly cron backs up each allowed person into their own Drive', async () => {
+  const env = makeEnv();
+  google.drives.clear();
+  const a = (await signIn(env, 'zach@example.com')).session_token;
+  const b = (await signIn(env, 'fam@example.com')).session_token;
+  await call(env, 'PUT', '/api/docs', { token: a, body: { docs: [{ c: 'navColor', i: '_', b: 0, j: '"#zach"' }] } });
+  await call(env, 'PUT', '/api/docs', { token: b, body: { docs: [{ c: 'navColor', i: '_', b: 0, j: '"#fam"' }] } });
+  const waits = [];
+  await worker.scheduled({}, env, { waitUntil: (p) => waits.push(p) });
+  await Promise.all(waits);
+  assert.equal(JSON.parse(backups('zach@example.com')[0].content).navColor, '#zach');
+  assert.equal(JSON.parse(backups('fam@example.com')[0].content).navColor, '#fam');
+  env.ALLOWED_EMAILS = 'zach@example.com';
+  google.drives.clear();
+  const w2 = [];
+  await worker.scheduled({}, env, { waitUntil: (p) => w2.push(p) });
+  await Promise.all(w2);
+  assert.equal(backups('fam@example.com').length, 0, 'removed person is skipped');
+});
+
+test('assembleBackup handles every collection shape', () => {
+  const rows = [
+    { collection: 'pagesData', doc_id: 'p:b', data: '{"id":"b"}' },
+    { collection: 'pagesData', doc_id: '__order', data: '["p:b","p:a"]' },
+    { collection: 'pagesData', doc_id: 'p:a', data: '{"id":"a"}' },
+    { collection: 'habitQty', doc_id: '2026-09', data: '{"2026-09-30":{"g":1}}' },
+    { collection: 'habitQty', doc_id: '2026-10', data: '{}' },
+    { collection: 'habitQty', doc_id: '2026-11', data: '{"2026-11-01":{"g":2}}' },
+    { collection: 'weightTarget', doc_id: '_', data: '""' },
+    { collection: 'fitnessLog', doc_id: '2026-10-27', data: '[{"id":"x"}]' },
+  ];
+  const out = JSON.parse(assembleBackup(rows, new Date(0)));
+  assert.deepEqual(out.pagesData, [{ id: 'b' }, { id: 'a' }]);
+  assert.deepEqual(out.habitQty, { '2026-09-30': { g: 1 }, '2026-11-01': { g: 2 } });
+  assert.equal(out.weightTarget, '');
+  assert.deepEqual(out.fitnessLog, { '2026-10-27': [{ id: 'x' }] });
+  assert.equal(out._backupAt, '1970-01-01T00:00:00.000Z');
+});

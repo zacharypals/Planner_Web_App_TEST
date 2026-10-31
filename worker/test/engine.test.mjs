@@ -12,7 +12,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const html = readFileSync(join(here, '..', '..', 'index.html'), 'utf8');
 const src = html.slice(html.indexOf('// ═══ SYNC ENGINE START'), html.indexOf('// ═══ SYNC ENGINE END'));
 assert.ok(src.length > 1000, 'engine block found in index.html');
-installFakeGoogle();
+globalThis.__fakeGoogle = installFakeGoogle();
 
 // Build one "device": its own localStorage, Sync instance and React-like state.
 function device(env, name) {
@@ -51,7 +51,8 @@ function device(env, name) {
   const factory = new Function('localStorage', 'fetch', 'navigator', 'setTimeout', 'clearTimeout',
     `${prelude}\n${src}\nreturn { Sync, syncSplit, syncJoin, syncMerge3, SYNC_NO_BASE, SYNC_DELETED };`);
   const timers = [];
-  const fakeSetTimeout = (fn) => { timers.push(fn); return timers.length; };
+  // Short waits run for real (the import polls for an in-progress save); sync debounces/retries never fire on their own.
+  const fakeSetTimeout = (fn, ms) => (ms <= 100 ? setTimeout(fn, 1) : (timers.push(fn), timers.length));
   const lib = factory(localStorage, fetchShim, { get onLine() { return net.online; } }, fakeSetTimeout, () => {});
   const state = {};
   const statuses = [];
@@ -308,4 +309,96 @@ test('expired session reports auth loss instead of retrying', async () => {
   await a.Sync.flush();
   assert.equal(lost, 1);
   assert.equal(a.Sync.pendingCount(), 1, 'edit kept for after sign-in');
+});
+
+// ── Import / restore and backup round trip ─────────────────────────
+import { backupUser } from '../src/backup.js';
+
+const BIG = () => ({
+  weekData: {
+    '2026-10-18': { proverb: 'Be still', goals: [{ id: 'g1', name: 'Run', done: true }], people: [], tasks: { '2026-10-19': [{ id: 't1', title: 'A', done: false, colorIndex: 2 }] }, dayNotes: { '2026-10-20': 'note' } },
+    '2026-10-25': { proverb: '', tasks: { '2026-10-27': [{ id: 't2', title: 'Dentist', isEvent: true, eventTime: '10:30', gcalId: 'abc' }] } },
+  },
+  pagesData: [{ id: 'doc_2', title: 'Two', body: '<p>b</p>', tasks: [] }, { id: 'doc_1', title: 'One', body: '<h1>x</h1>', tasks: [{ id: 'pt1', title: 'Quote', scheduledDate: '' }] }],
+  habitGoals: [{ id: 'g1', name: 'Daily Pages' }, { id: 'h2', name: 'Run', linkedExerciseIds: ['e1'] }],
+  habitCompletions: { '2026-09-30': ['g1'], '2026-10-01': ['g1', 'h2'], '2026-10-27': [] },
+  fitnessLog: { '2026-10-27': [{ id: 'x1', exerciseId: 'e1', collapsed: true, sets: [{ id: 's1', reps: 8, weight: 135, done: true }] }] },
+  navColor: '#5c2d52',
+  _savedAt: '2026-10-28T00:00:00.000Z',
+});
+
+test('import replaces everything, removes leftovers, and verifies', async () => {
+  const env = makeEnv();
+  const a = await bootDevice(env, 'laptop');
+  a.edit('weekData', () => ({ 'TEST-only': { proverb: 'scratch' } }));
+  a.edit('pagesData', () => [{ id: 'junk', title: 'junk' }]);
+  a.edit('navColor', () => '#ff0000');
+  await a.Sync.flush();
+  const b = await bootDevice(env, 'phone');
+  assert.ok(b.state.weekData['TEST-only']);
+
+  const progress = [];
+  const r = await a.Sync.importAll(BIG(), (d, t) => progress.push([d, t]));
+  assert.deepEqual(r.mismatches, []);
+  assert.ok(r.changes > 5);
+  assert.deepEqual(progress.at(-1), [r.changes, r.changes]);
+  const want = BIG();
+  assert.deepEqual(a.state.weekData, want.weekData);
+  assert.deepEqual(a.state.pagesData, want.pagesData);
+  assert.deepEqual(a.state.habitGoals, want.habitGoals);
+  assert.equal(a.state.navColor, '#5c2d52');
+  assert.deepEqual(a.state.fitnessLog, want.fitnessLog);
+  assert.equal(a.Sync.pendingCount(), 0);
+  assert.equal(a.store.get('lpt_sync_outbox'), '{}', 'outbox not bloated');
+
+  await b.Sync.pull();
+  assert.deepEqual(b.state.weekData, want.weekData, 'other device drops the test-only week');
+  assert.deepEqual(b.state.pagesData, want.pagesData);
+  assert.equal(b.state.navColor, '#5c2d52');
+
+  // Re-running the same import is a no-op
+  const again = await a.Sync.importAll(BIG());
+  assert.equal(again.changes, 0);
+  assert.deepEqual(again.mismatches, []);
+});
+
+test('import wins over a conflicting edit from another device', async () => {
+  const env = makeEnv();
+  const a = await bootDevice(env, 'laptop');
+  const b = await bootDevice(env, 'phone');
+  a.edit('navColor', () => '#111111');
+  await a.Sync.flush();
+  b.edit('habitGoals', () => [{ id: 'zz', name: 'phone-only' }]);
+  await b.Sync.flush();
+  const r = await a.Sync.importAll(BIG());   // a hasn't pulled b's change; importAll pulls first anyway
+  assert.deepEqual(r.mismatches, []);
+  assert.deepEqual(a.state.habitGoals, BIG().habitGoals);
+});
+
+test('import fails cleanly offline, and can be re-run', async () => {
+  const env = makeEnv();
+  const a = await bootDevice(env, 'laptop');
+  a.net.online = false;
+  await assert.rejects(a.Sync.importAll(BIG()), /Upload failed|Network/);
+  a.net.online = true;
+  const r = await a.Sync.importAll(BIG());
+  assert.deepEqual(r.mismatches, []);
+  assert.deepEqual(a.state.pagesData, BIG().pagesData);
+});
+
+test('round trip: app data → D1 → nightly backup file → import on a fresh account is identical', async () => {
+  const env = makeEnv();
+  const google = globalThis.__fakeGoogle;
+  const a = await bootDevice(env, 'laptop');
+  await a.Sync.importAll(BIG());
+  const user = env.DB.raw.prepare("SELECT id, email, backup_folder_id FROM users WHERE email = 'zach@example.com'").get();
+  const r = await backupUser(env, user);
+  assert.equal(r.status, 'ok', JSON.stringify(r));
+  const file = [...google.drives.get('zach@example.com').values()].find((f) => f.name.startsWith('lp-planner-backup-'));
+  const restored = JSON.parse(file.content);
+  const f = await bootDevice(env, 'family', 'fam@example.com');
+  const r2 = await f.Sync.importAll(restored);
+  assert.deepEqual(r2.mismatches, []);
+  const want = BIG(); delete want._savedAt;
+  for (const k of Object.keys(want)) assert.deepEqual(f.state[k], want[k], k);
 });

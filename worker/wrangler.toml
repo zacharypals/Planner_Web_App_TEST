@@ -21,3 +21,6 @@ binding = "DB"
 database_name = "planner-db"
 database_id = "40279ea1-b79c-4950-a671-857fefbebf36"
 migrations_dir = "migrations"
+
+[triggers]
+crons = ["0 10 * * *"]
