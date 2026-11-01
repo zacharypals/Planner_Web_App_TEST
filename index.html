@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.5.4 -->
+<!-- LP Planner v4.5.5 -->
+<!-- v4.5.5 — Fitness "+ Exercise" picker lists exercises A→Z within each group (display only; library order unchanged). -->
 <!-- v4.5.4 — Fitness cardio rows: Sec, min/mi and Done headers line up over their columns (Done centered over the check, same as strength rows). -->
 <!-- v4.5.3 — Fitness set rows: column headers (Weight, Done) now line up exactly over their inputs and the check circle. -->
 <!-- v4.5.2 — Fitness set rows: the complete-set check now sits right after the inputs and the delete ✕ alone at the far right, so they're no longer side by side. -->
@@ -8578,7 +8579,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.5.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.5.5</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -9920,7 +9921,8 @@ function ExercisePicker({ exercises, onAdd, onAddNew, onClose }) {
   );
 
   const grouped = FITNESS_CATEGORIES.reduce((acc, cat) => {
-    const items = filtered.filter(e => (e.category || 'Other') === cat);
+    const items = filtered.filter(e => (e.category || 'Other') === cat)
+      .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true }));   // v4.5.5: A→Z within each group
     if (items.length) acc[cat] = items;
     return acc;
   }, {});
