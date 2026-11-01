@@ -19,7 +19,9 @@ const ACCESS_MARGIN_MS = 5 * 60 * 1000;
 export async function authExchange(req, env) {
   const body = await req.json().catch(() => ({}));
   const { code, redirect_uri } = body;
-  if (!code || redirect_uri !== env.REDIRECT_URI) return json({ error: 'bad_request' }, 400);
+  // REDIRECT_URI may list several comma-separated URIs (live + test apps share this Worker, 0.2.2).
+  const allowedRedirects = String(env.REDIRECT_URI || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!code || !allowedRedirects.includes(redirect_uri)) return json({ error: 'bad_request' }, 400);
   if (!env.GOOGLE_CLIENT_SECRET) return json({ error: 'worker_missing_google_secret' }, 500);
 
   const tokenRes = await fetch('https://oauth2.googleapis.com/token', {

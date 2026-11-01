@@ -363,3 +363,15 @@ test('assembleBackup handles every collection shape', () => {
   assert.deepEqual(out.fitnessLog, { '2026-10-27': [{ id: 'x' }] });
   assert.equal(out._backupAt, '1970-01-01T00:00:00.000Z');
 });
+
+test('exchange accepts any listed redirect URI and rejects others (0.2.2)', async () => {
+  const env = makeEnv();
+  const LIVE = 'https://zacharypals.github.io/Planner_Web_App/oauth.html';
+  env.REDIRECT_URI = `${LIVE}, ${REDIRECT}`;
+  for (const uri of [LIVE, REDIRECT]) {
+    const r = await call(env, 'POST', '/auth/exchange', { body: { code: 'code:zach@example.com', redirect_uri: uri } });
+    assert.equal(r.status, 200, uri + ' ' + JSON.stringify(r.data));
+  }
+  const bad = await call(env, 'POST', '/auth/exchange', { body: { code: 'code:zach@example.com', redirect_uri: 'https://evil.example/oauth.html' } });
+  assert.equal(bad.status, 400);
+});

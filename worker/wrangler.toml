@@ -9,8 +9,9 @@ compatibility_date = "2025-09-01"
 
 [vars]
 ALLOWED_ORIGIN = "https://zacharypals.github.io"
-# Must exactly match an "Authorized redirect URI" on the Google OAuth client.
-REDIRECT_URI = "https://zacharypals.github.io/Planner_Web_App_TEST/oauth.html"
+# Comma-separated; each must exactly match an "Authorized redirect URI" on the Google OAuth client.
+# Live app first, test app second (Worker 0.2.2+ accepts any listed URI).
+REDIRECT_URI = "https://zacharypals.github.io/Planner_Web_App/oauth.html,https://zacharypals.github.io/Planner_Web_App_TEST/oauth.html"
 # Same OAuth client LP Planner already uses (keeps access to the Drive file for the later import).
 GOOGLE_CLIENT_ID = "1050376914317-d9al0irmqsmhkq334rffqg30mbtlguuf.apps.googleusercontent.com"
 # Comma-separated. Each person gets their own private data. Removing an email locks it out on the next request.
