@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.5.0 -->
+<!-- LP Planner v4.5.1 -->
+<!-- v4.5.1 — Light mode task/event colors: "Calm tonal, defined" palette (soft violets and blues with a few warm accents, matched to the Dusk Violet theme). Same 18 task / 16 event slots, so existing tasks keep their slot. Dark palettes unchanged. -->
 <!-- v4.5.0 — Weekly view: goal tasks now sit in a collapsible "Goals" section under Habits (collapsed by default, with a done count). Dark mode: dedicated deep task/event palettes (same color families, ~7:1 text contrast) replace the dimmed pastels. -->
 <!-- v4.4.1 — Mobile bottom nav order: Fitness · Goals · Habits · Week · More (Week and Goals swapped). -->
 <!-- v4.4.0 — Dark mode: Auto (follows device) / Light / Dark, saved per device (lp_theme). Toggle in the top bar on desktop and in the More sheet on mobile. Hard-coded light surfaces moved to theme variables (--surface, --tint, --neutral-bg, --neutral-line, --grid-line, --tile-*); light mode looks the same. -->
@@ -4531,43 +4532,43 @@ function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitComp
   );
 }
 
-const TASK_COLORS = [
-  '#d4edda', // sage green
-  '#f8d7da', // blush pink
-  '#fff3cd', // warm yellow
-  '#cce5ff', // sky blue
-  '#e2d9f3', // soft lavender
-  '#ffdab3', // apricot orange
-  '#b2f2e5', // seafoam teal
-  '#f3d9fa', // orchid lilac
-  '#c8e6c9', // leaf green
-  '#ffccbc', // coral
-  '#b3e5fc', // cyan sky
-  '#f0e68c', // pastel olive
-  '#e1bee7', // soft plum
-  '#ffe0b2', // marigold
-  '#b2dfdb', // teal mist
-  '#d7ccc8', // warm taupe
-  '#c5cae9', // periwinkle indigo
-  '#ffcdd2', // watermelon
+const TASK_COLORS = [ // v4.5.1 "Calm tonal, defined" (light); dark mode uses --tc-N
+  '#dad6fa', // lavender
+  '#b5d4fc', // periwinkle blue
+  '#f8d4a4', // apricot sand
+  '#d3c1eb', // violet
+  '#bde1f3', // mist blue
+  '#f9c1bf', // rose
+  '#bcc5ec', // iris
+  '#e7cdec', // orchid
+  '#a6ded2', // sea glass
+  '#bccef3', // cornflower
+  '#dfd5f5', // lilac
+  '#b1d6f6', // sky
+  '#aedfe1', // blue teal
+  '#efc2da', // dusty mauve
+  '#fdccac', // peach
+  '#cacaee', // heather
+  '#bcdfc2', // sage
+  '#b2d7ee', // slate blue
 ];
-const EVENT_COLORS = [
-  '#fce7f3', // soft pink
-  '#ede9fe', // lilac
-  '#dbeafe', // cornflower
-  '#d1fae5', // seafoam
-  '#fef3c7', // champagne
-  '#ffedd5', // cantaloupe
-  '#e0f7fa', // ice cyan
-  '#f3e5f5', // orchid mist
-  '#dcedc8', // spring green
-  '#ffe0e0', // watermelon pink
-  '#e8eaf6', // periwinkle indigo
-  '#fff9c4', // butter yellow
-  '#d7ccc8', // warm taupe
-  '#b2ebf2', // aqua
-  '#f8bbd0', // rose
-  '#c8e6c9', // mint leaf
+const EVENT_COLORS = [ // v4.5.1 calm tonal, lighter than tasks (light); dark mode uses --ec-N
+  '#f5dcf2', // soft orchid
+  '#cbe4ff', // pale periwinkle
+  '#f7e6c3', // champagne
+  '#dfd9f6', // pale violet
+  '#c7eeea', // pale sea glass
+  '#ffdad3', // blush
+  '#d3ddf9', // pale iris
+  '#daefd6', // pale sage
+  '#c5e8f4', // ice blue
+  '#fed9e6', // pale rose
+  '#d9dcf6', // pale heather
+  '#ffe2c6', // pale peach
+  '#cae6fa', // pale sky
+  '#ecdff7', // pale lilac
+  '#c8eadd', // pale mint
+  '#cfdff9', // pale cornflower
 ];
 // v4.5.0: palette color for a slot — light mode uses the hex above; dark mode overrides via --tc-N / --ec-N.
 function taskBg(i) { const n = ((i ?? 0) % TASK_COLORS.length + TASK_COLORS.length) % TASK_COLORS.length; return `var(--tc-${n}, ${TASK_COLORS[n]})`; }
@@ -8571,7 +8572,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.5.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.5.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
