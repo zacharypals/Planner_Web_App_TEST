@@ -38,3 +38,11 @@ Original pastels (sage green, blush pink, warm yellow, sky blue, soft lavender, 
 - Palettes live in `TASK_COLORS` / `EVENT_COLORS` (light) and `--tc-N` / `--ec-N` (dark). Tasks store only `colorIndex`, so swapping a palette recolors existing tasks without touching data.
 - If light and dark should share color families per slot, regenerate the dark vars from the light hues (same hue, L≈0.40, C≈0.085).
 - Auto-color picks the first unused slot each day (`pickTaskColorIndex`), so slots 0–5 are the ones seen most.
+
+## Dark options matched to "Calm tonal, defined" (shown 2026-11-01, not adopted — dark kept as is)
+Same hue per slot as the light palette, so a task keeps its color family in both modes.
+- Dark matched (tasks): `#4c476c` `#274973` `#734c02` `#4e3965` `#295265` `#6d3435` `#383f67` `#5a4060` `#005549` `#34456b` `#514567` `#204b6d` `#125357` `#643651` `#77441e` `#434166` `#2c5435` `#214d65`
+- Dark matched (events): `#4d324b` `#263f59` `#534320` `#3f3757` `#104643` `#56322c` `#323c5a` `#2d4428` `#144451` `#54313f` `#373a5a` `#593f24` `#204157` `#463553` `#1a4639` `#2c3d5a`
+- Dark matched, softer (tasks): `#47435d` `#2e445f` `#644a24` `#453855` `#314b58` `#5c3636` `#363c56` `#503e54` `#1f4b43` `#35405a` `#4a4359` `#2a455c` `#264b4d` `#563749` `#67452d` `#3e3e57` `#324b37` `#2b4656`
+- Dark matched, softer (events): `#443042` `#283a4c` `#493e27` `#39344b` `#1d3f3c` `#4b302c` `#30374d` `#2d3d29` `#1e3d46` `#492f39` `#34364d` `#4f3b29` `#243b4b` `#3e3248` `#213f35` `#2c384d`
+Mockup: `dark-matched-palette.png`.
