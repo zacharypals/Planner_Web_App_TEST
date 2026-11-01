@@ -4,8 +4,8 @@
   "description": "Weekly planner, habit tracker, and monthly calendar \u2014 D1 test build",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#3b1f5e",
-  "theme_color": "#3b1f5e",
+  "background_color": "#3a2960",
+  "theme_color": "#3a2960",
   "orientation": "portrait-primary",
   "icons": [
     {

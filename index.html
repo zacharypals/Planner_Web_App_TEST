@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.2.4 -->
+<!-- LP Planner v4.3.0 -->
+<!-- v4.3.0 — "Dusk Violet" color theme (colors only): cool violet-tinted neutrals replace the warm brown/pink mix; violet accent replaces forest green; deep violet nav/headers; softer amber gold; shadows tinted to match. Saved nav/header colors that equal the old defaults display as the new theme defaults. -->
 <!-- v4.2.4 — Goals timeline: grid lines medium gray (#888078), between v4.2.2 and v4.2.3. -->
 <!-- v4.2.2 — Goals timeline: darker, more distinct grid lines (month columns, row dividers, header and label column borders). -->
 <!-- v4.2.1 — Goals tab: left goals list collapses to a slim strip (‹ / ›), remembered per device; strip shows active goals as clickable color dots. Desktop only. -->
@@ -11,7 +12,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon-512.png">
-<meta name="theme-color" content="#7c3f6e">
+<meta name="theme-color" content="#3a2960">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="LP Planner">
@@ -26,19 +27,19 @@
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
-    --cream: #f5edf3;
-    --paper: #fdf9fc;
-    --ink: #2c2418;
-    --ink-light: #78716a;
-    --ink-faint: #bfb8ad;
-    --accent: #2d6b4a;
-    --accent-light: #f5edf3;
-    --gold: #c4960e;
-    --gold-light: #fdf8ec;
-    --border: #e8e4dd;
-    --shadow: rgba(26,21,16,0.05);
-    --shadow-md: rgba(26,21,16,0.10);
-    --shadow-lg: rgba(26,21,16,0.15);
+    --cream: #f6f5fb;
+    --paper: #fdfdff;
+    --ink: #2a2538;
+    --ink-light: #6a6678;
+    --ink-faint: #b2afbd;
+    --accent: #6a50a7;
+    --accent-light: #f1edff;
+    --gold: #cb9238;
+    --gold-light: #fff6e4;
+    --border: #e2e0ea;
+    --shadow: rgba(35,30,51,0.05);
+    --shadow-md: rgba(35,30,51,0.10);
+    --shadow-lg: rgba(35,30,51,0.15);
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
@@ -64,12 +65,12 @@
   /* LAYOUT */
   .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
   .nav-bar {
-    background: linear-gradient(135deg, #5c2d52 0%, #7c3f6e 100%);
+    background: linear-gradient(135deg, #322353 0%, #473473 100%);
     color: var(--paper);
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 24px; height: 48px; flex-shrink: 0;
     border-bottom: none;
-    box-shadow: 0 2px 12px rgba(26,21,16,0.2);
+    box-shadow: 0 2px 12px rgba(35,30,51,0.2);
   }
   .nav-brand { font-family: 'Playfair Display', serif; font-size: 18px; letter-spacing: 0.03em; color: var(--cream); }
   /* AUTH BAR */
@@ -241,7 +242,7 @@
   }
   .sidebar-link.planner { background: var(--accent-light); color: var(--accent); }
   .sidebar-link.planner:hover { background: var(--accent); color: white; }
-  .sidebar-link.daily { background: rgba(196,150,14,0.15); color: var(--gold); display: block; margin: 8px 12px 16px; text-decoration: none; }
+  .sidebar-link.daily { background: rgba(203,146,56,0.15); color: var(--gold); display: block; margin: 8px 12px 16px; text-decoration: none; }
   .sidebar-link.daily:hover { background: var(--gold); color: white; }
 
   /* MAIN PANEL */
@@ -267,7 +268,7 @@
     padding: 10px 8px; text-align: center;
     font-size: 11px; font-weight: 500; letter-spacing: 0.08em;
     text-transform: uppercase;
-    background: linear-gradient(180deg, #2d6b4a 0%, #256042 100%);
+    background: linear-gradient(180deg, #523e82 0%, #44326e 100%);
     position: sticky; top: 0; z-index: 10;
     border-radius: var(--radius-md) var(--radius-md) 0 0;
   }
@@ -280,7 +281,7 @@
     padding: 10px; position: relative; background: var(--paper);
     transition: background 0.15s, box-shadow 0.15s; min-height: 200px;
   }
-  .cal-day:hover { background: #f5edf3; box-shadow: inset 0 0 0 1px var(--border); }
+  .cal-day:hover { background: var(--accent-light); box-shadow: inset 0 0 0 1px var(--border); }
   .cal-day.today { background: var(--gold-light); }
   .add-task-btn {
     width: 100%; border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
@@ -320,7 +321,7 @@
     background: var(--accent-light); border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     font-weight: 600; transition: background 0.1s;
   }
-  .habit-task-label:hover { background: #edd9e8; }
+  .habit-task-label:hover { background: #e9e4fe; }
   .habit-task-row {
     background: white;
     border-bottom: 1px solid rgba(0,0,0,0.04);
@@ -395,8 +396,8 @@
   }
   .workout-card-header {
     display: flex; align-items: center; gap: 8px;
-    padding: 10px 14px; background: #e8d9e4;
-    border-bottom: 1px solid rgba(92,45,82,0.15);
+    padding: 10px 14px; background: #e9e4fe;
+    border-bottom: 1px solid rgba(106,80,167,0.15);
   }
   .workout-name-input {
     flex: 1; background: transparent; border: none; outline: none;
@@ -435,7 +436,7 @@
     outline: none; margin-top: 0;
   }
   .set-note-input::placeholder { color: var(--ink-faint); font-style: italic; }
-  .set-note-input:focus { background: rgba(45,107,74,0.04); }
+  .set-note-input:focus { background: rgba(106,80,167,0.04); }
   .set-num {
     font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-faint);
     width: 18px; flex-shrink: 0; text-align: right;
@@ -531,10 +532,10 @@
   .fitness-week-col.today { border-color: var(--accent); }
   .fitness-week-col-hdr {
     padding: 6px 8px; text-align: center;
-    background: linear-gradient(180deg, #7c3f6e 0%, #5c2d52 100%);
+    background: linear-gradient(180deg, #523e82 0%, #44326e 100%);
     border-radius: var(--radius-md) var(--radius-md) 0 0;
   }
-  .fitness-week-col.today .fitness-week-col-hdr { background: linear-gradient(180deg, #9a4f87 0%, #7c3f6e 100%); }
+  .fitness-week-col.today .fitness-week-col-hdr { background: linear-gradient(180deg, #6953a0 0%, #523e82 100%); }
   .fitness-week-col-day { font-size: 9px; color: rgba(255,255,255,0.65); font-family: 'DM Mono',monospace; text-transform: uppercase; letter-spacing: 0.06em; }
   .fitness-week-col-date { font-size: 16px; color: white; font-family: 'Playfair Display',serif; font-weight: 600; }
   .fitness-week-col.today .fitness-week-col-date { color: var(--gold); }
@@ -549,7 +550,7 @@
     padding: 3px 6px; font-size: 10px; font-family: 'DM Sans',sans-serif; font-weight: 600;
     margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .fitness-week-workout-pill.cardio { background: var(--gold-light); color: var(--gold); border: 1px solid rgba(196,150,14,0.25); }
+  .fitness-week-workout-pill.cardio { background: var(--gold-light); color: var(--gold); border: 1px solid rgba(203,146,56,0.25); }
   .fitness-week-add {
     background: none; border: 1px dashed var(--border); border-radius: 4px;
     color: var(--ink-faint); font-size: 10px; cursor: pointer; width: 100%;
@@ -1002,7 +1003,7 @@
   .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
   .btn { padding: 8px 18px; border-radius: var(--radius-sm); border: none; cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: all 0.15s; }
   .btn-primary { background: var(--accent); color: white; }
-  .btn-primary:hover { background: #1a4030; }
+  .btn-primary:hover { background: #533c87; }
   .btn-secondary { background: var(--cream); color: var(--ink-light); border: 1px solid var(--border); }
   .btn-secondary:hover { background: var(--border); }
 
@@ -1052,7 +1053,7 @@
     background: var(--paper);
     box-shadow: 0 0 0 1px rgba(0,0,0,0.06);
   }
-  .monthly-cell:hover { background: #f5edf3; box-shadow: 0 0 0 1px var(--border), 0 2px 8px var(--shadow); }
+  .monthly-cell:hover { background: var(--accent-light); box-shadow: 0 0 0 1px var(--border), 0 2px 8px var(--shadow); }
   .monthly-cell.empty { background: var(--cream); cursor: default; min-height: 110px; box-shadow: none; }
   .monthly-cell.today { background: var(--gold-light); }
   .monthly-cell.today .monthly-cell-date { color: var(--gold); font-weight: 700; }
@@ -1107,7 +1108,7 @@
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
   .modal-btn { padding: 7px 16px; border-radius: var(--radius-sm); border: none; cursor: pointer; font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; transition: all 0.15s; }
   .modal-btn.primary { background: var(--accent); color: white; }
-  .modal-btn.primary:hover { background: #1a4030; }
+  .modal-btn.primary:hover { background: #533c87; }
   .modal-btn.secondary { background: var(--cream); color: var(--ink); border: 1px solid var(--border); }
   .modal-btn.secondary:hover { background: var(--border); }
   .modal-btn.danger { background: #fee2e2; color: #c0392b; margin-right: auto; }
@@ -1427,7 +1428,7 @@
   }
   .pages-list-item-taskcount {
     font-family: 'DM Sans', sans-serif; font-size: 10px; font-weight: 600;
-    color: var(--accent); background: rgba(45,90,61,0.08);
+    color: var(--accent); background: rgba(106,80,167,0.08);
     padding: 1px 7px; border-radius: 20px; display: inline-block; margin-top: 3px;
   }
 
@@ -1601,7 +1602,7 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.04);
     transition: box-shadow 0.2s;
   }
-  .pages-task-item:hover { box-shadow: 0 4px 12px rgba(45,90,61,0.1), 0 0 0 1px rgba(45,90,61,0.15); }
+  .pages-task-item:hover { box-shadow: 0 4px 12px rgba(106,80,167,0.1), 0 0 0 1px rgba(106,80,167,0.15); }
   .pages-task-check {
     width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 4px;
     flex-shrink: 0; background: white; cursor: pointer; margin-top: 2px;
@@ -1624,7 +1625,7 @@
   .pages-task-date-input:focus { outline: none; border-color: var(--accent); }
   .pages-task-date-badge {
     font-family: 'DM Mono', monospace; font-size: 10px;
-    background: rgba(45,90,61,0.1); color: var(--accent);
+    background: rgba(106,80,167,0.1); color: var(--accent);
     padding: 2px 8px; border-radius: 20px;
   }
   .pages-task-details-input {
@@ -1643,7 +1644,7 @@
   /* Project task badge */
   .project-task-badge {
     font-family: 'DM Sans', monospace; font-size: 9px; font-weight: 600;
-    color: var(--accent); background: rgba(45,90,61,0.08);
+    color: var(--accent); background: rgba(106,80,167,0.08);
     padding: 1px 6px; border-radius: 20px; display: inline-flex; align-items: center; gap: 3px;
     margin-top: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
@@ -1700,7 +1701,7 @@
      ═══════════════════════════════════════════════════════════════ */
   :root {
     --card-border: 1px solid var(--border);
-    --card-shadow: 0 1px 3px rgba(44,36,24,0.07);
+    --card-shadow: 0 1px 3px rgba(35,30,51,0.07);
   }
 
   /* ── Top bar: soft translucent tabs, ghost buttons ── */
@@ -1788,7 +1789,7 @@
   .view-tab:hover:not(.active) { background: transparent; color: var(--ink); }
   .view-tab.active {
     background: var(--paper); color: var(--ink); font-weight: 600;
-    box-shadow: 0 1px 3px rgba(44,36,24,0.12);
+    box-shadow: 0 1px 3px rgba(35,30,51,0.12);
   }
 
   /* ── Chips ── */
@@ -1807,7 +1808,7 @@
   .pages-body { border-radius: var(--radius-md); }
   .sidebar-textarea:focus, .modal-input:focus, .modal-textarea:focus,
   .review-textarea:focus, .pages-body:focus {
-    border-color: var(--accent); box-shadow: 0 0 0 3px rgba(45,107,74,0.12);
+    border-color: var(--accent); box-shadow: 0 0 0 3px rgba(106,80,167,0.12);
   }
 
   /* ── Modals & popovers: same card language ── */
@@ -1841,7 +1842,7 @@
      All goal styles use the gl- prefix.
      ═══════════════════════════════════════════════════════════════ */
   .gl-wrap { flex: 1; display: flex; gap: 16px; padding: 16px; overflow: hidden; min-height: 0; }
-  .gl-card { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 1px 3px rgba(44,36,24,0.07); }
+  .gl-card { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 1px 3px rgba(35,30,51,0.07); }
   .gl-side { width: 300px; flex-shrink: 0; padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
   .gl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
   .gl-side { transition: width 0.18s ease, padding 0.18s ease; }
@@ -1867,26 +1868,26 @@
   .gl-goal-card { text-align: left; width: 100%; font-family: 'DM Sans', sans-serif; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; cursor: pointer; display: block; color: var(--ink); }
   .gl-goal-card:hover { box-shadow: 0 2px 8px var(--shadow-md); }
   .gl-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
-  .gl-bar { height: 6px; border-radius: 3px; overflow: hidden; background: #efeae6; }
+  .gl-bar { height: 6px; border-radius: 3px; overflow: hidden; background: #ebeaf0; }
   .gl-bar > div { height: 100%; border-radius: 3px; }
   .gl-health { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
   .gl-health.ontrack { color: #22573c; background: #e3f1e9; }
   .gl-health.atrisk { color: #7a4f00; background: #fbf0d6; }
   .gl-health.behind { color: #b03a2e; background: #fbe9e7; }
-  .gl-health.upcoming, .gl-health.parked { color: #5f5952; background: #efeae6; }
+  .gl-health.upcoming, .gl-health.parked { color: #6a6678; background: #ebeaf0; }
   .gl-health.done { color: #fff; background: var(--accent); }
   .gl-mono { font-family: 'DM Mono', monospace; }
   .gl-input { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--ink); background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; outline: none; min-width: 0; }
-  .gl-input:focus { border-color: #7c3f6e; }
+  .gl-input:focus { border-color: var(--accent); }
   .gl-inline { font-family: 'DM Sans', sans-serif; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 3px 6px; outline: none; min-width: 0; }
   .gl-inline:hover { border-color: var(--border); }
-  .gl-inline:focus { border-color: #7c3f6e; background: #fff; }
+  .gl-inline:focus { border-color: var(--accent); background: #fff; }
   .gl-check { width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--ink-faint); background: #fff; flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; padding: 0; }
   .gl-check.on { background: var(--accent); border-color: var(--accent); }
   .gl-ms { border: 1px solid var(--border); border-radius: 12px; background: #fff; overflow: hidden; }
   .gl-ms-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; flex-wrap: wrap; }
   .gl-caret { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 11px; width: 22px; height: 28px; padding: 0; }
-  .gl-task { display: flex; align-items: center; gap: 8px; min-height: 38px; border-top: 1px solid #f3efeb; padding: 2px 10px 2px 40px; position: relative; }
+  .gl-task { display: flex; align-items: center; gap: 8px; min-height: 38px; border-top: 1px solid #f1f0f5; padding: 2px 10px 2px 40px; position: relative; }
   .gl-x { border: none; background: none; cursor: pointer; color: var(--ink-faint); font-size: 13px; padding: 4px 6px; opacity: 0; }
   .gl-task:hover .gl-x, .gl-ms-head:hover .gl-x { opacity: 1; }
   .gl-sched { font-family: 'DM Sans', sans-serif; font-size: 12px; border-radius: 999px; padding: 4px 10px; cursor: pointer; white-space: nowrap; border: 1px dashed var(--ink-faint); background: transparent; color: var(--ink-light); }
@@ -1894,15 +1895,15 @@
   .gl-pop { position: absolute; z-index: 300; right: 8px; top: calc(100% - 2px); width: 290px; background: var(--paper); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 28px var(--shadow-lg); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
   .gl-daygrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
   .gl-daybtn { font-family: 'DM Sans', sans-serif; border: 1px solid var(--border); background: #fff; border-radius: 8px; padding: 5px 0; font-size: 11px; color: var(--ink); cursor: pointer; line-height: 1.3; }
-  .gl-daybtn.on { border: 2px solid #7c3f6e; background: var(--cream); font-weight: 600; }
+  .gl-daybtn.on { border: 2px solid var(--accent); background: var(--cream); font-weight: 600; }
   .gl-daybtn.today { color: var(--accent); font-weight: 600; }
   /* Timeline */
   .gl-tl-scroll { overflow-x: auto; }
   .gl-tl { display: flex; min-width: 900px; }
-  .gl-tl-labels { width: 250px; flex-shrink: 0; border-right: 1px solid #888078; }
+  .gl-tl-labels { width: 250px; flex-shrink: 0; border-right: 1px solid #878491; }
   .gl-tl-area { flex: 1; position: relative; min-width: 640px; }
-  .gl-tl-head { height: 38px; border-bottom: 1px solid #888078; display: flex; align-items: center; }
-  .gl-tl-row { position: relative; border-bottom: 1px solid #888078; }
+  .gl-tl-head { height: 38px; border-bottom: 1px solid #878491; display: flex; align-items: center; }
+  .gl-tl-row { position: relative; border-bottom: 1px solid #878491; }
   .gl-tl-row.goal { height: 46px; }
   .gl-tl-row.ms { height: 34px; }
   .gl-tl-lab { display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 13px; overflow: hidden; }
@@ -1913,7 +1914,7 @@
   .gl-tl-todaytag { position: absolute; top: 3px; font-family: 'DM Mono', monospace; font-size: 9px; line-height: 12px; background: var(--gold); color: var(--ink); padding: 2px 7px; border-radius: 999px; z-index: 3; pointer-events: none; }
   .gl-seg { display: flex; background: var(--cream); border-radius: 10px; padding: 3px; }
   .gl-seg button { font-family: 'DM Sans', sans-serif; border: none; background: transparent; font-size: 13px; padding: 5px 11px; border-radius: 8px; color: var(--ink-light); cursor: pointer; }
-  .gl-seg button.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(44,36,24,0.12); }
+  .gl-seg button.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(35,30,51,0.12); }
   .gl-upnext { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
   .gl-mobile-only { display: none; }
   /* Goal tasks inside the Weekly Planner */
@@ -1930,9 +1931,9 @@
   .gl-next:hover { box-shadow: 0 2px 8px var(--shadow-md); }
   .gl-next.late { background: #fdf3f1; border-color: #f0c9c3; }
   /* Mobile "More" sheet */
-  .more-sheet-overlay { position: fixed; inset: 0; background: rgba(44,36,24,0.35); z-index: 95; }
-  .more-sheet { position: fixed; left: 0; right: 0; bottom: 56px; z-index: 96; background: var(--paper); border-radius: 18px 18px 0 0; padding: 10px 16px 12px; box-shadow: 0 -8px 24px rgba(44,36,24,0.18); }
-  .more-sheet-btn { width: 100%; display: flex; align-items: center; gap: 14px; min-height: 52px; border: none; background: transparent; font-size: 15px; font-family: 'DM Sans', sans-serif; color: var(--ink); text-align: left; cursor: pointer; border-bottom: 1px solid #f3efeb; }
+  .more-sheet-overlay { position: fixed; inset: 0; background: rgba(35,30,51,0.35); z-index: 95; }
+  .more-sheet { position: fixed; left: 0; right: 0; bottom: 56px; z-index: 96; background: var(--paper); border-radius: 18px 18px 0 0; padding: 10px 16px 12px; box-shadow: 0 -8px 24px rgba(35,30,51,0.18); }
+  .more-sheet-btn { width: 100%; display: flex; align-items: center; gap: 14px; min-height: 52px; border: none; background: transparent; font-size: 15px; font-family: 'DM Sans', sans-serif; color: var(--ink); text-align: left; cursor: pointer; border-bottom: 1px solid #f1f0f5; }
   .more-sheet-btn:last-child { border-bottom: none; }
   .more-sheet-btn.active { color: var(--accent); font-weight: 600; }
   .mobile-bottom-nav-btn svg { display: block; }
@@ -3683,7 +3684,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
             <div className="cal-grid">
               {weekDays.map((d,i)=>(
                 <div key={'h'+i} className={`cal-header-cell ${isSameDay(d,today)?'today':''}`}
-                  style={{background: calHeaderColor}}>
+                  style={{background: themeColor(calHeaderColor)}}>
                   <div className="day-name">{DAYS[d.getDay()]}</div>
                   <div className="day-date">{d.getDate()}</div>
                   {i===6 && (
@@ -4607,7 +4608,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
           <span className="invite-badge needsAction" style={{fontSize:8,padding:'1px 4px'}}>📨</span>
         )}
         <div className={`task-check ${task.done?'done':''}`}
-          style={{borderColor: task.done ? '#2d5a3d' : undefined, color: task.done ? '#2d5a3d' : undefined, background: task.done ? '#e8f0eb' : undefined}}
+          style={{borderColor: task.done ? '#6a50a7' : undefined, color: task.done ? '#6a50a7' : undefined, background: task.done ? '#f1edff' : undefined}}
           onClick={()=>onUpdate({done:!task.done})} />
         <div style={{flex:1,minWidth:0}}>
           <textarea
@@ -6711,6 +6712,10 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
 // ─────────────────────────────────────────────
 // COLOR PICKER POPOVER
 // ─────────────────────────────────────────────
+// v4.3.0: old theme defaults saved in settings display as the new theme's colors (display only, data untouched)
+const OLD_THEME_COLORS = { '#5c2d52': '#3a2960', '#7c3f6e': '#523e82' };
+function themeColor(c) { return OLD_THEME_COLORS[(c || '').toLowerCase()] || c; }
+
 const HEADER_PRESETS = [
   '#1e3d29','#2d5a3d','#1a3a4a','#3b2a4a',
   '#4a2a2a','#4a3a1a','#2a2a4a','#1a4a3a',
@@ -6889,8 +6894,8 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
         {
           label: 'Weight',
           data: weightVals,
-          borderColor: '#2d5a3d',
-          backgroundColor: 'rgba(45,90,61,0.10)',
+          borderColor: '#6a50a7',
+          backgroundColor: 'rgba(106,80,167,0.10)',
           fill: true,
           spanGaps: true,
           borderWidth: 2,
@@ -7568,7 +7573,7 @@ function GlTimeline({ goals, onOpenGoal }) {
           </div>
           <div className="gl-tl-area">
             {range.cols.slice(1).map((c, i) => (
-              <div key={i} aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: ((c.start - range.start) / total * 100) + '%', width: 1, background: '#888078' }} />
+              <div key={i} aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: ((c.start - range.start) / total * 100) + '%', width: 1, background: '#878491' }} />
             ))}
             <div className="gl-tl-head" style={{ position: 'relative' }}>
               {range.cols.map((c, i) => (
@@ -7627,9 +7632,9 @@ function GlTimeline({ goals, onOpenGoal }) {
       </div>
       )}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, padding: '10px 16px', borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--ink-light)' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, background: '#7c3f6e', opacity: 0.55 }} />Done</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px solid #7c3f6e', boxSizing: 'border-box' }} />In progress</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px dashed #7c3f6e', boxSizing: 'border-box' }} />Upcoming</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, background: '#6a50a7', opacity: 0.55 }} />Done</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px solid #6a50a7', boxSizing: 'border-box' }} />In progress</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px dashed #6a50a7', boxSizing: 'border-box' }} />Upcoming</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px solid var(--red)', boxSizing: 'border-box' }} />Overdue</span>
         <span style={{ marginLeft: 'auto' }}>Click a bar or name to open the goal</span>
       </div>
@@ -7972,7 +7977,7 @@ function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, sele
               <section className="gl-card gl-mobile-only" style={{ flexDirection: 'column', overflow: 'hidden' }}>
                 <div className="gl-label" style={{ padding: '12px 14px 6px' }}>This week · goal tasks</div>
                 {weekItems.map(({ goal, ms, task }) => (
-                  <label key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 48, padding: '0 14px', borderTop: '1px solid #f3efeb', cursor: 'pointer' }}>
+                  <label key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 48, padding: '0 14px', borderTop: '1px solid #f1f0f5', cursor: 'pointer' }}>
                     <input type="checkbox" checked={!!task.done} style={{ width: 20, height: 20, accentColor: goal.color }}
                       onChange={() => setGoals(gs => glPatchTask(gs, goal.id, ms.id, task.id, { done: !task.done }))} />
                     <span style={{ flex: 1, fontSize: 15, textDecoration: task.done ? 'line-through' : 'none', color: task.done ? 'var(--ink-light)' : 'var(--ink)' }}>{task.title || 'Untitled task'}</span>
@@ -8016,8 +8021,8 @@ function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, sele
 function App() {
   const [page, setPageRaw] = useState(() => sessionStorage.getItem('lp_page') || 'planner');
   const setPage = (p) => { sessionStorage.setItem('lp_page', p); setPageRaw(p); };
-  const [navColor, setNavColor] = useSynced('navColor', '#5c2d52');
-  const [calHeaderColor, setCalHeaderColor] = useSynced('calHeaderColor', '#7c3f6e');
+  const [navColor, setNavColor] = useSynced('navColor', '#3a2960');
+  const [calHeaderColor, setCalHeaderColor] = useSynced('calHeaderColor', '#523e82');
   const [weekData, setWeekData] = useSynced('weekData', {});
   const [pagesData, setPagesData] = useSynced('pagesData', []); // [{id,title,body,createdAt,lastModified,folderId,order,tasks:[]}]
   const [foldersData, setFoldersData] = useSynced('foldersData', []); // [{id,name,expanded,order}]
@@ -8379,7 +8384,7 @@ function App() {
       {authLoading && (
         <div style={{
           position:'fixed', inset:0, zIndex:20000,
-          background:'linear-gradient(135deg, #5c2d52 0%, #7c3f6e 100%)',
+          background:'linear-gradient(135deg, #322353 0%, #473473 100%)',
           display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14,
         }}>
           <span style={{fontSize:32,color:'rgba(255,255,255,0.85)',display:'inline-block',animation:'spin 1.1s linear infinite'}}>↻</span>
@@ -8390,7 +8395,7 @@ function App() {
       {!authLoading && !authUser && (
         <div style={{
           position:'fixed', inset:0, zIndex:20000,
-          background:'linear-gradient(135deg, #5c2d52 0%, #7c3f6e 100%)',
+          background:'linear-gradient(135deg, #322353 0%, #473473 100%)',
           display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:24,
         }}>
           <div style={{
@@ -8426,7 +8431,7 @@ function App() {
               🔒 Sign-in is required to protect your data. Without it, any changes you make locally can be silently overwritten the next time you log in.
             </div>
             <button onClick={loadError ? () => { setAuthLoading(true); bootSession(); } : handleSignIn} style={{
-              background:'white', color:'#5c2d52', border:'none', borderRadius:10,
+              background:'white', color:'#3a2960', border:'none', borderRadius:10,
               padding:'13px 32px', fontFamily:"'DM Sans',sans-serif", fontWeight:700,
               fontSize:15, cursor:'pointer', width:'100%', letterSpacing:'0.01em',
               boxShadow:'0 4px 16px rgba(0,0,0,0.2)', transition:'transform 0.15s',
@@ -8438,9 +8443,9 @@ function App() {
           </div>
         </div>
       )}
-      <div className="nav-bar" style={{background: navColor}}>
+      <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.2.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.3.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -8547,16 +8552,16 @@ function App() {
         <div className="more-sheet" role="dialog" aria-label="More">
           <div className="mobile-sheet-handle" />
           <button className={`more-sheet-btn ${page==='monthly'?'active':''}`} onClick={()=>{setPage('monthly');setMoreOpen(false);}}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3f6e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6a50a7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01"/></svg>
             Monthly Calendar
           </button>
           <button className={`more-sheet-btn ${page==='pages'?'active':''}`} onClick={()=>{setPage('pages');setMoreOpen(false);}}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3f6e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6a50a7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
             Pages
           </button>
           {authUser && (
             <button className="more-sheet-btn" disabled={syncing} onClick={()=>{setMoreOpen(false);handleSyncCalendar();}}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3f6e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14"/></svg>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6a50a7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14"/></svg>
               {syncing ? 'Syncing…' : 'Sync Calendar'}
             </button>
           )}
@@ -9497,7 +9502,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                               borderRadius:'2px 2px 0 0',position:'relative'}}>
                               {/* Target line */}
                               {monthlyTarget>0&&(
-                                <div style={{position:'absolute',bottom:`${Math.round((monthlyTarget/maxMonth)*56)-barH}px`,left:0,right:0,height:1,background:'rgba(196,150,14,0.6)',}}/>
+                                <div style={{position:'absolute',bottom:`${Math.round((monthlyTarget/maxMonth)*56)-barH}px`,left:0,right:0,height:1,background:'rgba(203,146,56,0.6)',}}/>
                               )}
                             </div>
                             <div style={{fontSize:7,fontFamily:"'DM Mono',monospace",color:isCurrentMonth?'var(--accent)':'var(--ink-faint)',fontWeight:isCurrentMonth?700:400}}>
@@ -9510,7 +9515,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                     <div style={{fontSize:8,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',marginTop:4,display:'flex',alignItems:'center',gap:6}}>
                       <span style={{display:'inline-flex',alignItems:'center',gap:2}}><span style={{width:8,height:8,background:'var(--teal)',borderRadius:1,display:'inline-block'}}/>≥monthly target</span>
                       <span style={{display:'inline-flex',alignItems:'center',gap:2}}><span style={{width:8,height:8,background:'var(--blue)',borderRadius:1,display:'inline-block'}}/>below target</span>
-                      <span style={{display:'inline-flex',alignItems:'center',gap:2}}><span style={{width:8,height:1,background:'rgba(196,150,14,0.6)',display:'inline-block'}}/>monthly target</span>
+                      <span style={{display:'inline-flex',alignItems:'center',gap:2}}><span style={{width:8,height:1,background:'rgba(203,146,56,0.6)',display:'inline-block'}}/>monthly target</span>
                     </div>
                     {goal.endDate&&<div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',marginTop:8}}>Ends: {goal.endDate}</div>}
                   </div>
