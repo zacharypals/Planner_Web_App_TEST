@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.2.2 -->
+<!-- LP Planner v4.2.3 -->
+<!-- v4.2.3 — Goals timeline: grid lines near-black (#3d3630). -->
 <!-- v4.2.2 — Goals timeline: darker, more distinct grid lines (month columns, row dividers, header and label column borders). -->
 <!-- v4.2.1 — Goals tab: left goals list collapses to a slim strip (‹ / ›), remembered per device; strip shows active goals as clickable color dots. Desktop only. -->
 <!-- v4.2.0 — Goals tab: goals → milestones → tasks with dates, Gantt timeline (week/month/quarter/year, filter), health (work done vs. time used), goal tasks shown in the Weekly Planner (single source in `goals`), 'Goals · next up' sidebar, mobile nav Fitness/Week/Habits/Goals/More. -->
@@ -1898,11 +1899,10 @@
   /* Timeline */
   .gl-tl-scroll { overflow-x: auto; }
   .gl-tl { display: flex; min-width: 900px; }
-  .gl-tl-labels { width: 250px; flex-shrink: 0; border-right: 1px solid #d3cbc1; }
+  .gl-tl-labels { width: 250px; flex-shrink: 0; border-right: 1px solid #3d3630; }
   .gl-tl-area { flex: 1; position: relative; min-width: 640px; }
-  .gl-tl-head { height: 38px; border-bottom: 1px solid #d3cbc1; display: flex; align-items: center; }
-  .gl-tl-row { position: relative; border-bottom: 1px solid #e6dfd7; }
-  .gl-tl-row.goal { border-top: 1px solid #ddd5cb; }
+  .gl-tl-head { height: 38px; border-bottom: 1px solid #3d3630; display: flex; align-items: center; }
+  .gl-tl-row { position: relative; border-bottom: 1px solid #3d3630; }
   .gl-tl-row.goal { height: 46px; }
   .gl-tl-row.ms { height: 34px; }
   .gl-tl-lab { display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 13px; overflow: hidden; }
@@ -7568,7 +7568,7 @@ function GlTimeline({ goals, onOpenGoal }) {
           </div>
           <div className="gl-tl-area">
             {range.cols.slice(1).map((c, i) => (
-              <div key={i} aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: ((c.start - range.start) / total * 100) + '%', width: 1, background: '#d3cbc1' }} />
+              <div key={i} aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: ((c.start - range.start) / total * 100) + '%', width: 1, background: '#3d3630' }} />
             ))}
             <div className="gl-tl-head" style={{ position: 'relative' }}>
               {range.cols.map((c, i) => (
@@ -8440,7 +8440,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.2.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.2.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
