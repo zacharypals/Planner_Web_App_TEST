@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.4.0 -->
+<!-- LP Planner v4.4.1 -->
+<!-- v4.4.1 — Mobile bottom nav order: Fitness · Goals · Habits · Week · More (Week and Goals swapped). -->
 <!-- v4.4.0 — Dark mode: Auto (follows device) / Light / Dark, saved per device (lp_theme). Toggle in the top bar on desktop and in the More sheet on mobile. Hard-coded light surfaces moved to theme variables (--surface, --tint, --neutral-bg, --neutral-line, --grid-line, --tile-*); light mode looks the same. -->
 <!-- v4.3.0 — "Dusk Violet" color theme (colors only): cool violet-tinted neutrals replace the warm brown/pink mix; violet accent replaces forest green; deep violet nav/headers; softer amber gold; shadows tinted to match. Saved nav/header colors that equal the old defaults display as the new theme defaults. -->
 <!-- v4.2.4 — Goals timeline: grid lines medium gray (#888078), between v4.2.2 and v4.2.3. -->
@@ -8537,7 +8538,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.4.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.4.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -8639,7 +8640,7 @@ function App() {
         onOpenPage={(id)=>{ setSelectedPagesId(id); setPage('pages'); }} />}
       </div>
 
-      {/* Mobile bottom nav — only visible on phones via CSS (v4.2.0: Fitness · Week · Habits · Goals · More) */}
+      {/* Mobile bottom nav — only visible on phones via CSS (v4.4.1: Fitness · Goals · Habits · Week · More) */}
       {moreOpen && <div className="more-sheet-overlay" onClick={()=>setMoreOpen(false)} />}
       {moreOpen && (
         <div className="more-sheet" role="dialog" aria-label="More">
@@ -8668,14 +8669,14 @@ function App() {
         <button className={`mobile-bottom-nav-btn ${page==='fitness'?'active':''}`} onClick={()=>{setPage('fitness');setMoreOpen(false);}}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6.5 6.5v11M3.5 9v6M17.5 6.5v11M20.5 9v6M6.5 12h11"/></svg>Fitness
         </button>
-        <button className={`mobile-bottom-nav-btn ${page==='planner'?'active':''}`} onClick={()=>{setPage('planner');setMoreOpen(false);}}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M7.5 4v17M12 4v17M16.5 4v17"/></svg>Week
+        <button className={`mobile-bottom-nav-btn ${page==='goals'?'active':''}`} onClick={()=>{setPage('goals');setMoreOpen(false);}}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4 2.5 4H5"/></svg>Goals
         </button>
         <button className={`mobile-bottom-nav-btn ${page==='habit'||page==='metrics'?'active':''}`} onClick={()=>{setPage('habit');setMoreOpen(false);}}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg>Habits
         </button>
-        <button className={`mobile-bottom-nav-btn ${page==='goals'?'active':''}`} onClick={()=>{setPage('goals');setMoreOpen(false);}}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4 2.5 4H5"/></svg>Goals
+        <button className={`mobile-bottom-nav-btn ${page==='planner'?'active':''}`} onClick={()=>{setPage('planner');setMoreOpen(false);}}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M7.5 4v17M12 4v17M16.5 4v17"/></svg>Week
         </button>
         <button className={`mobile-bottom-nav-btn ${moreOpen||page==='monthly'||page==='pages'?'active':''}`} aria-expanded={moreOpen} onClick={()=>setMoreOpen(o=>!o)}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>More
