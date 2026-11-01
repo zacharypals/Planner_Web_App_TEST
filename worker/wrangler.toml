@@ -15,7 +15,7 @@ REDIRECT_URI = "https://zacharypals.github.io/Planner_Web_App/oauth.html,https:/
 # Same OAuth client LP Planner already uses (keeps access to the Drive file for the later import).
 GOOGLE_CLIENT_ID = "1050376914317-d9al0irmqsmhkq334rffqg30mbtlguuf.apps.googleusercontent.com"
 # Comma-separated. Each person gets their own private data. Removing an email locks it out on the next request.
-ALLOWED_EMAILS = "znpals@gmail.com"
+ALLOWED_EMAILS = "znpals@gmail.com,christinelittlecomedy@gmail.com"
 
 [[d1_databases]]
 binding = "DB"
