@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.2.0 -->
+<!-- LP Planner v4.2.1 -->
+<!-- v4.2.1 — Goals tab: left goals list collapses to a slim strip (‹ / ›), remembered per device; strip shows active goals as clickable color dots. Desktop only. -->
 <!-- v4.2.0 — Goals tab: goals → milestones → tasks with dates, Gantt timeline (week/month/quarter/year, filter), health (work done vs. time used), goal tasks shown in the Weekly Planner (single source in `goals`), 'Goals · next up' sidebar, mobile nav Fitness/Week/Habits/Goals/More. -->
 <html lang="en">
 <head>
@@ -1841,6 +1842,16 @@
   .gl-card { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 1px 3px rgba(44,36,24,0.07); }
   .gl-side { width: 300px; flex-shrink: 0; padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
   .gl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+  .gl-side { transition: width 0.18s ease, padding 0.18s ease; }
+  .gl-side-body { display: flex; flex-direction: column; gap: 12px; }
+  .gl-side-strip { display: none; flex-direction: column; align-items: center; gap: 10px; }
+  .gl-side.collapsed { width: 52px; padding: 12px 0; overflow: hidden; }
+  .gl-side.collapsed .gl-side-body { display: none; }
+  .gl-side.collapsed .gl-side-strip { display: flex; }
+  .gl-side-toggle { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: #fff; color: var(--ink-light); cursor: pointer; font-size: 15px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; font-family: 'DM Sans', sans-serif; }
+  .gl-side-toggle:hover { background: var(--cream); color: var(--ink); }
+  .gl-side-vlabel { writing-mode: vertical-rl; transform: rotate(180deg); font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 600; color: var(--ink); margin: 4px 0; }
+  .gl-side-dot { width: 14px; height: 14px; border-radius: 50%; border: none; cursor: pointer; padding: 0; flex-shrink: 0; }
   .gl-h2 { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 600; color: var(--ink); }
   .gl-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-light); }
   .gl-btn { font-family: 'DM Sans', sans-serif; font-size: 13px; border: 1px solid var(--border); background: #fff; color: var(--ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
@@ -1926,6 +1937,9 @@
   @media (max-width: 767px) {
     .gl-wrap { flex-direction: column; padding: 12px; gap: 12px; overflow: visible; padding-bottom: 80px; }
     .gl-side { width: auto; overflow: visible; }
+    .gl-side.collapsed { width: auto; padding: 16px; overflow: visible; }
+    .gl-side.collapsed .gl-side-body { display: flex; }
+    .gl-side.collapsed .gl-side-strip { display: none; }
     .gl-main { overflow: visible; }
     .gl-desktop-only { display: none !important; }
     .gl-mobile-only { display: flex; }
@@ -7838,6 +7852,8 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage }) {
 function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage }) {
   const today = glToday();
   const [statusTab, setStatusTab] = useState('active');
+  const [sideCollapsed, setSideCollapsedRaw] = useState(() => lsGet('glSideCollapsed') === '1'); // desktop only; per device
+  const setSideCollapsed = (v) => { lsSet('glSideCollapsed', v ? '1' : '0'); setSideCollapsedRaw(v); };
   const list = Array.isArray(goals) ? goals : [];
   const sel = selectedId ? list.find(g => g.id === selectedId) : null;
   const counts = { active: 0, parked: 0, done: 0 };
@@ -7874,10 +7890,24 @@ function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, sele
 
   return (
     <div className="gl-wrap">
-      <aside className={`gl-card gl-side ${sel ? 'gl-desktop-only' : ''}`} aria-label="Goals list">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <aside className={`gl-card gl-side ${sel ? 'gl-desktop-only' : ''} ${sideCollapsed ? 'collapsed' : ''}`} aria-label="Goals list">
+        <div className="gl-side-strip">
+          <button className="gl-side-toggle" aria-label="Expand goals list" title="Expand goals list" onClick={() => setSideCollapsed(false)}>›</button>
+          <span className="gl-side-vlabel">Goals</span>
+          {list.filter(g => g.status === 'active').map(g => (
+            <button key={g.id} className="gl-side-dot" title={g.title || 'Untitled goal'} aria-label={'Open ' + (g.title || 'goal')}
+              style={{ background: g.color, boxShadow: sel && sel.id === g.id ? `0 0 0 2px #fff, 0 0 0 4px ${g.color}` : 'none' }}
+              onClick={() => setSelectedId(g.id)} />
+          ))}
+          <button className="gl-side-toggle" aria-label="New goal" title="New goal" onClick={newGoal} style={{ marginTop: 4 }}>+</button>
+        </div>
+        <div className="gl-side-body">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <span className="gl-h2" style={{ fontSize: 22 }}>Goals</span>
-          <button className="gl-btn primary" onClick={newGoal}>+ New goal</button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button className="gl-btn primary" onClick={newGoal}>+ New goal</button>
+            <button className="gl-side-toggle gl-desktop-only" aria-label="Collapse goals list" title="Collapse goals list" onClick={() => setSideCollapsed(true)}>‹</button>
+          </div>
         </div>
         <div role="tablist" aria-label="Goal status" style={{ display: 'flex', gap: 6 }}>
           {['active', 'parked', 'done'].map(s => (
@@ -7923,6 +7953,7 @@ function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, sele
             {counts.active} active of a soft limit of {GL_SOFT_LIMIT}{counts.active > GL_SOFT_LIMIT ? ' — consider parking one' : ''}
           </div>
         )}
+        </div>
       </aside>
 
       <main className="gl-main">
@@ -8407,7 +8438,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.2.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.2.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
