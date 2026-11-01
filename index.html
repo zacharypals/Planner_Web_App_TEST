@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.4.1 -->
+<!-- LP Planner v4.5.0 -->
+<!-- v4.5.0 — Weekly view: goal tasks now sit in a collapsible "Goals" section under Habits (collapsed by default, with a done count). Dark mode: dedicated deep task/event palettes (same color families, ~7:1 text contrast) replace the dimmed pastels. -->
 <!-- v4.4.1 — Mobile bottom nav order: Fitness · Goals · Habits · Week · More (Week and Goals swapped). -->
 <!-- v4.4.0 — Dark mode: Auto (follows device) / Light / Dark, saved per device (lp_theme). Toggle in the top bar on desktop and in the More sheet on mobile. Hard-coded light surfaces moved to theme variables (--surface, --tint, --neutral-bg, --neutral-line, --grid-line, --tile-*); light mode looks the same. -->
 <!-- v4.3.0 — "Dusk Violet" color theme (colors only): cool violet-tinted neutrals replace the warm brown/pink mix; violet accent replaces forest green; deep violet nav/headers; softer amber gold; shadows tinted to match. Saved nav/header colors that equal the old defaults display as the new theme defaults. -->
@@ -63,6 +64,7 @@
     --tile-num: rgba(42,37,56,0.7);
     --hc-pct: 100%;      /* user-color text: unchanged in light */
     --gl-ink-pct: 60%; --gl-ink-to: #000;  /* glInk = 60% of the goal color */
+    --prio-bg: #fee2e2;
   }
   html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); overflow-x: hidden; overscroll-behavior-y: contain; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -336,6 +338,8 @@
     font-weight: 600; transition: background 0.1s;
   }
   .habit-task-label:hover { background: var(--tint); }
+  .gl-day-section-body { padding: 6px 0 1px; }
+  .gl-day-section-body .gl-wtask:last-child { margin-bottom: 4px; }
   .habit-task-row {
     background: var(--surface);
     border-bottom: 1px solid rgba(0,0,0,0.04);
@@ -2003,13 +2007,13 @@
     --tile-num: #8e8b99;
     --hc-pct: 58%;
     --gl-ink-pct: 55%; --gl-ink-to: #fff;
+    /* v4.5.0 dark task / event palettes (same order and color families as TASK_COLORS / EVENT_COLORS) */
+    --tc-0: #1f542e; --tc-1: #6d323f; --tc-2: #5e4f07; --tc-3: #1f4a73; --tc-4: #4e3c6f; --tc-5: #683c0b; --tc-6: #005648; --tc-7: #5e3661; --tc-8: #3a5018; --tc-9: #6e3429; --tc-10: #005168; --tc-11: #515413; --tc-12: #673352; --tc-13: #684a09; --tc-14: #00555a; --tc-15: #6c371d; --tc-16: #384475; --tc-17: #6e3236;
+    --ec-0: #582d42; --ec-1: #43345c; --ec-2: #223e61; --ec-3: #0b4834; --ec-4: #544310; --ec-5: #593215; --ec-6: #00474e; --ec-7: #4f2f51; --ec-8: #31441a; --ec-9: #5c2c31; --ec-10: #333962; --ec-11: #4e4612; --ec-12: #5b301c; --ec-13: #004845; --ec-14: #5a2c3c; --ec-15: #234725;
+    --prio-bg: #4a2228;
   }
-  /* Pastel task / event colors: dim them so light text stays readable */
-  [data-theme="dark"] .task-card,
-  [data-theme="dark"] .monthly-event-chip {
-    background-image: linear-gradient(rgba(20,18,27,0.66), rgba(20,18,27,0.66)) !important;
-  }
-  [data-theme="dark"] .task-color-swatch { filter: brightness(0.75); }
+  /* v4.5.0: task / event colors come from --tc-N / --ec-N (see taskBg/eventBg); custom colors keep a light dim */
+  [data-theme="dark"] .task-card.custom-color { background-image: linear-gradient(rgba(20,18,27,0.35), rgba(20,18,27,0.35)); }
   /* Status chips and notices that had light pastel fills */
   [data-theme="dark"] .gl-health.ontrack { color: #7fd1a3; background: #16301f; }
   [data-theme="dark"] .gl-health.atrisk { color: #e5b15b; background: #2d220f; }
@@ -3545,7 +3549,16 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const goalTasksByDay = React.useMemo(() => glTasksByDay(goals), [goals]);
   function setGoalTask(it, patch) { if (setGoals) setGoals(gs => glPatchTask(gs, it.goalId, it.msId, it.taskId, patch)); }
   function renderGoalTasks(localKey, desktop) {
-    return (goalTasksByDay[localKey] || []).map(({goal, ms, task}) => {
+    const list = goalTasksByDay[localKey] || [];
+    if (!list.length) return null;
+    return (
+      <GlDaySection key={'gls-'+localKey} done={list.filter(x => x.task.done).length} total={list.length}>
+        {renderGoalTaskCards(list, desktop)}
+      </GlDaySection>
+    );
+  }
+  function renderGoalTaskCards(list, desktop) {
+    return list.map(({goal, ms, task}) => {
       const ref = {goalId: goal.id, msId: ms.id, taskId: task.id};
       return (
         <GlWeekTask key={'gt-'+task.id} item={{goal, ms, task}}
@@ -4556,6 +4569,11 @@ const EVENT_COLORS = [
   '#f8bbd0', // rose
   '#c8e6c9', // mint leaf
 ];
+// v4.5.0: palette color for a slot — light mode uses the hex above; dark mode overrides via --tc-N / --ec-N.
+function taskBg(i) { const n = ((i ?? 0) % TASK_COLORS.length + TASK_COLORS.length) % TASK_COLORS.length; return `var(--tc-${n}, ${TASK_COLORS[n]})`; }
+function eventBg(i) { const n = ((i ?? 0) % EVENT_COLORS.length + EVENT_COLORS.length) % EVENT_COLORS.length; return `var(--ec-${n}, ${EVENT_COLORS[n]})`; }
+function paletteBg(isEvent, i) { return isEvent ? eventBg(i) : taskBg(i); }
+
 // Picks a color index not already used by other tasks the same day, so
 // colors don't visibly repeat until every palette slot is taken; falls
 // back to random once the day genuinely has more tasks than colors.
@@ -4624,13 +4642,13 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
   }
 
   return (
-    <div className={`task-card ${task.done?'done':''} ${isDragOver?'drag-over':''} ${task.isEvent?'is-event':''}`}
+    <div className={`task-card ${task.done?'done':''} ${isDragOver?'drag-over':''} ${task.isEvent?'is-event':''} ${task.customColor && !(task.isProjectTask && task.priority)?'custom-color':''}`}
       style={{
         background: task.isProjectTask && task.priority
-          ? '#fee2e2'
+          ? 'var(--prio-bg)'
           : task.customColor
             ? task.customColor + '55'
-            : (task.isEvent ? EVENT_COLORS : TASK_COLORS)[(task.colorIndex ?? 0) % (task.isEvent ? EVENT_COLORS : TASK_COLORS).length],
+            : paletteBg(task.isEvent, task.colorIndex),
         opacity: isDragOver ? 0.5 : 1,
         borderLeft: task.isProjectTask && task.priority ? '3px solid #dc2626' : undefined,
       }}
@@ -4814,7 +4832,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
             <button className="task-color-toggle" onClick={e=>{e.stopPropagation();setShowColors(s=>!s);}}>
               <span style={{
                 display:'inline-block',width:10,height:10,borderRadius:'50%',
-                background:(task.isEvent?EVENT_COLORS:TASK_COLORS)[task.colorIndex??0],
+                background:paletteBg(task.isEvent, task.colorIndex),
                 border:'1.5px solid rgba(0,0,0,0.2)',marginRight:4,verticalAlign:'middle'
               }}/>
               Color {showColors ? '▲' : '▼'}
@@ -4824,7 +4842,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
             <div className="task-color-picker" onClick={e=>e.stopPropagation()}>
               {(task.isEvent?EVENT_COLORS:TASK_COLORS).map((c,i)=>(
                 <div key={i} className={`task-color-swatch ${(task.colorIndex??0)===i?'active':''}`}
-                  style={{background:c}}
+                  style={{background:paletteBg(task.isEvent, i)}}
                   onClick={e=>{e.stopPropagation();onUpdate({colorIndex:i,customColor:undefined});setShowColors(false);}}
                   title={`Color ${i+1}`} />
               ))}
@@ -6650,7 +6668,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
                   <div className="monthly-cell-events">
                     {dayEvents.slice(0,3).map(ev=>(
                       <div key={ev.id} className="monthly-event-chip"
-                        style={{background: TASK_COLORS[(ev.colorIndex??3) % TASK_COLORS.length], cursor:'grab', opacity: dragInfo?.eventId===ev.id ? 0.4 : 1}}
+                        style={{background: taskBg(ev.colorIndex??3), cursor:'grab', opacity: dragInfo?.eventId===ev.id ? 0.4 : 1}}
                         draggable
                         onDragStart={e=>{e.stopPropagation();handleDragStart(e,ev.id,dk);}}
                         onDragEnd={()=>{setDragInfo(null);setDragOverDay(null);}}
@@ -7474,6 +7492,21 @@ function GlSchedulePicker({ value, onPick, onClose, extra, anchor }) {
 }
 
 // ── Goal task as it appears inside the Weekly Planner (desktop column + mobile day view) ──
+// v4.5.0: collapsible "Goals" section under Habits in the week grid / mobile day view (collapsed by default, like Habits)
+function GlDaySection({ done, total, children }) {
+  const [collapsed, setCollapsed] = useState(true);
+  return (
+    <div className="habit-task-section gl-day-section">
+      <div className="habit-task-label" onClick={() => setCollapsed(c => !c)}>
+        <span style={{fontSize:8}}>{collapsed ? '▸' : '▾'}</span>
+        <span>Goals</span>
+        <span style={{marginLeft:'auto', fontSize:9, fontWeight:700, opacity:0.8}}>{done}/{total}</span>
+      </div>
+      {!collapsed && <div className="gl-day-section-body">{children}</div>}
+    </div>
+  );
+}
+
 function GlWeekTask({ item, onToggle, onMove, onOpen, onDragStart, onDragEnd }) {
   const { goal, ms, task } = item;
   const [menu, setMenu] = useState(false);   // false | { anchor }
@@ -8538,7 +8571,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.4.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.5.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -11101,7 +11134,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
               )}
               {(selectedDoc.tasks||[]).map(task => (
                 <div key={task.id} className="pages-task-item"
-                  style={task.priority ? {background:'#fee2e2', borderColor:'#fca5a5'} : {}}>
+                  style={task.priority ? {background:'var(--prio-bg)', borderColor:'#fca5a5'} : {}}>
                   <div className={`pages-task-check ${task.done?'done':''}`}
                     onClick={()=>updateTask(selectedDoc.id, task.id, {done:!task.done})} />
                   <div className="pages-task-body">
