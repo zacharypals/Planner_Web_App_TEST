@@ -25,6 +25,7 @@ const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const SPLITS = {
   weekData: 'map', fitnessLog: 'map', pagesData: 'list',
   habitCompletions: 'month', habitQty: 'month', habitNotes: 'month', habitMetrics: 'month',
+  goals: 'list',   // added with the Goals tab (app v4.2.0)
 };
 
 export function ptDate(d = new Date()) {

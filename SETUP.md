@@ -14,6 +14,21 @@ All commands are PowerShell. Paths used:
 
 ---
 
+## Updating to Worker 0.2.1 (goals in nightly backups — app v4.2.x)
+
+From v4.2.0 on, Claude pushes changes straight to GitHub, so there's no zip. The app updates itself once GitHub Pages republishes. The Worker only changes when its version changes, and then it needs a deploy from your local repo:
+
+```powershell
+cd "C:\Users\slapc\OneDrive\Documents\Personal\ProjectsVS\Planner_Tracker_D1"
+git pull                      # brings down the pushed changes (wrangler.toml is untouched)
+cd worker
+npx wrangler deploy           # no database migration in this update
+```
+
+Worker 0.2.1 adds `goals` to the backup's split table, so nightly Drive backups include the Goals tab (before this, goals were in D1 but missing from the backup file).
+
+---
+
 ## Updating to v4.1.0 (Drive import + nightly backups)
 
 Already set up with v4.0.0? These are the only steps. Run them in PowerShell.
