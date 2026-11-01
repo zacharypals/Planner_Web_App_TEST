@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.5.2 -->
+<!-- LP Planner v4.5.3 -->
+<!-- v4.5.3 — Fitness set rows: column headers (Weight, Done) now line up exactly over their inputs and the check circle. -->
 <!-- v4.5.2 — Fitness set rows: the complete-set check now sits right after the inputs and the delete ✕ alone at the far right, so they're no longer side by side. -->
 <!-- v4.5.1 — Light mode task/event colors: "Calm tonal, defined" palette (soft violets and blues with a few warm accents, matched to the Dusk Violet theme). Same 18 task / 16 event slots, so existing tasks keep their slot. Dark palettes unchanged. -->
 <!-- v4.5.0 — Weekly view: goal tasks now sit in a collapsible "Goals" section under Habits (collapsed by default, with a done count). Dark mode: dedicated deep task/event palettes (same color families, ~7:1 text contrast) replace the dimmed pastels. -->
@@ -8576,7 +8577,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.5.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.5.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -9188,7 +9189,8 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
               <span className="set-label" style={{width:32,textAlign:'center'}}>Sec</span>
               <span className="set-label" style={{width:56,textAlign:'center',marginLeft:6}}>min/mi</span></>)
             :(<><span className="set-label" style={{width:52,textAlign:'center'}}>Reps</span>
-              <span className="set-label" style={{width:52,textAlign:'center',marginLeft:18}}>Weight</span>
+              <span className="set-label" style={{visibility:'hidden'}}>×</span>
+              <span className="set-label" style={{width:52,textAlign:'center'}}>Weight</span>
               <span className="set-label" style={{visibility:'hidden'}}>lbs</span></>)}
             <span className="set-label" style={{width:22,marginLeft:10,display:'flex',justifyContent:'center',whiteSpace:'nowrap'}}>Done</span>
           </div>
