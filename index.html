@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.5.3 -->
+<!-- LP Planner v4.5.4 -->
+<!-- v4.5.4 — Fitness cardio rows: Sec, min/mi and Done headers line up over their columns (Done centered over the check, same as strength rows). -->
 <!-- v4.5.3 — Fitness set rows: column headers (Weight, Done) now line up exactly over their inputs and the check circle. -->
 <!-- v4.5.2 — Fitness set rows: the complete-set check now sits right after the inputs and the delete ✕ alone at the far right, so they're no longer side by side. -->
 <!-- v4.5.1 — Light mode task/event colors: "Calm tonal, defined" palette (soft violets and blues with a few warm accents, matched to the Dusk Violet theme). Same 18 task / 16 event slots, so existing tasks keep their slot. Dark palettes unchanged. -->
@@ -8577,7 +8578,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.5.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.5.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -9185,9 +9186,9 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             <span className="set-num"></span>
             {isCardio?(<><span className="set-label" style={{width:60,textAlign:'center'}}>Dist (mi)</span>
               <span className="set-label" style={{width:32,textAlign:'center',marginLeft:6}}>Min</span>
-              <span style={{width:10,flexShrink:0}}/>
+              <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,flexShrink:0,visibility:'hidden'}}>:</span>
               <span className="set-label" style={{width:32,textAlign:'center'}}>Sec</span>
-              <span className="set-label" style={{width:56,textAlign:'center',marginLeft:6}}>min/mi</span></>)
+              <span className="set-label" style={{width:56,textAlign:'center'}}>min/mi</span></>)
             :(<><span className="set-label" style={{width:52,textAlign:'center'}}>Reps</span>
               <span className="set-label" style={{visibility:'hidden'}}>×</span>
               <span className="set-label" style={{width:52,textAlign:'center'}}>Weight</span>
