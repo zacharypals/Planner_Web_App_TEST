@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.5.1 -->
+<!-- LP Planner v4.5.2 -->
+<!-- v4.5.2 — Fitness set rows: the complete-set check now sits right after the inputs and the delete ✕ alone at the far right, so they're no longer side by side. -->
 <!-- v4.5.1 — Light mode task/event colors: "Calm tonal, defined" palette (soft violets and blues with a few warm accents, matched to the Dusk Violet theme). Same 18 task / 16 event slots, so existing tasks keep their slot. Dark palettes unchanged. -->
 <!-- v4.5.0 — Weekly view: goal tasks now sit in a collapsible "Goals" section under Habits (collapsed by default, with a done count). Dark mode: dedicated deep task/event palettes (same color families, ~7:1 text contrast) replace the dimmed pastels. -->
 <!-- v4.4.1 — Mobile bottom nav order: Fitness · Goals · Habits · Week · More (Week and Goals swapped). -->
@@ -474,9 +475,12 @@
   .set-check {
     width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink-faint);
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; flex-shrink: 0; transition: all 0.12s; margin-left: auto;
+    cursor: pointer; flex-shrink: 0; transition: all 0.12s; margin-left: 10px;
     background: var(--surface);
   }
+  /* v4.5.2: delete ✕ sits alone at the far right, away from the check */
+  .set-del-btn { margin-left: auto; background: none; border: none; cursor: pointer; font-size: 11px; color: var(--ink-faint); opacity: 0.35; line-height: 1; padding: 6px 4px 6px 10px; }
+  .set-del-btn:hover { opacity: 0.8; color: var(--red); }
   .set-check:hover { border-color: var(--accent); background: var(--accent-light); }
   .set-check.done { background: var(--accent); border-color: var(--accent); }
   .set-check.done::after { content: '✓'; color: white; font-size: 12px; font-weight: 700; }
@@ -8572,7 +8576,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.5.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.5.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -9184,8 +9188,9 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
               <span className="set-label" style={{width:32,textAlign:'center'}}>Sec</span>
               <span className="set-label" style={{width:56,textAlign:'center',marginLeft:6}}>min/mi</span></>)
             :(<><span className="set-label" style={{width:52,textAlign:'center'}}>Reps</span>
-              <span className="set-label" style={{width:52,textAlign:'center',marginLeft:18}}>Weight</span></>)}
-            <span className="set-label" style={{marginLeft:'auto',marginRight:2}}>Done</span>
+              <span className="set-label" style={{width:52,textAlign:'center',marginLeft:18}}>Weight</span>
+              <span className="set-label" style={{visibility:'hidden'}}>lbs</span></>)}
+            <span className="set-label" style={{width:22,marginLeft:10,display:'flex',justifyContent:'center',whiteSpace:'nowrap'}}>Done</span>
           </div>
           {ex.sets.map((set,si)=>{
             const dist=parseFloat(set.dist)||0,timeDec=parseTimeInput(set.time);
@@ -9230,8 +9235,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                   <span className="set-label">lbs</span>
                 </>)}
                 <div className={`set-check ${set.done?'done':''}`} onClick={()=>updateSet(dk,ex.id,set.id,{done:!set.done})}/>
-                <button onClick={()=>deleteSet(dk,ex.id,set.id)}
-                  style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',opacity:0.35,marginLeft:2,lineHeight:1}}>✕</button>
+                <button className="set-del-btn" aria-label="Delete set" onClick={()=>deleteSet(dk,ex.id,set.id)}>✕</button>
                 </div>
                 <input type="text" className="set-note-input" placeholder="note…" value={set.note||''}
                   onChange={e=>updateSet(dk,ex.id,set.id,{note:e.target.value})}/>
