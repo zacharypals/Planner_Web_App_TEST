@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.1.0 -->
+<!-- LP Planner v4.2.0 -->
+<!-- v4.2.0 — Goals tab: goals → milestones → tasks with dates, Gantt timeline (week/month/quarter/year, filter), health (work done vs. time used), goal tasks shown in the Weekly Planner (single source in `goals`), 'Goals · next up' sidebar, mobile nav Fitness/Week/Habits/Goals/More. -->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1831,6 +1832,114 @@
     .monthly-cal-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
     .monthly-event-chip .chip-time { display: none; } /* narrow cells: show the title, not the time */
   }
+
+  /* ═══════════════════════════════════════════════════════════════
+     v4.2.0 GOALS — Goals tab, timeline, goal tasks in the week, mobile nav "More".
+     All goal styles use the gl- prefix.
+     ═══════════════════════════════════════════════════════════════ */
+  .gl-wrap { flex: 1; display: flex; gap: 16px; padding: 16px; overflow: hidden; min-height: 0; }
+  .gl-card { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: 0 1px 3px rgba(44,36,24,0.07); }
+  .gl-side { width: 300px; flex-shrink: 0; padding: 16px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+  .gl-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+  .gl-h2 { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 600; color: var(--ink); }
+  .gl-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-light); }
+  .gl-btn { font-family: 'DM Sans', sans-serif; font-size: 13px; border: 1px solid var(--border); background: #fff; color: var(--ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .gl-btn:hover { background: var(--cream); }
+  .gl-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  .gl-btn.primary:hover { filter: brightness(1.08); }
+  .gl-btn.ghost { border-color: transparent; background: transparent; color: var(--ink-light); }
+  .gl-btn.danger { color: var(--red); }
+  .gl-chip { font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); background: #fff; color: var(--ink-light); cursor: pointer; }
+  .gl-chip.on { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 600; }
+  .gl-goal-card { text-align: left; width: 100%; font-family: 'DM Sans', sans-serif; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; cursor: pointer; display: block; color: var(--ink); }
+  .gl-goal-card:hover { box-shadow: 0 2px 8px var(--shadow-md); }
+  .gl-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+  .gl-bar { height: 6px; border-radius: 3px; overflow: hidden; background: #efeae6; }
+  .gl-bar > div { height: 100%; border-radius: 3px; }
+  .gl-health { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .gl-health.ontrack { color: #22573c; background: #e3f1e9; }
+  .gl-health.atrisk { color: #7a4f00; background: #fbf0d6; }
+  .gl-health.behind { color: #b03a2e; background: #fbe9e7; }
+  .gl-health.upcoming, .gl-health.parked { color: #5f5952; background: #efeae6; }
+  .gl-health.done { color: #fff; background: var(--accent); }
+  .gl-mono { font-family: 'DM Mono', monospace; }
+  .gl-input { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--ink); background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; outline: none; min-width: 0; }
+  .gl-input:focus { border-color: #7c3f6e; }
+  .gl-inline { font-family: 'DM Sans', sans-serif; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 3px 6px; outline: none; min-width: 0; }
+  .gl-inline:hover { border-color: var(--border); }
+  .gl-inline:focus { border-color: #7c3f6e; background: #fff; }
+  .gl-check { width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--ink-faint); background: #fff; flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; padding: 0; }
+  .gl-check.on { background: var(--accent); border-color: var(--accent); }
+  .gl-ms { border: 1px solid var(--border); border-radius: 12px; background: #fff; overflow: hidden; }
+  .gl-ms-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; flex-wrap: wrap; }
+  .gl-caret { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 11px; width: 22px; height: 28px; padding: 0; }
+  .gl-task { display: flex; align-items: center; gap: 8px; min-height: 38px; border-top: 1px solid #f3efeb; padding: 2px 10px 2px 40px; position: relative; }
+  .gl-x { border: none; background: none; cursor: pointer; color: var(--ink-faint); font-size: 13px; padding: 4px 6px; opacity: 0; }
+  .gl-task:hover .gl-x, .gl-ms-head:hover .gl-x { opacity: 1; }
+  .gl-sched { font-family: 'DM Sans', sans-serif; font-size: 12px; border-radius: 999px; padding: 4px 10px; cursor: pointer; white-space: nowrap; border: 1px dashed var(--ink-faint); background: transparent; color: var(--ink-light); }
+  .gl-sched.set { border: none; background: #f3e9f8; color: #6a3a87; font-weight: 600; }
+  .gl-pop { position: absolute; z-index: 300; right: 8px; top: calc(100% - 2px); width: 290px; background: var(--paper); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 28px var(--shadow-lg); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .gl-daygrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .gl-daybtn { font-family: 'DM Sans', sans-serif; border: 1px solid var(--border); background: #fff; border-radius: 8px; padding: 5px 0; font-size: 11px; color: var(--ink); cursor: pointer; line-height: 1.3; }
+  .gl-daybtn.on { border: 2px solid #7c3f6e; background: var(--cream); font-weight: 600; }
+  .gl-daybtn.today { color: var(--accent); font-weight: 600; }
+  /* Timeline */
+  .gl-tl-scroll { overflow-x: auto; }
+  .gl-tl { display: flex; min-width: 900px; }
+  .gl-tl-labels { width: 250px; flex-shrink: 0; border-right: 1px solid var(--border); }
+  .gl-tl-area { flex: 1; position: relative; min-width: 640px; }
+  .gl-tl-head { height: 38px; border-bottom: 1px solid var(--border); display: flex; align-items: center; }
+  .gl-tl-row { position: relative; border-bottom: 1px solid #f3efeb; }
+  .gl-tl-row.goal { height: 46px; }
+  .gl-tl-row.ms { height: 34px; }
+  .gl-tl-lab { display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 13px; overflow: hidden; }
+  .gl-tl-lab span.t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gl-tl-bar { position: absolute; border-radius: 9px; cursor: pointer; overflow: hidden; box-sizing: border-box; }
+  .gl-tl-dia { position: absolute; width: 11px; height: 11px; transform: rotate(45deg); box-sizing: border-box; pointer-events: none; }
+  .gl-tl-today { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--gold); pointer-events: none; z-index: 2; }
+  .gl-tl-todaytag { position: absolute; top: 3px; font-family: 'DM Mono', monospace; font-size: 9px; line-height: 12px; background: var(--gold); color: var(--ink); padding: 2px 7px; border-radius: 999px; z-index: 3; pointer-events: none; }
+  .gl-seg { display: flex; background: var(--cream); border-radius: 10px; padding: 3px; }
+  .gl-seg button { font-family: 'DM Sans', sans-serif; border: none; background: transparent; font-size: 13px; padding: 5px 11px; border-radius: 8px; color: var(--ink-light); cursor: pointer; }
+  .gl-seg button.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(44,36,24,0.12); }
+  .gl-upnext { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+  .gl-mobile-only { display: none; }
+  /* Goal tasks inside the Weekly Planner */
+  .gl-wtask { border-radius: var(--radius-md); margin-bottom: 8px; padding: 7px 8px; font-size: 12px; position: relative; cursor: grab; border: 1px solid transparent; }
+  .gl-wtask .gl-wtask-row { display: flex; align-items: flex-start; gap: 6px; }
+  .gl-wtask .gl-wtask-title { flex: 1; min-width: 0; font-weight: 500; font-size: 11px; line-height: 1.3; word-break: break-word; }
+  .gl-wtask.done .gl-wtask-title { text-decoration: line-through; opacity: 0.55; }
+  .gl-wtask-pill { display: inline-block; margin: 4px 0 0 20px; font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 999px; max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: top; }
+  .gl-wtask-more { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 13px; padding: 0 2px; line-height: 1; opacity: 0; }
+  .gl-wtask:hover .gl-wtask-more { opacity: 1; }
+  .gl-wtask .task-check { margin-top: 1px; }
+  .gl-wtask-menu { position: absolute; z-index: 400; top: 100%; right: 0; width: 220px; background: var(--paper); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 28px var(--shadow-lg); padding: 8px; display: flex; flex-direction: column; gap: 6px; cursor: default; }
+  .gl-next { border: 1px solid var(--border); background: #fff; border-radius: 10px; padding: 8px 10px; cursor: pointer; text-align: left; width: 100%; font-family: 'DM Sans', sans-serif; color: var(--ink); }
+  .gl-next:hover { box-shadow: 0 2px 8px var(--shadow-md); }
+  .gl-next.late { background: #fdf3f1; border-color: #f0c9c3; }
+  /* Mobile "More" sheet */
+  .more-sheet-overlay { position: fixed; inset: 0; background: rgba(44,36,24,0.35); z-index: 95; }
+  .more-sheet { position: fixed; left: 0; right: 0; bottom: 56px; z-index: 96; background: var(--paper); border-radius: 18px 18px 0 0; padding: 10px 16px 12px; box-shadow: 0 -8px 24px rgba(44,36,24,0.18); }
+  .more-sheet-btn { width: 100%; display: flex; align-items: center; gap: 14px; min-height: 52px; border: none; background: transparent; font-size: 15px; font-family: 'DM Sans', sans-serif; color: var(--ink); text-align: left; cursor: pointer; border-bottom: 1px solid #f3efeb; }
+  .more-sheet-btn:last-child { border-bottom: none; }
+  .more-sheet-btn.active { color: var(--accent); font-weight: 600; }
+  .mobile-bottom-nav-btn svg { display: block; }
+  @media (max-width: 767px) {
+    .gl-wrap { flex-direction: column; padding: 12px; gap: 12px; overflow: visible; padding-bottom: 80px; }
+    .gl-side { width: auto; overflow: visible; }
+    .gl-main { overflow: visible; }
+    .gl-desktop-only { display: none !important; }
+    .gl-mobile-only { display: flex; }
+    .gl-x, .gl-wtask-more { opacity: 1; }
+    .gl-wtask .gl-wtask-title { font-size: 15px; }
+    .gl-wtask { padding: 10px 10px; cursor: default; }
+    .gl-wtask-pill { font-size: 11px; }
+    .gl-pop { position: fixed; left: 12px; right: 12px; top: auto; bottom: 72px; width: auto; }
+    .gl-wtask-menu { position: fixed; left: 12px; right: 12px; top: auto; bottom: 72px; width: auto; padding: 12px; }
+    .gl-task { padding-left: 14px; }
+    .gl-ms-head > input.gl-inline { flex-basis: calc(100% - 70px) !important; }
+    .gl-input, .gl-inline { font-size: 16px; } /* 16px prevents iOS auto-zoom */
+  }
+  @media (min-width: 768px) { .more-sheet, .more-sheet-overlay { display: none !important; } }
 </style>
 </head>
 <body>
@@ -2076,6 +2185,7 @@ const SYNC_SPLITS = {
   fitnessLog: 'map',        // one doc per day
   pagesData: 'list',        // one doc per page, plus a small order doc
   habitCompletions: 'month', habitQty: 'month', habitNotes: 'month', habitMetrics: 'month',
+  goals: 'list',            // one doc per goal (v4.2.0)
 };
 const SYNC_DELETED = Symbol('deleted');   // sentinel for "document removed"
 const SYNC_NO_BASE = Symbol('nobase');    // sentinel for "base version content unknown"
@@ -2991,7 +3101,7 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
   );
 }
 
-function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory }) {
+function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
@@ -3343,6 +3453,23 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   }
 
   const [dragging, setDragging] = useState(null); // {dayKey, id}
+  // Goal tasks (v4.2.0): read from `goals`, never copied into weekData. Keys are local dates.
+  const [dragGoal, setDragGoal] = useState(null); // {goalId, msId, taskId} while dragging a goal task
+  const goalTasksByDay = React.useMemo(() => glTasksByDay(goals), [goals]);
+  function setGoalTask(it, patch) { if (setGoals) setGoals(gs => glPatchTask(gs, it.goalId, it.msId, it.taskId, patch)); }
+  function renderGoalTasks(localKey, desktop) {
+    return (goalTasksByDay[localKey] || []).map(({goal, ms, task}) => {
+      const ref = {goalId: goal.id, msId: ms.id, taskId: task.id};
+      return (
+        <GlWeekTask key={'gt-'+task.id} item={{goal, ms, task}}
+          onToggle={()=>setGoalTask(ref, {done: !task.done})}
+          onMove={d=>setGoalTask(ref, {scheduledDate: d})}
+          onOpen={()=>onOpenGoal && onOpenGoal(goal.id)}
+          onDragStart={desktop ? ()=>{ setDragging(null); setDragGoal(ref); } : undefined}
+          onDragEnd={desktop ? ()=>setDragGoal(null) : undefined} />
+      );
+    });
+  }
   const [dragOver, setDragOver] = useState(null);  // {dayKey, id}
 
   function reorderTasks(dayKey, fromId, toId) {
@@ -3466,6 +3593,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         <textarea className="sidebar-textarea" placeholder="Write a quote to meditate on…"
           value={wd.proverb||''} onChange={e=>setWD(w=>({...w,proverb:e.target.value}))} rows={3} />
       </div>
+      {onOpenGoal && <GlNextUp goals={goals} weekKeys={weekDays.map(fmtLocal)} onOpenGoal={onOpenGoal} />}
       <div className="sidebar-section">
         <div className="checklist-header">
           <div className="sidebar-section-title">Weekly Goals:</div>
@@ -3557,6 +3685,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                     onDragOver={e=>e.preventDefault()}
                     onDrop={e=>{
                       e.preventDefault();
+                      if(dragGoal) { setGoalTask(dragGoal, {scheduledDate: fmtLocal(d)}); setDragGoal(null); setDragOver(null); return; }
                       if(!dragging) return;
                       if(dragging.dayKey === dk) {
                         if(!dragOver || dragOver.dayKey !== dk) reorderTasks(dk, dragging.id, null);
@@ -3568,6 +3697,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                     <DailyHabitsSection dayKey={dk}
                       habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
                       habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />
+                    {renderGoalTasks(fmtLocal(d), true)}
                     {tasks.map(task=>(
                       <TaskCard key={task.id} task={task}
                         onUpdate={p=>updateTask(dk,task.id,p)}
@@ -3597,6 +3727,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                         onDragOver={()=>setDragOver({dayKey:dk, id:task.id})}
                         onDragEnd={()=>{ setDragging(null); setDragOver(null); }}
                         onDrop={()=>{
+                          if(dragGoal) { setGoalTask(dragGoal, {scheduledDate: fmtLocal(d)}); setDragGoal(null); setDragOver(null); return; }
                           if(dragging) {
                             if(dragging.dayKey === dk) reorderTasks(dk, dragging.id, task.id);
                             else moveTaskBetweenDays(dragging.dayKey, dk, dragging.id, task.id);
@@ -3673,6 +3804,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           <DailyHabitsSection dayKey={mobileDayKey}
             habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
             habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />
+          {renderGoalTasks(fmtLocal(mobileDayDate), false)}
           {mobileDayTasks.map(task=>(
             <div key={task.id} data-task-id={task.id}
               style={{
@@ -7116,6 +7248,738 @@ function DataPanel({ me, refreshMe, suggestImport, onClose }) {
 // ─────────────────────────────────────────────
 // Synced app data is created with useSynced(key, init) below; each one uploads and syncs itself.
 
+// ─────────────────────────────────────────────
+// GOALS (v4.2.0)
+// goals: [{ id, title, why, color, status:'active'|'parked'|'done', startDate, targetDate,
+//           notesPageId, showCountdown, retro, createdAt, completedAt,
+//           milestones:[{ id, title, startDate, dueDate, done, completedAt,
+//                         tasks:[{ id, title, scheduledDate, done, completedAt }] }] }]
+// Goal tasks live ONLY in `goals`. The Weekly Planner shows every task whose scheduledDate falls
+// in the visible week; checking it off or moving it edits this record — nothing is copied into
+// weekData, so there is nothing to keep in step. Dates are local 'YYYY-MM-DD' (fmtLocal).
+// Synced as one document per goal (SYNC_SPLITS.goals = 'list').
+// ─────────────────────────────────────────────
+const GL_COLORS = ['#8b4aac','#2e7eb8','#1a9c82','#c4960e','#dc4a3a','#2d6b4a','#7c3f6e','#b8682e'];
+const GL_SOFT_LIMIT = 5;
+function glId(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function glToday() { return fmtLocal(new Date()); }
+function glDays(a, b) { const da = parseLocal(a), db = parseLocal(b); return (da && db) ? Math.round((db - da) / 86400000) : 0; }
+function glAddDays(s, n) { const d = parseLocal(s) || new Date(); d.setDate(d.getDate() + n); return fmtLocal(d); }
+function glShort(s) { const d = parseLocal(s); return d ? MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate() : ''; }
+function glShortDay(s) { const d = parseLocal(s); return d ? DAYS[d.getDay()] + ' ' + MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate() : ''; }
+function glRgb(hex) {
+  let h = (hex || '#7c3f6e').replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  const n = parseInt(h, 16) || 0;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function glTint(hex, a) { const [r, g, b] = glRgb(hex); return `rgba(${r},${g},${b},${a})`; }
+function glInk(hex) { const [r, g, b] = glRgb(hex); return `rgb(${Math.round(r * 0.6)},${Math.round(g * 0.6)},${Math.round(b * 0.6)})`; } // darker shade for text on a tint
+function glMsProgress(m) { if (m.done) return 1; const t = m.tasks || []; return t.length ? t.filter(x => x.done).length / t.length : 0; }
+function glProgress(g) {
+  if (g.status === 'done') return 1;
+  const ms = g.milestones || [];
+  return ms.length ? ms.reduce((s, m) => s + glMsProgress(m), 0) / ms.length : 0;
+}
+function glTaskCounts(g) {
+  let total = 0, done = 0;
+  (g.milestones || []).forEach(m => (m.tasks || []).forEach(t => { total++; if (t.done) done++; }));
+  return { total, done };
+}
+function glMsOverdue(m, today) { return !m.done && !!m.dueDate && m.dueDate < today; }
+function glNextMilestone(g) {
+  const open = (g.milestones || []).filter(m => !m.done);
+  open.sort((a, b) => (a.dueDate || '9999').localeCompare(b.dueDate || '9999'));
+  return open[0] || null;
+}
+// Health = work done vs. time used. An overdue milestone caps a goal at "At risk";
+// a passed target date with work left is "Behind".
+function glHealth(g, today) {
+  today = today || glToday();
+  const p = glProgress(g);
+  const span = glDays(g.startDate, g.targetDate);
+  const used = span > 0 ? Math.min(1, Math.max(0, glDays(g.startDate, today) / span)) : 0;
+  const base = { p, used, daysLeft: g.targetDate ? glDays(today, g.targetDate) : null };
+  if (g.status === 'done') return { ...base, key: 'done', label: 'Done' };
+  if (g.status === 'parked') return { ...base, key: 'parked', label: 'Parked' };
+  if (g.startDate && today < g.startDate) return { ...base, key: 'upcoming', label: 'Upcoming' };
+  if (g.targetDate && today > g.targetDate) return { ...base, key: 'behind', label: 'Behind' };
+  const late = (g.milestones || []).some(m => glMsOverdue(m, today));
+  if (p >= used - 0.10 && !late) return { ...base, key: 'ontrack', label: 'On track' };
+  if (p >= used - 0.25) return { ...base, key: 'atrisk', label: 'At risk' };
+  return { ...base, key: 'behind', label: 'Behind' };
+}
+function glPatchGoal(gs, gid, fn) { return gs.map(g => g.id === gid ? fn(g) : g); }
+function glPatchMs(g, mid, fn) { return { ...g, milestones: (g.milestones || []).map(m => m.id === mid ? fn(m) : m) }; }
+function glPatchTask(gs, gid, mid, tid, patch) {
+  const extra = ('done' in patch) ? { completedAt: patch.done ? Date.now() : null } : {};
+  return glPatchGoal(gs, gid, g => glPatchMs(g, mid, m => ({
+    ...m, tasks: (m.tasks || []).map(t => t.id === tid ? { ...t, ...patch, ...extra } : t),
+  })));
+}
+function glTasksByDay(goals) {   // 'YYYY-MM-DD' → [{ goal, ms, task }]
+  const out = {};
+  (goals || []).forEach(g => (g.milestones || []).forEach(m => (m.tasks || []).forEach(t => {
+    if (t.scheduledDate) (out[t.scheduledDate] || (out[t.scheduledDate] = [])).push({ goal: g, ms: m, task: t });
+  })));
+  return out;
+}
+function glNewGoal(goals) {
+  const used = new Set((goals || []).map(g => g.color));
+  const color = GL_COLORS.find(c => !used.has(c)) || GL_COLORS[(goals || []).length % GL_COLORS.length];
+  const t = glToday();
+  return { id: glId('gl'), title: '', why: '', color, status: 'active', startDate: t, targetDate: glAddDays(t, 90),
+    notesPageId: null, showCountdown: false, retro: '', createdAt: Date.now(), completedAt: null, milestones: [] };
+}
+function glNewMilestone(g) {
+  const ms = g.milestones || [];
+  const last = ms[ms.length - 1];
+  const start = last && last.dueDate ? glAddDays(last.dueDate, 1) : (g.startDate || glToday());
+  let due = glAddDays(start, 13);
+  if (g.targetDate && due > g.targetDate) due = g.targetDate < start ? start : g.targetDate;
+  return { id: glId('ms'), title: '', startDate: start, dueDate: due, done: false, completedAt: null, tasks: [] };
+}
+
+function GlHealthPill({ h }) { return <span className={`gl-health ${h.key}`}>{h.label}</span>; }
+
+// Day picker used to schedule a goal task onto a day (Goals tab and Weekly Planner menu).
+function GlSchedulePicker({ value, onPick, onClose, extra, anchor }) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(parseLocal(value) || today));
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const end = days[6];
+  const label = `${MONTHS[weekStart.getMonth()].slice(0, 3)} ${weekStart.getDate()} – ${weekStart.getMonth() === end.getMonth() ? '' : MONTHS[end.getMonth()].slice(0, 3) + ' '}${end.getDate()}`;
+  return (
+    <>
+      <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={e => { e.stopPropagation(); onClose(); }} />
+      <div className="gl-pop" style={anchor ? { position: 'fixed', top: anchor.top, left: anchor.left, right: 'auto' } : undefined} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <button className="gl-btn ghost" aria-label="Previous week" onClick={() => setWeekStart(w => addDays(w, -7))}>‹</button>
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-light)' }}>Week of {label}</span>
+          <button className="gl-btn ghost" aria-label="Next week" onClick={() => setWeekStart(w => addDays(w, 7))}>›</button>
+        </div>
+        <div className="gl-daygrid">
+          {days.map(d => {
+            const k = fmtLocal(d);
+            return (
+              <button key={k} className={`gl-daybtn ${k === value ? 'on' : ''} ${isSameDay(d, today) ? 'today' : ''}`}
+                onClick={() => { onPick(k); onClose(); }}>
+                {DAYS[d.getDay()]}<br />{d.getDate()}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input type="date" className="gl-input" style={{ flex: 1, padding: '5px 8px', fontSize: 12 }} aria-label="Pick a date"
+            value={value || ''} onChange={e => { if (e.target.value) { onPick(e.target.value); onClose(); } }} />
+          {value && <button className="gl-btn ghost" style={{ fontSize: 12 }} onClick={() => { onPick(null); onClose(); }}>Unschedule</button>}
+        </div>
+        {extra}
+      </div>
+    </>
+  );
+}
+
+// ── Goal task as it appears inside the Weekly Planner (desktop column + mobile day view) ──
+function GlWeekTask({ item, onToggle, onMove, onOpen, onDragStart, onDragEnd }) {
+  const { goal, ms, task } = item;
+  const [menu, setMenu] = useState(false);   // false | { anchor }
+  function openMenu(e) {
+    e.stopPropagation();
+    if (window.matchMedia('(max-width: 767px)').matches) { setMenu({ anchor: null }); return; }
+    const r = e.currentTarget.getBoundingClientRect();
+    const left = Math.max(8, Math.min(r.right - 290, window.innerWidth - 300));
+    const top = r.bottom + 330 > window.innerHeight ? Math.max(8, r.top - 330) : r.bottom + 4;
+    setMenu({ anchor: { top, left } });
+  }
+  const c = goal.color || '#7c3f6e';
+  return (
+    <div className={`gl-wtask ${task.done ? 'done' : ''}`}
+      style={{ background: glTint(c, 0.12), borderColor: glTint(c, 0.3) }}
+      draggable={!!onDragStart}
+      onDragStart={onDragStart ? e => { e.stopPropagation(); try { e.dataTransfer.setData('text/plain', 'goal-task'); e.dataTransfer.effectAllowed = 'move'; } catch {} onDragStart(); } : undefined}
+      onDragEnd={onDragEnd}
+      title={`${goal.title || 'Goal'} › ${ms.title || 'Milestone'}`}>
+      <div className="gl-wtask-row">
+        <div className={`task-check ${task.done ? 'done' : ''}`} role="checkbox" aria-checked={!!task.done}
+          style={{ color: c, borderColor: c, background: task.done ? glTint(c, 0.18) : undefined }}
+          onClick={e => { e.stopPropagation(); onToggle(); }} />
+        <div className="gl-wtask-title">{task.title || 'Untitled task'}</div>
+        <button className="gl-wtask-more" aria-label="Goal task options" onClick={openMenu}>⋯</button>
+      </div>
+      <span className="gl-wtask-pill" style={{ color: glInk(c), background: glTint(c, 0.18) }}>◆ {goal.title || 'Goal'}</span>
+      {menu && (
+        <GlSchedulePicker value={task.scheduledDate} onPick={onMove} onClose={() => setMenu(false)} anchor={menu.anchor}
+          extra={<button className="gl-btn" style={{ fontSize: 12 }} onClick={() => { setMenu(false); onOpen(); }}>Open goal ›</button>} />
+      )}
+    </div>
+  );
+}
+
+// ── "Goals · next up" block for the Weekly Planner sidebar ──
+function GlNextUp({ goals, weekKeys, onOpenGoal }) {
+  const today = glToday();
+  const active = (goals || []).filter(g => g.status === 'active');
+  if (!active.length) return null;
+  const inWeek = new Set(weekKeys);
+  return (
+    <div className="sidebar-section">
+      <div className="checklist-header">
+        <div className="sidebar-section-title">Goals · next up</div>
+        <button className="add-btn" title="Open Goals" onClick={() => onOpenGoal(null)}>›</button>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {active.map(g => {
+          const m = glNextMilestone(g);
+          const late = m && glMsOverdue(m, today);
+          const thisWeek = (g.milestones || []).reduce((n, mm) => n + (mm.tasks || []).filter(t => !t.done && inWeek.has(t.scheduledDate)).length, 0);
+          return (
+            <button key={g.id} className={`gl-next ${late ? 'late' : ''}`} onClick={() => onOpenGoal(g.id)}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 600 }}>
+                <span className="gl-dot" style={{ background: g.color, width: 8, height: 8 }} />
+                <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m ? (m.title || 'Untitled milestone') : (g.title || 'Untitled goal')}</span>
+              </div>
+              <div style={{ fontSize: 11, marginTop: 2, paddingLeft: 15, color: late ? '#b03a2e' : 'var(--ink-light)', fontWeight: late ? 600 : 400 }}>
+                {g.title || 'Goal'}
+                {m ? (late ? ` · ${glDays(m.dueDate, today)}d overdue` : m.dueDate ? ` · due ${glShort(m.dueDate)}` : '') : ' · no open milestones'}
+                {thisWeek ? ` · ${thisWeek} this week` : ''}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Timeline range per zoom level ──
+function glRange(zoom, offset) {
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  if (zoom === 'week') {
+    const start = addDays(getWeekStart(now), -7 + offset * 28);
+    const cols = Array.from({ length: 10 }, (_, i) => { const d = addDays(start, i * 7); return { start: d, label: MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate() }; });
+    return { start, end: addDays(start, 70), cols };
+  }
+  const per = zoom === 'year' ? 3 : 1;
+  const count = { month: 6, quarter: 12, year: 8 }[zoom] || 6;
+  const shift = ({ month: 3, quarter: 6, year: 12 }[zoom] || 3) * offset;
+  let s = zoom === 'year' ? new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1) : new Date(now.getFullYear(), now.getMonth(), 1);
+  s = new Date(s.getFullYear(), s.getMonth() + shift, 1);
+  const cols = Array.from({ length: count }, (_, i) => {
+    const d = new Date(s.getFullYear(), s.getMonth() + i * per, 1);
+    const label = zoom === 'year'
+      ? `Q${Math.floor(d.getMonth() / 3) + 1} ${d.getFullYear()}`
+      : MONTHS[d.getMonth()].slice(0, 3).toUpperCase() + ((i === 0 || d.getMonth() === 0) ? ' ' + d.getFullYear() : '');
+    return { start: d, label };
+  });
+  return { start: s, end: new Date(s.getFullYear(), s.getMonth() + count * per, 1), cols };
+}
+
+function GlTimeline({ goals, onOpenGoal }) {
+  const today = glToday();
+  const [zoom, setZoom] = useState(() => sessionStorage.getItem('lp_glZoom') || 'month');
+  const [offset, setOffset] = useState(0);
+  const [show, setShow] = useState('active');   // 'active' | 'all' | <goalId>
+  const [collapsed, setCollapsed] = useState({});
+  const range = glRange(zoom, offset);
+  const total = range.end - range.start;
+  const pct = (s, endOfDay) => { const d = parseLocal(s); if (!d) return null; if (endOfDay) d.setDate(d.getDate() + 1); return (d - range.start) / total * 100; };
+  const clip = (a, b) => { if (a == null || b == null) return null; const l = Math.max(0, a), r = Math.min(100, b); return r > l ? { left: l, width: r - l } : null; };
+
+  const shown = goals.filter(g => show === 'active' ? g.status === 'active' : show === 'all' ? g.status !== 'done' : g.id === show);
+  const rows = [];
+  shown.forEach(g => {
+    rows.push({ type: 'goal', g });
+    if (!collapsed[g.id]) (g.milestones || []).forEach(m => rows.push({ type: 'ms', g, m }));
+  });
+  const todayPct = pct(today);
+  const endCol = range.cols[range.cols.length - 1];
+  const rangeLabel = `${MONTHS[range.start.getMonth()].slice(0, 3)} ${range.start.getFullYear()} – ${MONTHS[endCol.start.getMonth()].slice(0, 3)} ${endCol.start.getFullYear()}`;
+  function setZ(z) { sessionStorage.setItem('lp_glZoom', z); setZoom(z); setOffset(0); }
+
+  return (
+    <section className="gl-card gl-desktop-only" style={{ overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+          <span className="gl-h2">Timeline</span>
+          <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)' }}>{rangeLabel}</span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--ink-light)' }}>Show
+            <select className="gl-input" style={{ padding: '5px 8px' }} value={show} onChange={e => setShow(e.target.value)}>
+              <option value="active">All active goals</option>
+              <option value="all">Active + parked</option>
+              {goals.map(g => <option key={g.id} value={g.id}>{g.title || 'Untitled goal'}</option>)}
+            </select>
+          </label>
+          <button className="gl-btn" aria-label="Earlier" onClick={() => setOffset(o => o - 1)}>‹</button>
+          <button className="gl-btn" onClick={() => setOffset(0)}>Today</button>
+          <button className="gl-btn" aria-label="Later" onClick={() => setOffset(o => o + 1)}>›</button>
+          <div className="gl-seg" role="group" aria-label="Zoom">
+            {['week', 'month', 'quarter', 'year'].map(z => (
+              <button key={z} className={zoom === z ? 'on' : ''} aria-pressed={zoom === z} onClick={() => setZ(z)}>{z[0].toUpperCase() + z.slice(1)}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+      {!rows.length ? (
+        <div style={{ padding: '28px 16px', fontSize: 13, color: 'var(--ink-light)', textAlign: 'center' }}>
+          {goals.length ? 'No goals match this filter.' : 'Create a goal to see it on the timeline.'}
+        </div>
+      ) : (
+      <div className="gl-tl-scroll">
+        <div className="gl-tl">
+          <div className="gl-tl-labels">
+            <div className="gl-tl-head gl-label" style={{ padding: '0 14px' }}>Goal / milestone</div>
+            {rows.map(r => r.type === 'goal' ? (
+              <div key={r.g.id} className="gl-tl-row goal gl-tl-lab" style={{ background: glTint(r.g.color, 0.05) }}>
+                <button className="gl-caret" aria-label={collapsed[r.g.id] ? 'Expand' : 'Collapse'}
+                  onClick={() => setCollapsed(c => ({ ...c, [r.g.id]: !c[r.g.id] }))}>{collapsed[r.g.id] ? '▸' : '▾'}</button>
+                <span className="gl-dot" style={{ background: r.g.color }} />
+                <span className="t" style={{ fontWeight: 600, cursor: 'pointer', fontSize: 14 }} onClick={() => onOpenGoal(r.g.id)}>{r.g.title || 'Untitled goal'}</span>
+                <span className="gl-mono" style={{ fontSize: 11, color: 'var(--ink-light)' }}>{Math.round(glProgress(r.g) * 100)}%</span>
+              </div>
+            ) : (
+              <div key={r.m.id} className="gl-tl-row ms gl-tl-lab" style={{ paddingLeft: 40 }}>
+                <span aria-hidden="true" style={{ color: r.m.done ? 'var(--accent)' : glMsOverdue(r.m, today) ? 'var(--red)' : r.g.color, width: 12 }}>{r.m.done ? '✓' : '◆'}</span>
+                <span className="t" style={{ color: r.m.done ? 'var(--ink-light)' : glMsOverdue(r.m, today) ? '#b03a2e' : 'var(--ink)', textDecoration: r.m.done ? 'line-through' : 'none', cursor: 'pointer' }}
+                  onClick={() => onOpenGoal(r.g.id)}>{r.m.title || 'Untitled milestone'}</span>
+                {glMsOverdue(r.m, today)
+                  ? <span style={{ fontSize: 11, fontWeight: 600, color: '#b03a2e' }}>Overdue</span>
+                  : (r.m.tasks || []).length > 0 && <span className="gl-mono" style={{ fontSize: 11, color: 'var(--ink-light)' }}>{(r.m.tasks || []).filter(t => t.done).length}/{r.m.tasks.length}</span>}
+              </div>
+            ))}
+          </div>
+          <div className="gl-tl-area">
+            {range.cols.slice(1).map((c, i) => (
+              <div key={i} aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: ((c.start - range.start) / total * 100) + '%', width: 1, background: '#efeae6' }} />
+            ))}
+            <div className="gl-tl-head" style={{ position: 'relative' }}>
+              {range.cols.map((c, i) => (
+                <span key={i} className="gl-mono" style={{ position: 'absolute', bottom: 6, left: `calc(${(c.start - range.start) / total * 100}% + 8px)`, fontSize: 11, color: 'var(--ink-light)', whiteSpace: 'nowrap' }}>{c.label}</span>
+              ))}
+            </div>
+            {rows.map(r => {
+              if (r.type === 'goal') {
+                const g = r.g;
+                const s = pct(g.startDate), e = pct(g.targetDate, true);
+                const bar = clip(s, e);
+                const fill = (s != null && e != null) ? clip(s, s + (e - s) * glProgress(g)) : null;
+                const dia = e != null && e - 0.0001 <= 100 && e >= 0 ? e : null;
+                return (
+                  <div key={g.id} className="gl-tl-row goal" style={{ background: glTint(g.color, 0.04) }}>
+                    {bar && <div className="gl-tl-bar" onClick={() => onOpenGoal(g.id)} title={`${g.title || 'Goal'}: ${glShort(g.startDate)} – ${glShort(g.targetDate)}`}
+                      style={{ top: 13, height: 20, left: bar.left + '%', width: bar.width + '%', background: glTint(g.color, 0.2) }} />}
+                    {fill && <div className="gl-tl-bar" onClick={() => onOpenGoal(g.id)}
+                      style={{ top: 13, height: 20, left: fill.left + '%', width: fill.width + '%', background: g.color, borderRadius: '9px 0 0 9px' }} />}
+                    {dia != null && <div className="gl-tl-dia" style={{ top: 17.5, left: `calc(${dia}% - 5.5px)`, background: '#fff', border: `2px solid ${g.color}` }} />}
+                  </div>
+                );
+              }
+              const { g, m } = r;
+              const late = glMsOverdue(m, today);
+              const current = !m.done && !late && (!m.startDate || m.startDate <= today);
+              const s = pct(m.startDate || m.dueDate), e = pct(m.dueDate, true);
+              const bar = clip(s, e);
+              const st = m.done ? { background: g.color, opacity: 0.55 }
+                : late ? { background: 'rgba(220,74,58,0.12)', border: '1.5px solid var(--red)' }
+                : current ? { background: glTint(g.color, 0.16), border: `1.5px solid ${g.color}` }
+                : { background: glTint(g.color, 0.08), border: `1.5px dashed ${glTint(g.color, 0.55)}` };
+              const prog = glMsProgress(m);
+              const dia = !m.done && e != null && e >= 0 && e <= 100 ? e : null;
+              return (
+                <div key={m.id} className="gl-tl-row ms">
+                  {bar && (
+                    <div className="gl-tl-bar" onClick={() => onOpenGoal(g.id)} title={`${m.title || 'Milestone'}: ${glShort(m.startDate)} – ${glShort(m.dueDate)}`}
+                      style={{ top: 10, height: 14, left: bar.left + '%', width: bar.width + '%', ...st }}>
+                      {current && prog > 0 && <div style={{ width: (prog * 100) + '%', height: '100%', background: glTint(g.color, 0.45) }} />}
+                    </div>
+                  )}
+                  {dia != null && <div className="gl-tl-dia" style={{ top: 11.5, left: `calc(${dia}% - 5.5px)`,
+                    background: late ? 'var(--red)' : current ? g.color : '#fff', border: late || current ? 'none' : `2px solid ${g.color}` }} />}
+                </div>
+              );
+            })}
+            {todayPct != null && todayPct >= 0 && todayPct <= 100 && (
+              <>
+                <div className="gl-tl-today" style={{ left: todayPct + '%' }} />
+                <span className="gl-tl-todaytag" style={{ left: `calc(${todayPct}% + 4px)` }}>TODAY</span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+      )}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, padding: '10px 16px', borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--ink-light)' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, background: '#7c3f6e', opacity: 0.55 }} />Done</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px solid #7c3f6e', boxSizing: 'border-box' }} />In progress</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px dashed #7c3f6e', boxSizing: 'border-box' }} />Upcoming</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px solid var(--red)', boxSizing: 'border-box' }} />Overdue</span>
+        <span style={{ marginLeft: 'auto' }}>Click a bar or name to open the goal</span>
+      </div>
+    </section>
+  );
+}
+
+// One milestone in the goal editor: header row plus (when open) its tasks.
+function GlMilestoneEditor({ m, color, open, onToggleOpen, onChange, onDelete }) {
+  const today = glToday();
+  const [newTask, setNewTask] = useState('');
+  const [focusId, setFocusId] = useState(null);
+  const [picker, setPicker] = useState(null);   // task id whose schedule picker is open
+  const tasks = m.tasks || [];
+  const late = glMsOverdue(m, today);
+  function setTask(tid, patch) {
+    const extra = ('done' in patch) ? { completedAt: patch.done ? Date.now() : null } : {};
+    onChange(mm => ({ ...mm, tasks: (mm.tasks || []).map(t => t.id === tid ? { ...t, ...patch, ...extra } : t) }));
+  }
+  function addTask(title, afterId) {
+    const t = { id: glId('gt'), title: title || '', scheduledDate: null, done: false, completedAt: null };
+    onChange(mm => {
+      const list = [...(mm.tasks || [])];
+      const i = afterId ? list.findIndex(x => x.id === afterId) : -1;
+      if (i >= 0) list.splice(i + 1, 0, t); else list.push(t);
+      return { ...mm, tasks: list };
+    });
+    return t.id;
+  }
+  return (
+    <div className="gl-ms" style={{ borderColor: open ? color : late ? '#f0c9c3' : undefined, borderWidth: open ? 2 : 1 }}>
+      <div className="gl-ms-head" style={{ background: open ? glTint(color, 0.06) : late ? '#fdf3f1' : undefined }}>
+        <button className="gl-caret" aria-label={open ? 'Collapse milestone' : 'Expand milestone'} onClick={onToggleOpen}>{open ? '▾' : '▸'}</button>
+        <button className={`gl-check ${m.done ? 'on' : ''}`} aria-label={m.done ? 'Mark milestone not done' : 'Mark milestone done'}
+          onClick={() => onChange(mm => ({ ...mm, done: !mm.done, completedAt: !mm.done ? Date.now() : null }))}>{m.done ? '✓' : ''}</button>
+        <input className="gl-inline" style={{ flex: '1 1 160px', fontSize: 14, fontWeight: open ? 600 : 500, textDecoration: m.done ? 'line-through' : 'none', color: m.done ? 'var(--ink-light)' : late ? '#b03a2e' : 'var(--ink)' }}
+          placeholder="Milestone name" value={m.title} autoFocus={!m.title}
+          onChange={e => onChange(mm => ({ ...mm, title: e.target.value }))} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
+          <input type="date" className="gl-input" style={{ padding: '4px 6px', fontSize: 12 }} aria-label="Milestone start"
+            value={m.startDate || ''} onChange={e => onChange(mm => ({ ...mm, startDate: e.target.value || null }))} />
+          <span style={{ color: 'var(--ink-faint)' }}>–</span>
+          <input type="date" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, borderColor: late ? 'var(--red)' : undefined }} aria-label="Milestone due date"
+            value={m.dueDate || ''} onChange={e => onChange(mm => ({ ...mm, dueDate: e.target.value || null }))} />
+        <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)', minWidth: 34, textAlign: 'right' }}>{tasks.filter(t => t.done).length}/{tasks.length}</span>
+        <button className="gl-x" aria-label="Delete milestone" onClick={() => {
+          if (tasks.length && !window.confirm(`Delete "${m.title || 'this milestone'}" and its ${tasks.length} task${tasks.length === 1 ? '' : 's'}?`)) return;
+          onDelete();
+        }}>✕</button>
+        </div>
+      </div>
+      {open && (
+        <div>
+          {tasks.map(t => (
+            <div key={t.id} className="gl-task">
+              <button className={`gl-check ${t.done ? 'on' : ''}`} aria-label={t.done ? 'Mark task not done' : 'Mark task done'}
+                onClick={() => setTask(t.id, { done: !t.done })}>{t.done ? '✓' : ''}</button>
+              <input className="gl-inline" style={{ flex: 1, fontSize: 14, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? 'var(--ink-light)' : 'var(--ink)' }}
+                placeholder="Task" value={t.title} autoFocus={focusId === t.id}
+                onChange={e => setTask(t.id, { title: e.target.value })}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); setFocusId(addTask('', t.id)); } }}
+                onBlur={() => { if (!t.title.trim()) onChange(mm => ({ ...mm, tasks: (mm.tasks || []).filter(x => x.id !== t.id) })); }} />
+              <button className={`gl-sched ${t.scheduledDate ? 'set' : ''}`}
+                style={t.scheduledDate ? { background: glTint(color, 0.14), color: glInk(color) } : undefined}
+                onClick={() => setPicker(p => p === t.id ? null : t.id)}>
+                {t.scheduledDate ? glShortDay(t.scheduledDate) : '+ Schedule'}
+              </button>
+              <button className="gl-x" aria-label="Delete task" onClick={() => onChange(mm => ({ ...mm, tasks: (mm.tasks || []).filter(x => x.id !== t.id) }))}>✕</button>
+              {picker === t.id && <GlSchedulePicker value={t.scheduledDate} onPick={d => setTask(t.id, { scheduledDate: d })} onClose={() => setPicker(null)} />}
+            </div>
+          ))}
+          <div className="gl-task">
+            <span style={{ width: 18, textAlign: 'center', color: 'var(--ink-faint)' }}>+</span>
+            <input className="gl-inline" style={{ flex: 1, fontSize: 14 }} placeholder="Add a task — press Enter" value={newTask}
+              onChange={e => setNewTask(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && newTask.trim()) { e.preventDefault(); addTask(newTask.trim()); setNewTask(''); } }} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage }) {
+  const today = glToday();
+  const [openMs, setOpenMs] = useState(() => { const n = glNextMilestone(goal); return n ? { [n.id]: true } : {}; });
+  const h = glHealth(goal, today);
+  const counts = glTaskCounts(goal);
+  const c = goal.color || '#7c3f6e';
+  const ms = goal.milestones || [];
+  const pages = (pagesData || []).filter(p => p && p.id);
+  function setMs(mid, fn) { onChange(g => glPatchMs(g, mid, fn)); }
+  function addMs() {
+    const m = glNewMilestone(goal);
+    onChange(g => ({ ...g, milestones: [...(g.milestones || []), m] }));
+    setOpenMs(o => ({ ...o, [m.id]: true }));
+  }
+  const healthText = h.key === 'done' ? 'Goal complete.'
+    : h.key === 'parked' ? 'Parked — not counted against your active goals.'
+    : h.key === 'upcoming' ? `Starts ${glShort(goal.startDate)}.`
+    : h.key === 'behind' && goal.targetDate && today > goal.targetDate ? `Target date passed ${glDays(goal.targetDate, today)} days ago.`
+    : `${h.p >= h.used ? 'Ahead of pace' : h.key === 'ontrack' ? 'Roughly on pace' : 'Behind pace'}${ms.some(m => glMsOverdue(m, today)) ? ', with an overdue milestone' : ''}.${h.daysLeft != null ? ` ${h.daysLeft} day${h.daysLeft === 1 ? '' : 's'} to target.` : ''}`;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <button className="gl-btn ghost" style={{ alignSelf: 'flex-start', paddingLeft: 0 }} onClick={onBack}>‹ All goals</button>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
+        <div className="gl-card" style={{ flex: '999 1 520px', minWidth: 0, overflow: 'visible' }}>
+          <div style={{ height: 6, background: c, borderRadius: '16px 16px 0 0' }} />
+          <div style={{ padding: '16px 20px 14px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input className="gl-inline" placeholder="Goal name" value={goal.title} autoFocus={!goal.title}
+                style={{ flex: 1, fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 600 }}
+                onChange={e => onChange(g => ({ ...g, title: e.target.value }))} />
+              <GlHealthPill h={h} />
+            </div>
+            <textarea className="gl-inline" rows={2} placeholder="Why does this matter? (optional)" value={goal.why || ''}
+              style={{ width: '100%', resize: 'vertical', fontSize: 14, fontStyle: 'italic', color: 'var(--ink-light)', marginTop: 4, boxSizing: 'border-box' }}
+              onChange={e => onChange(g => ({ ...g, why: e.target.value }))} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
+              <div className="gl-bar" style={{ flex: 1, height: 8, background: glTint(c, 0.15) }}><div style={{ width: Math.round(glProgress(goal) * 100) + '%', background: c }} /></div>
+              <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)' }}>{Math.round(glProgress(goal) * 100)}% · {counts.done} of {counts.total} tasks</span>
+            </div>
+          </div>
+          <div style={{ padding: '14px 20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span className="gl-label">Milestones</span>
+              <button className="gl-btn" onClick={addMs}>+ Add milestone</button>
+            </div>
+            {!ms.length && <div style={{ fontSize: 13, color: 'var(--ink-light)', padding: '6px 2px' }}>Break the goal into milestones — checkpoints with dates — then add tasks under each one and schedule them into your weeks.</div>}
+            {ms.map(m => (
+              <GlMilestoneEditor key={m.id} m={m} color={c} open={!!openMs[m.id]}
+                onToggleOpen={() => setOpenMs(o => ({ ...o, [m.id]: !o[m.id] }))}
+                onChange={fn => setMs(m.id, fn)}
+                onDelete={() => onChange(g => ({ ...g, milestones: (g.milestones || []).filter(x => x.id !== m.id) }))} />
+            ))}
+          </div>
+        </div>
+
+        <div style={{ flex: '1 1 280px', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--ink-light)' }}>Start
+                <input type="date" className="gl-input" value={goal.startDate || ''} onChange={e => onChange(g => ({ ...g, startDate: e.target.value || null }))} />
+              </label>
+              <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--ink-light)' }}>Target
+                <input type="date" className="gl-input" value={goal.targetDate || ''} onChange={e => onChange(g => ({ ...g, targetDate: e.target.value || null }))} />
+              </label>
+            </div>
+            <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--ink-light)' }}>Status
+              <select className="gl-input" value={goal.status} onChange={e => { const v = e.target.value; onChange(g => ({ ...g, status: v, completedAt: v === 'done' ? (g.completedAt || Date.now()) : null })); }}>
+                <option value="active">Active</option><option value="parked">Parked</option><option value="done">Done</option>
+              </select>
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12, color: 'var(--ink-light)' }}>Color
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {GL_COLORS.map(col => (
+                  <button key={col} aria-label={'Color ' + col} onClick={() => onChange(g => ({ ...g, color: col }))}
+                    style={{ width: 24, height: 24, borderRadius: '50%', background: col, cursor: 'pointer', border: col === c ? '3px solid #fff' : 'none', boxShadow: col === c ? `0 0 0 2px ${col}` : 'none' }} />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <span className="gl-label">Health</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+              <span style={{ width: 72, color: 'var(--ink-light)' }}>Work done</span>
+              <div className="gl-bar" style={{ flex: 1, height: 8, background: glTint(c, 0.15) }}><div style={{ width: Math.round(h.p * 100) + '%', background: c }} /></div>
+              <span className="gl-mono" style={{ fontSize: 12, width: 36, textAlign: 'right' }}>{Math.round(h.p * 100)}%</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+              <span style={{ width: 72, color: 'var(--ink-light)' }}>Time used</span>
+              <div className="gl-bar" style={{ flex: 1, height: 8 }}><div style={{ width: Math.round(h.used * 100) + '%', background: 'var(--ink-light)' }} /></div>
+              <span className="gl-mono" style={{ fontSize: 12, width: 36, textAlign: 'right' }}>{Math.round(h.used * 100)}%</span>
+            </div>
+            <div style={{ fontSize: 13, color: h.key === 'ontrack' || h.key === 'done' ? '#22573c' : h.key === 'atrisk' ? '#7a4f00' : h.key === 'behind' ? '#b03a2e' : 'var(--ink-light)' }}>{healthText}</div>
+          </div>
+
+          <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <span className="gl-label">Linked</span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <select className="gl-input" style={{ flex: 1 }} value={goal.notesPageId || ''} aria-label="Linked notes page"
+                onChange={e => { const v = e.target.value || null; onChange(g => ({ ...g, notesPageId: v })); }}>
+                <option value="">No notes page</option>
+                {pages.map(p => <option key={p.id} value={p.id}>{p.title || 'Untitled page'}</option>)}
+              </select>
+              {goal.notesPageId && pages.some(p => p.id === goal.notesPageId) && <button className="gl-btn" onClick={() => onOpenPage(goal.notesPageId)}>Open</button>}
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!goal.showCountdown} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }}
+                onChange={e => { const v = e.target.checked; onChange(g => ({ ...g, showCountdown: v })); }} />
+              Show target date in Countdowns
+            </label>
+          </div>
+
+          <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 6, borderStyle: goal.status === 'done' ? 'solid' : 'dashed' }}>
+            <span className="gl-label">Retro</span>
+            {goal.status === 'done' ? (
+              <textarea className="gl-input" rows={4} placeholder="What worked? What would you change next time?" value={goal.retro || ''}
+                style={{ resize: 'vertical' }} onChange={e => onChange(g => ({ ...g, retro: e.target.value }))} />
+            ) : (
+              <span style={{ fontSize: 13, color: 'var(--ink-light)' }}>Opens when you mark this goal done: what worked, what you'd change.</span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {goal.status !== 'done'
+              ? <button className="gl-btn primary" style={{ flex: 1, minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'done', completedAt: Date.now() }))}>Mark goal done</button>
+              : <button className="gl-btn" style={{ flex: 1, minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'active', completedAt: null }))}>Reopen goal</button>}
+            {goal.status === 'active' && <button className="gl-btn" style={{ minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'parked' }))}>Park</button>}
+            {goal.status === 'parked' && <button className="gl-btn" style={{ minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'active' }))}>Unpark</button>}
+          </div>
+          <button className="gl-btn ghost danger" style={{ alignSelf: 'flex-start' }} onClick={() => {
+            if (window.confirm(`Delete "${goal.title || 'this goal'}" with all its milestones and tasks? This can't be undone.`)) onDelete();
+          }}>Delete goal</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage }) {
+  const today = glToday();
+  const [statusTab, setStatusTab] = useState('active');
+  const list = Array.isArray(goals) ? goals : [];
+  const sel = selectedId ? list.find(g => g.id === selectedId) : null;
+  const counts = { active: 0, parked: 0, done: 0 };
+  list.forEach(g => { counts[g.status] = (counts[g.status] || 0) + 1; });
+
+  // Keep "Show in Countdowns" goals mirrored into the countdowns list (ids prefixed 'goal-').
+  useEffect(() => {
+    if (!setCountdowns) return;
+    const cur = Array.isArray(countdowns) ? countdowns : [];
+    const want = list.filter(g => g.showCountdown && g.targetDate && g.status !== 'done')
+      .map(g => ({ id: 'goal-' + g.id, title: g.title || 'Goal', startDate: g.startDate || today, endDate: g.targetDate, color: g.color }));
+    const others = cur.filter(c => !String(c.id).startsWith('goal-'));
+    const next = [...others, ...want];
+    if (JSON.stringify(next) !== JSON.stringify(cur)) setCountdowns(next);
+  }, [goals]);
+
+  function changeGoal(gid, fn) { setGoals(gs => glPatchGoal(gs, gid, fn)); }
+  function newGoal() {
+    if (counts.active >= GL_SOFT_LIMIT && !window.confirm(`You already have ${counts.active} active goals (soft limit ${GL_SOFT_LIMIT}). Add another anyway?`)) return;
+    const g = glNewGoal(list);
+    setGoals(gs => [...gs, g]);
+    setStatusTab('active');
+    setSelectedId(g.id);
+  }
+
+  const shownList = list.filter(g => g.status === statusTab);
+  const upcoming = [];
+  list.filter(g => g.status === 'active').forEach(g => (g.milestones || []).forEach(m => { if (!m.done) upcoming.push({ g, m }); }));
+  upcoming.sort((a, b) => (a.m.dueDate || '9999').localeCompare(b.m.dueDate || '9999'));
+  const weekStart = getWeekStart(new Date());
+  const weekKeys = Array.from({ length: 7 }, (_, i) => fmtLocal(addDays(weekStart, i)));
+  const byDay = glTasksByDay(list.filter(g => g.status !== 'done'));
+  const weekItems = weekKeys.flatMap(k => byDay[k] || []);
+
+  return (
+    <div className="gl-wrap">
+      <aside className={`gl-card gl-side ${sel ? 'gl-desktop-only' : ''}`} aria-label="Goals list">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span className="gl-h2" style={{ fontSize: 22 }}>Goals</span>
+          <button className="gl-btn primary" onClick={newGoal}>+ New goal</button>
+        </div>
+        <div role="tablist" aria-label="Goal status" style={{ display: 'flex', gap: 6 }}>
+          {['active', 'parked', 'done'].map(s => (
+            <button key={s} role="tab" aria-selected={statusTab === s} className={`gl-chip ${statusTab === s ? 'on' : ''}`} onClick={() => setStatusTab(s)}>
+              {s[0].toUpperCase() + s.slice(1)} {counts[s] || 0}
+            </button>
+          ))}
+        </div>
+        {!shownList.length && (
+          <div style={{ fontSize: 13, color: 'var(--ink-light)', padding: '8px 2px', lineHeight: 1.5 }}>
+            {statusTab === 'active' ? 'No active goals yet. Start one with + New goal.' : statusTab === 'parked' ? 'Nothing parked.' : 'No finished goals yet.'}
+          </div>
+        )}
+        {shownList.map(g => {
+          const h = glHealth(g, today);
+          const m = glNextMilestone(g);
+          const doneMs = (g.milestones || []).filter(x => x.done).length;
+          const late = m && glMsOverdue(m, today);
+          return (
+            <button key={g.id} className="gl-goal-card" onClick={() => setSelectedId(g.id)}
+              style={{ border: sel && sel.id === g.id ? `2px solid ${g.color}` : undefined }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="gl-dot" style={{ background: g.color }} />
+                <span style={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.title || 'Untitled goal'}</span>
+                <GlHealthPill h={h} />
+              </div>
+              <div className="gl-bar" style={{ margin: '9px 0 6px', background: glTint(g.color, 0.15) }}><div style={{ width: Math.round(h.p * 100) + '%', background: g.color }} /></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--ink-light)' }}>
+                <span>{Math.round(h.p * 100)}% · {doneMs} of {(g.milestones || []).length} milestones</span>
+                <span className="gl-mono">{glShort(g.targetDate)}</span>
+              </div>
+              {g.status === 'active' && m && (
+                <div style={{ marginTop: 6, fontSize: 12, color: late ? '#b03a2e' : 'var(--ink)', fontWeight: late ? 600 : 400 }}>
+                  {late ? `${m.title || 'Milestone'} · ${glDays(m.dueDate, today)} days overdue`
+                    : <><span style={{ color: 'var(--ink-light)' }}>Next:</span> {m.title || 'Untitled milestone'}{m.dueDate ? ` · due ${glShort(m.dueDate)}` : ''}</>}
+                </div>
+              )}
+            </button>
+          );
+        })}
+        {statusTab === 'active' && counts.active > 0 && (
+          <div style={{ fontSize: 12, color: counts.active > GL_SOFT_LIMIT ? '#7a4f00' : 'var(--ink-light)', background: counts.active > GL_SOFT_LIMIT ? '#fbf0d6' : 'var(--cream)', borderRadius: 8, padding: '8px 10px' }}>
+            {counts.active} active of a soft limit of {GL_SOFT_LIMIT}{counts.active > GL_SOFT_LIMIT ? ' — consider parking one' : ''}
+          </div>
+        )}
+      </aside>
+
+      <main className="gl-main">
+        {sel ? (
+          <GlDetail key={sel.id} goal={sel} pagesData={pagesData} onOpenPage={onOpenPage}
+            onChange={fn => changeGoal(sel.id, fn)}
+            onBack={() => setSelectedId(null)}
+            onDelete={() => { setGoals(gs => gs.filter(g => g.id !== sel.id)); setSelectedId(null); }} />
+        ) : (
+          <>
+            <GlTimeline goals={list} onOpenGoal={setSelectedId} />
+
+            {weekItems.length > 0 && (
+              <section className="gl-card gl-mobile-only" style={{ flexDirection: 'column', overflow: 'hidden' }}>
+                <div className="gl-label" style={{ padding: '12px 14px 6px' }}>This week · goal tasks</div>
+                {weekItems.map(({ goal, ms, task }) => (
+                  <label key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 48, padding: '0 14px', borderTop: '1px solid #f3efeb', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={!!task.done} style={{ width: 20, height: 20, accentColor: goal.color }}
+                      onChange={() => setGoals(gs => glPatchTask(gs, goal.id, ms.id, task.id, { done: !task.done }))} />
+                    <span style={{ flex: 1, fontSize: 15, textDecoration: task.done ? 'line-through' : 'none', color: task.done ? 'var(--ink-light)' : 'var(--ink)' }}>{task.title || 'Untitled task'}</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: glInk(goal.color), background: glTint(goal.color, 0.16), padding: '2px 8px', borderRadius: 999 }}>{DAYS[parseLocal(task.scheduledDate).getDay()]}</span>
+                  </label>
+                ))}
+              </section>
+            )}
+
+            {upcoming.length > 0 && (
+              <section className="gl-card" style={{ padding: '14px 16px', flexShrink: 0 }}>
+                <div className="gl-h2" style={{ fontSize: 18, marginBottom: 10 }}>Coming up</div>
+                <div className="gl-upnext">
+                  {upcoming.slice(0, 8).map(({ g, m }) => {
+                    const late = glMsOverdue(m, today);
+                    const tag = late ? `Overdue · ${glDays(m.dueDate, today)} day${glDays(m.dueDate, today) === 1 ? '' : 's'}`
+                      : m.startDate && m.startDate > today ? `Starts ${glShort(m.startDate)}`
+                      : m.dueDate ? `Due ${glShort(m.dueDate)}` : 'No due date';
+                    const t = m.tasks || [];
+                    return (
+                      <button key={m.id} onClick={() => setSelectedId(g.id)} className="gl-goal-card"
+                        style={{ background: late ? '#fdf3f1' : '#fff', borderColor: late ? '#f0c9c3' : undefined }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: late ? '#b03a2e' : 'var(--ink-light)' }}>{tag}</div>
+                        <div style={{ fontWeight: 600, fontSize: 14, margin: '4px 0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span className="gl-dot" style={{ background: g.color, width: 8, height: 8 }} />{m.title || 'Untitled milestone'}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--ink-light)' }}>{g.title || 'Goal'}{t.length ? ` · ${t.filter(x => x.done).length} of ${t.length} tasks` : ''}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
+            )}
+          </>
+        )}
+      </main>
+    </div>
+  );
+}
+
 function App() {
   const [page, setPageRaw] = useState(() => sessionStorage.getItem('lp_page') || 'planner');
   const setPage = (p) => { sessionStorage.setItem('lp_page', p); setPageRaw(p); };
@@ -7141,6 +8005,11 @@ function App() {
   const [fitnessExercises, setFitnessExercises] = useSynced('fitnessExercises', []); // [{id, name, category}] library
   const [fitnessGoals, setFitnessGoals] = useSynced('fitnessGoals', []); // [{id, exerciseId, period, target, unit}]
   const [countdowns, setCountdowns] = useSynced('countdowns', []); // [{id, title, startDate, endDate, color}]
+  const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
+  const [selectedGoalId, setSelectedGoalIdRaw] = useState(() => sessionStorage.getItem('lp_selectedGoalId') || null);
+  const setSelectedGoalId = (id) => { if(id) sessionStorage.setItem('lp_selectedGoalId', id); else sessionStorage.removeItem('lp_selectedGoalId'); setSelectedGoalIdRaw(id); };
+  const openGoal = (id) => { setSelectedGoalId(id || null); setPage('goals'); };
+  const [moreOpen, setMoreOpen] = useState(false); // mobile bottom-nav "More" sheet
 
   // Auth & sync state
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
@@ -7538,7 +8407,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: navColor}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.1.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.2.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -7547,6 +8416,7 @@ function App() {
           <button className={`nav-tab ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>Habit Tracker</button>
           <button className={`nav-tab ${page==='pages'?'active':''}`} onClick={()=>setPage('pages')}>Pages</button>
           <button className={`nav-tab ${page==='fitness'?'active':''}`} onClick={()=>setPage('fitness')}>Fitness</button>
+          <button className={`nav-tab ${page==='goals'?'active':''}`} onClick={()=>setPage('goals')}>Goals</button>
         </div>
         <div className="auth-area">
           {saveLabel && <span className={`save-status ${saveClass || saveStatus}`}>{saveLabel}</span>}
@@ -7613,7 +8483,7 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
@@ -7632,30 +8502,49 @@ function App() {
         onBack={()=>setPage('habit')} />}
       {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} foldersData={foldersData} setFoldersData={setFoldersData} weekData={weekData} setWeekData={setWeekData} selectedId={selectedPagesId} setSelectedId={setSelectedPagesId} />}
       {page==='fitness' && <FitnessView fitnessLog={fitnessLog} setFitnessLog={setFitnessLog} fitnessExercises={fitnessExercises} setFitnessExercises={setFitnessExercises} fitnessGoals={fitnessGoals} setFitnessGoals={setFitnessGoals} />}
+      {page==='goals' && <GoalsView goals={goals} setGoals={setGoals} pagesData={pagesData}
+        countdowns={countdowns} setCountdowns={setCountdowns}
+        selectedId={selectedGoalId} setSelectedId={setSelectedGoalId}
+        onOpenPage={(id)=>{ setSelectedPagesId(id); setPage('pages'); }} />}
       </div>
 
-      {/* Mobile bottom nav — only visible on phones via CSS */}
-      <div className="mobile-bottom-nav">
-        <button className={`mobile-bottom-nav-btn ${page==='monthly'?'active':''}`} onClick={()=>setPage('monthly')}>
-          <span className="icon">🗓</span>Month
-        </button>
-        <button className={`mobile-bottom-nav-btn ${page==='pages'?'active':''}`} onClick={()=>setPage('pages')}>
-          <span className="icon">📝</span>Pages
-        </button>
-        <button className={`mobile-bottom-nav-btn ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>
-          <span className="icon">✓</span>Habits
-        </button>
-        <button className={`mobile-bottom-nav-btn ${page==='planner'?'active':''}`} onClick={()=>setPage('planner')}>
-          <span className="icon">📅</span>Week
-        </button>
-        <button className={`mobile-bottom-nav-btn ${page==='fitness'?'active':''}`} onClick={()=>setPage('fitness')}>
-          <span className="icon">💪</span>Fitness
-        </button>
-        {authUser && (
-          <button className="mobile-bottom-nav-btn" onClick={handleSyncCalendar} disabled={syncing}>
-            <span className="icon">{syncing?'↻':'↓'}</span>Sync
+      {/* Mobile bottom nav — only visible on phones via CSS (v4.2.0: Fitness · Week · Habits · Goals · More) */}
+      {moreOpen && <div className="more-sheet-overlay" onClick={()=>setMoreOpen(false)} />}
+      {moreOpen && (
+        <div className="more-sheet" role="dialog" aria-label="More">
+          <div className="mobile-sheet-handle" />
+          <button className={`more-sheet-btn ${page==='monthly'?'active':''}`} onClick={()=>{setPage('monthly');setMoreOpen(false);}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3f6e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01"/></svg>
+            Monthly Calendar
           </button>
-        )}
+          <button className={`more-sheet-btn ${page==='pages'?'active':''}`} onClick={()=>{setPage('pages');setMoreOpen(false);}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3f6e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
+            Pages
+          </button>
+          {authUser && (
+            <button className="more-sheet-btn" disabled={syncing} onClick={()=>{setMoreOpen(false);handleSyncCalendar();}}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7c3f6e" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14"/></svg>
+              {syncing ? 'Syncing…' : 'Sync Calendar'}
+            </button>
+          )}
+        </div>
+      )}
+      <div className="mobile-bottom-nav">
+        <button className={`mobile-bottom-nav-btn ${page==='fitness'?'active':''}`} onClick={()=>{setPage('fitness');setMoreOpen(false);}}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6.5 6.5v11M3.5 9v6M17.5 6.5v11M20.5 9v6M6.5 12h11"/></svg>Fitness
+        </button>
+        <button className={`mobile-bottom-nav-btn ${page==='planner'?'active':''}`} onClick={()=>{setPage('planner');setMoreOpen(false);}}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M7.5 4v17M12 4v17M16.5 4v17"/></svg>Week
+        </button>
+        <button className={`mobile-bottom-nav-btn ${page==='habit'||page==='metrics'?'active':''}`} onClick={()=>{setPage('habit');setMoreOpen(false);}}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg>Habits
+        </button>
+        <button className={`mobile-bottom-nav-btn ${page==='goals'?'active':''}`} onClick={()=>{setPage('goals');setMoreOpen(false);}}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4 2.5 4H5"/></svg>Goals
+        </button>
+        <button className={`mobile-bottom-nav-btn ${moreOpen||page==='monthly'||page==='pages'?'active':''}`} aria-expanded={moreOpen} onClick={()=>setMoreOpen(o=>!o)}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>More
+        </button>
       </div>
     </div>
   );
