@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.3.0 -->
+<!-- LP Planner v4.4.0 -->
+<!-- v4.4.0 — Dark mode: Auto (follows device) / Light / Dark, saved per device (lp_theme). Toggle in the top bar on desktop and in the More sheet on mobile. Hard-coded light surfaces moved to theme variables (--surface, --tint, --neutral-bg, --neutral-line, --grid-line, --tile-*); light mode looks the same. -->
 <!-- v4.3.0 — "Dusk Violet" color theme (colors only): cool violet-tinted neutrals replace the warm brown/pink mix; violet accent replaces forest green; deep violet nav/headers; softer amber gold; shadows tinted to match. Saved nav/header colors that equal the old defaults display as the new theme defaults. -->
 <!-- v4.2.4 — Goals timeline: grid lines medium gray (#888078), between v4.2.2 and v4.2.3. -->
 <!-- v4.2.2 — Goals timeline: darker, more distinct grid lines (month columns, row dividers, header and label column borders). -->
@@ -16,6 +17,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="LP Planner">
+<script>/* v4.4.0: apply saved theme before first paint */(function(){try{var p=localStorage.getItem('lp_theme')||'auto';var d=p==='dark'||(p==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');}catch(e){}})();</script>
 <title>Weekly Planner & Habit Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -49,6 +51,17 @@
     --orange: #d9610a; --orange-light: #fef4eb;
     --teal: #1a9c82; --teal-light: #ebfaf6;
     --pink: #dc4a3a;
+    /* v4.4.0 theme tokens for formerly hard-coded colors */
+    --surface: #ffffff;
+    --tint: #e9e4fe;
+    --neutral-bg: #ebeaf0;
+    --neutral-line: #f1f0f5;
+    --grid-line: #878491;
+    --tile-empty: #d4d2dc;
+    --tile-multi: #2a2538;
+    --tile-num: rgba(42,37,56,0.7);
+    --hc-pct: 100%;      /* user-color text: unchanged in light */
+    --gl-ink-pct: 60%; --gl-ink-to: #000;  /* glInk = 60% of the goal color */
   }
   html, body { height: 100%; font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--ink); overflow-x: hidden; overscroll-behavior-y: contain; }
   @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
@@ -66,18 +79,18 @@
   .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
   .nav-bar {
     background: linear-gradient(135deg, #322353 0%, #473473 100%);
-    color: var(--paper);
+    color: #fdfdff;
     display: flex; align-items: center; justify-content: space-between;
     padding: 0 24px; height: 48px; flex-shrink: 0;
     border-bottom: none;
     box-shadow: 0 2px 12px rgba(35,30,51,0.2);
   }
-  .nav-brand { font-family: 'Playfair Display', serif; font-size: 18px; letter-spacing: 0.03em; color: var(--cream); }
+  .nav-brand { font-family: 'Playfair Display', serif; font-size: 18px; letter-spacing: 0.03em; color: #f6f5fb; }
   /* AUTH BAR */
   .auth-area { display: flex; align-items: center; gap: 8px; min-width: 200px; justify-content: flex-end; }
   .auth-btn {
     padding: 5px 12px; border-radius: var(--radius-sm); border: 1.5px solid rgba(255,255,255,0.3);
-    background: rgba(255,255,255,0.1); color: var(--cream); cursor: pointer;
+    background: rgba(255,255,255,0.1); color: #f6f5fb; cursor: pointer;
     font-size: 12px; font-family: 'DM Sans', sans-serif; font-weight: 500;
     transition: all 0.15s; white-space: nowrap;
   }
@@ -113,7 +126,7 @@
   .cal-header-cell:last-child { position: relative; }
   .hdr-color-popover {
     position: absolute; top: calc(100% + 6px); right: 0; left: auto; z-index: 100;
-    background: white; border-radius: var(--radius-md); padding: 12px;
+    background: var(--surface); border-radius: var(--radius-md); padding: 12px;
     box-shadow: 0 8px 28px var(--shadow-lg);
     min-width: 170px;
   }
@@ -143,7 +156,7 @@
     background: transparent; color: var(--ink-faint); letter-spacing: 0.05em; text-transform: uppercase;
     transition: all 0.15s;
   }
-  .nav-tab:hover { color: var(--cream); }
+  .nav-tab:hover { color: #f6f5fb; }
   .nav-tab.active { background: rgba(184,134,11,0.2); color: var(--gold); }
   .main-content { flex: 1; display: flex; overflow: hidden; }
 
@@ -213,7 +226,7 @@
   .checklist-item.checked .checklist-label { text-decoration: line-through; color: var(--ink-faint); }
   .check-box {
     width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 3px;
-    cursor: pointer; flex-shrink: 0; background: white; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0; background: var(--surface); display: flex; align-items: center; justify-content: center;
     transition: all 0.15s; margin-top: 2px;
   }
   .check-box.checked { background: var(--accent); border-color: var(--accent); }
@@ -321,9 +334,9 @@
     background: var(--accent-light); border-radius: var(--radius-sm) var(--radius-sm) 0 0;
     font-weight: 600; transition: background 0.1s;
   }
-  .habit-task-label:hover { background: #e9e4fe; }
+  .habit-task-label:hover { background: var(--tint); }
   .habit-task-row {
-    background: white;
+    background: var(--surface);
     border-bottom: 1px solid rgba(0,0,0,0.04);
     transition: background 0.1s;
   }
@@ -342,7 +355,7 @@
   .habit-schedule-btn {
     font-size: 10px; font-family: 'DM Sans', sans-serif; font-weight: 500;
     border: 1px solid var(--border); border-radius: 20px;
-    padding: 2px 8px; cursor: pointer; background: white; color: var(--ink-light);
+    padding: 2px 8px; cursor: pointer; background: var(--surface); color: var(--ink-light);
     transition: all 0.12s; white-space: nowrap;
   }
   .habit-schedule-btn.active {
@@ -396,7 +409,7 @@
   }
   .workout-card-header {
     display: flex; align-items: center; gap: 8px;
-    padding: 10px 14px; background: #e9e4fe;
+    padding: 10px 14px; background: var(--tint);
     border-bottom: 1px solid rgba(106,80,167,0.15);
   }
   .workout-name-input {
@@ -444,7 +457,7 @@
   .set-input {
     width: 52px; font-family: 'DM Mono', monospace; font-size: 12px; font-weight: 600;
     border: 1px solid var(--border); border-radius: var(--radius-sm);
-    padding: 3px 5px; text-align: center; background: white; color: var(--ink);
+    padding: 3px 5px; text-align: center; background: var(--surface); color: var(--ink);
     outline: none;
   }
   .set-input:focus { border-color: var(--accent); }
@@ -456,7 +469,7 @@
     width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--ink-faint);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; flex-shrink: 0; transition: all 0.12s; margin-left: auto;
-    background: white;
+    background: var(--surface);
   }
   .set-check:hover { border-color: var(--accent); background: var(--accent-light); }
   .set-check.done { background: var(--accent); border-color: var(--accent); }
@@ -522,7 +535,7 @@
     font-weight: 500; color: var(--ink-light); background: transparent;
     transition: all 0.12s;
   }
-  .fitness-view-tab.active { background: white; color: var(--accent); font-weight: 700; box-shadow: 0 1px 3px var(--shadow-md); }
+  .fitness-view-tab.active { background: var(--surface); color: var(--accent); font-weight: 700; box-shadow: 0 1px 3px var(--shadow-md); }
   .fitness-week-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
   .fitness-week-col {
     background: var(--paper); border-radius: var(--radius-md);
@@ -732,7 +745,7 @@
   .task-repeat-end-input {
     font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-light);
     border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px;
-    background: white; cursor: pointer;
+    background: var(--surface); cursor: pointer;
   }
   .task-repeat-end-input:focus { outline: none; border-color: var(--accent); }
   .task-repeat-apply-btn {
@@ -797,7 +810,7 @@
     margin-bottom: 6px;
   }
   .countdown-card {
-    background: white; border-radius: var(--radius-sm);
+    background: var(--surface); border-radius: var(--radius-sm);
     border: 1px solid var(--border);
     border-left-width: 3px;
     padding: 8px 10px 8px 10px;
@@ -848,7 +861,7 @@
   .habit-qty-input {
     width: 36px; border: 1px solid var(--border); border-radius: 6px;
     padding: 2px 4px; font-size: 11px; font-family: 'DM Mono', monospace;
-    color: var(--ink); background: white; text-align: center;
+    color: var(--ink); background: var(--surface); text-align: center;
     flex-shrink: 0;
   }
   .habit-qty-input:focus { outline: none; border-color: var(--accent); }
@@ -870,7 +883,7 @@
   .goal-check {
     width: 18px; height: 18px; border-radius: 5px; border: 1.5px solid var(--border);
     cursor: pointer; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s; background: white;
+    transition: all 0.2s; background: var(--surface);
   }
   .goal-check.checked { border-color: currentColor; }
   .goal-check.checked::after { content: '✓'; font-size: 11px; }
@@ -890,7 +903,7 @@
   .view-tabs { display: flex; gap: 4px; }
   .view-tab {
     padding: 5px 14px; border-radius: 20px; border: 1px solid var(--border);
-    background: white; font-size: 12px; cursor: pointer; transition: all 0.2s;
+    background: var(--surface); font-size: 12px; cursor: pointer; transition: all 0.2s;
     font-family: 'DM Mono', monospace; letter-spacing: 0.05em;
   }
   .view-tab.active { background: var(--accent); color: white; border-color: var(--accent); }
@@ -908,7 +921,7 @@
     color: var(--ink-faint); padding: 4px 0; font-weight: 500;
   }
   .month-day-cell {
-    border: none; border-radius: var(--radius-sm); background: white;
+    border: none; border-radius: var(--radius-sm); background: var(--surface);
     min-height: 80px; padding: 5px; position: relative; overflow: hidden;
     display: flex; flex-direction: column;
     box-shadow: 0 1px 3px var(--shadow), 0 0 0 1px rgba(0,0,0,0.04);
@@ -958,7 +971,7 @@
   .daily-goal-card {
     display: flex; flex-direction: column; align-items: center; gap: 8px;
     padding: 14px 19px; border-radius: var(--radius-md); border: 2.5px solid var(--border);
-    background: white; cursor: pointer; transition: all 0.2s; min-width: 100px;
+    background: var(--surface); cursor: pointer; transition: all 0.2s; min-width: 100px;
   }
   .daily-goal-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px var(--shadow-md); }
   .daily-goal-card.checked-today { box-shadow: 0 4px 12px var(--shadow-md); }
@@ -971,7 +984,7 @@
 
   /* COLOR PICKER */
   .color-picker-popup {
-    position: absolute; background: white; border: 1px solid var(--border);
+    position: absolute; background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius-md); padding: 10px; z-index: 100; display: flex; gap: 6px;
     box-shadow: 0 4px 16px var(--shadow-md); flex-wrap: wrap; width: 130px;
     left: 0; top: 100%; margin-top: 4px;
@@ -997,7 +1010,7 @@
   .modal-input {
     width: 100%; border: 1px solid var(--border); border-radius: var(--radius-sm);
     padding: 10px 12px; font-size: 14px; font-family: 'DM Sans', sans-serif;
-    outline: none; margin-bottom: 12px; background: white;
+    outline: none; margin-bottom: 12px; background: var(--surface);
   }
   .modal-input:focus { border-color: var(--accent); }
   .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
@@ -1010,7 +1023,7 @@
   .goal-filter-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
   .goal-filter-chip {
     padding: 4px 12px; border-radius: 14px; border: 1.5px solid var(--border);
-    font-size: 11px; cursor: pointer; transition: all 0.15s; background: white;
+    font-size: 11px; cursor: pointer; transition: all 0.15s; background: var(--surface);
     display: flex; align-items: center; gap: 4px;
   }
   .goal-filter-chip.active { border-color: var(--accent); background: var(--accent); color: white; }
@@ -1021,7 +1034,7 @@
   [data-tooltip]:hover::after {
     content: attr(data-tooltip);
     position: absolute; bottom: 125%; left: 50%; transform: translateX(-50%);
-    background: var(--ink); color: white; padding: 4px 8px; border-radius: 4px;
+    background: #2a2538; color: white; padding: 4px 8px; border-radius: 4px;
     font-size: 11px; white-space: nowrap; z-index: 999; pointer-events: none;
   }
 
@@ -1356,7 +1369,7 @@
     width: 100%; text-align: center; font-family: 'DM Mono', monospace;
     font-size: 14px; font-weight: 600; color: var(--ink);
     border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 4px 6px;
-    background: white; outline: none; box-sizing: border-box;
+    background: var(--surface); outline: none; box-sizing: border-box;
   }
   .mhc-metric-input:focus { border-color: var(--accent); }
   /* On desktop, the sidebar already shows these — hide in HabitChecklist */
@@ -1374,7 +1387,7 @@
   .monthly-habit-check-row {
     display: flex; align-items: center; gap: 10px;
     padding: 10px 14px; border-radius: var(--radius-sm); cursor: pointer;
-    background: white; transition: all 0.15s;
+    background: var(--surface); transition: all 0.15s;
     box-shadow: 0 1px 3px var(--shadow), 0 0 0 1px rgba(0,0,0,0.03);
   }
   .monthly-habit-check-row:hover { box-shadow: 0 2px 8px var(--shadow-md), 0 0 0 1px rgba(0,0,0,0.03); }
@@ -1461,7 +1474,7 @@
   .pages-folder-name-input {
     font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
     color: var(--ink); flex: 1; min-width: 0; border: 1.5px solid var(--accent);
-    border-radius: 5px; padding: 1px 5px; background: white; outline: none;
+    border-radius: 5px; padding: 1px 5px; background: var(--surface); outline: none;
   }
   .pages-folder-add-btn {
     background: none; border: none; cursor: pointer; font-size: 14px; font-weight: 600;
@@ -1499,7 +1512,7 @@
 
   /* Sticky title header */
   .pages-doc-header {
-    flex-shrink: 0; padding: 24px 36px 8px; background: white;
+    flex-shrink: 0; padding: 24px 36px 8px; background: var(--surface);
     border-bottom: none;
     box-shadow: 0 1px 6px rgba(0,0,0,0.05);
   }
@@ -1549,7 +1562,7 @@
     min-height: 240px; padding: 18px 20px;
     border: none;
     border-radius: var(--radius-md);
-    background: white; outline: none;
+    background: var(--surface); outline: none;
     font-family: 'DM Sans', sans-serif;
     font-size: 14px; line-height: 1.75; color: var(--ink);
     box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.05);
@@ -1598,14 +1611,14 @@
   .pages-task-item {
     display: flex; align-items: flex-start; gap: 10px;
     padding: 12px 14px; border-radius: var(--radius-md); margin-bottom: 8px;
-    background: white; border: none;
+    background: var(--surface); border: none;
     box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.04);
     transition: box-shadow 0.2s;
   }
   .pages-task-item:hover { box-shadow: 0 4px 12px rgba(106,80,167,0.1), 0 0 0 1px rgba(106,80,167,0.15); }
   .pages-task-check {
     width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 4px;
-    flex-shrink: 0; background: white; cursor: pointer; margin-top: 2px;
+    flex-shrink: 0; background: var(--surface); cursor: pointer; margin-top: 2px;
     display: flex; align-items: center; justify-content: center; transition: all 0.15s;
   }
   .pages-task-check.done { background: var(--accent); border-color: var(--accent); }
@@ -1660,14 +1673,14 @@
   .pages-toggle-strip {
     width: 32px; min-width: 32px; flex-shrink: 0;
     display: flex; flex-direction: column; align-items: center; padding-top: 14px; gap: 8px;
-    border-right: 1px solid rgba(0,0,0,0.06); background: white;
+    border-right: 1px solid rgba(0,0,0,0.06); background: var(--surface);
     cursor: pointer; transition: background 0.15s;
   }
   .pages-toggle-strip:hover { background: var(--cream); }
   .pages-toggle-btn {
     display: flex; align-items: center; justify-content: center;
     width: 20px; height: 20px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.08);
-    background: white; color: var(--ink-faint); font-size: 12px; pointer-events: none;
+    background: var(--surface); color: var(--ink-faint); font-size: 12px; pointer-events: none;
   }
   .pages-toggle-strip:hover .pages-toggle-btn { background: var(--accent); color: white; border-color: var(--accent); }
 
@@ -1851,59 +1864,59 @@
   .gl-side.collapsed { width: 52px; padding: 12px 0; overflow: hidden; }
   .gl-side.collapsed .gl-side-body { display: none; }
   .gl-side.collapsed .gl-side-strip { display: flex; }
-  .gl-side-toggle { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: #fff; color: var(--ink-light); cursor: pointer; font-size: 15px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; font-family: 'DM Sans', sans-serif; }
+  .gl-side-toggle { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-light); cursor: pointer; font-size: 15px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; padding: 0; flex-shrink: 0; font-family: 'DM Sans', sans-serif; }
   .gl-side-toggle:hover { background: var(--cream); color: var(--ink); }
   .gl-side-vlabel { writing-mode: vertical-rl; transform: rotate(180deg); font-family: 'Playfair Display', serif; font-size: 15px; font-weight: 600; color: var(--ink); margin: 4px 0; }
   .gl-side-dot { width: 14px; height: 14px; border-radius: 50%; border: none; cursor: pointer; padding: 0; flex-shrink: 0; }
   .gl-h2 { font-family: 'Playfair Display', serif; font-size: 20px; font-weight: 600; color: var(--ink); }
   .gl-label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-light); }
-  .gl-btn { font-family: 'DM Sans', sans-serif; font-size: 13px; border: 1px solid var(--border); background: #fff; color: var(--ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  .gl-btn { font-family: 'DM Sans', sans-serif; font-size: 13px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
   .gl-btn:hover { background: var(--cream); }
   .gl-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
   .gl-btn.primary:hover { filter: brightness(1.08); }
   .gl-btn.ghost { border-color: transparent; background: transparent; color: var(--ink-light); }
   .gl-btn.danger { color: var(--red); }
-  .gl-chip { font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); background: #fff; color: var(--ink-light); cursor: pointer; }
+  .gl-chip { font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-light); cursor: pointer; }
   .gl-chip.on { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 600; }
-  .gl-goal-card { text-align: left; width: 100%; font-family: 'DM Sans', sans-serif; background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; cursor: pointer; display: block; color: var(--ink); }
+  .gl-goal-card { text-align: left; width: 100%; font-family: 'DM Sans', sans-serif; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; cursor: pointer; display: block; color: var(--ink); }
   .gl-goal-card:hover { box-shadow: 0 2px 8px var(--shadow-md); }
   .gl-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
-  .gl-bar { height: 6px; border-radius: 3px; overflow: hidden; background: #ebeaf0; }
+  .gl-bar { height: 6px; border-radius: 3px; overflow: hidden; background: var(--neutral-bg); }
   .gl-bar > div { height: 100%; border-radius: 3px; }
   .gl-health { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
   .gl-health.ontrack { color: #22573c; background: #e3f1e9; }
   .gl-health.atrisk { color: #7a4f00; background: #fbf0d6; }
   .gl-health.behind { color: #b03a2e; background: #fbe9e7; }
-  .gl-health.upcoming, .gl-health.parked { color: #6a6678; background: #ebeaf0; }
+  .gl-health.upcoming, .gl-health.parked { color: #6a6678; background: var(--neutral-bg); }
   .gl-health.done { color: #fff; background: var(--accent); }
   .gl-mono { font-family: 'DM Mono', monospace; }
-  .gl-input { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--ink); background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; outline: none; min-width: 0; }
+  .gl-input { font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; outline: none; min-width: 0; }
   .gl-input:focus { border-color: var(--accent); }
   .gl-inline { font-family: 'DM Sans', sans-serif; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 3px 6px; outline: none; min-width: 0; }
   .gl-inline:hover { border-color: var(--border); }
-  .gl-inline:focus { border-color: var(--accent); background: #fff; }
-  .gl-check { width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--ink-faint); background: #fff; flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; padding: 0; }
+  .gl-inline:focus { border-color: var(--accent); background: var(--surface); }
+  .gl-check { width: 18px; height: 18px; border-radius: 5px; border: 2px solid var(--ink-faint); background: var(--surface); flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 11px; padding: 0; }
   .gl-check.on { background: var(--accent); border-color: var(--accent); }
-  .gl-ms { border: 1px solid var(--border); border-radius: 12px; background: #fff; overflow: hidden; }
+  .gl-ms { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
   .gl-ms-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; flex-wrap: wrap; }
   .gl-caret { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 11px; width: 22px; height: 28px; padding: 0; }
-  .gl-task { display: flex; align-items: center; gap: 8px; min-height: 38px; border-top: 1px solid #f1f0f5; padding: 2px 10px 2px 40px; position: relative; }
+  .gl-task { display: flex; align-items: center; gap: 8px; min-height: 38px; border-top: 1px solid var(--neutral-line); padding: 2px 10px 2px 40px; position: relative; }
   .gl-x { border: none; background: none; cursor: pointer; color: var(--ink-faint); font-size: 13px; padding: 4px 6px; opacity: 0; }
   .gl-task:hover .gl-x, .gl-ms-head:hover .gl-x { opacity: 1; }
   .gl-sched { font-family: 'DM Sans', sans-serif; font-size: 12px; border-radius: 999px; padding: 4px 10px; cursor: pointer; white-space: nowrap; border: 1px dashed var(--ink-faint); background: transparent; color: var(--ink-light); }
   .gl-sched.set { border: none; background: #f3e9f8; color: #6a3a87; font-weight: 600; }
   .gl-pop { position: absolute; z-index: 300; right: 8px; top: calc(100% - 2px); width: 290px; background: var(--paper); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 28px var(--shadow-lg); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
   .gl-daygrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
-  .gl-daybtn { font-family: 'DM Sans', sans-serif; border: 1px solid var(--border); background: #fff; border-radius: 8px; padding: 5px 0; font-size: 11px; color: var(--ink); cursor: pointer; line-height: 1.3; }
+  .gl-daybtn { font-family: 'DM Sans', sans-serif; border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 5px 0; font-size: 11px; color: var(--ink); cursor: pointer; line-height: 1.3; }
   .gl-daybtn.on { border: 2px solid var(--accent); background: var(--cream); font-weight: 600; }
   .gl-daybtn.today { color: var(--accent); font-weight: 600; }
   /* Timeline */
   .gl-tl-scroll { overflow-x: auto; }
   .gl-tl { display: flex; min-width: 900px; }
-  .gl-tl-labels { width: 250px; flex-shrink: 0; border-right: 1px solid #878491; }
+  .gl-tl-labels { width: 250px; flex-shrink: 0; border-right: 1px solid var(--grid-line); }
   .gl-tl-area { flex: 1; position: relative; min-width: 640px; }
-  .gl-tl-head { height: 38px; border-bottom: 1px solid #878491; display: flex; align-items: center; }
-  .gl-tl-row { position: relative; border-bottom: 1px solid #878491; }
+  .gl-tl-head { height: 38px; border-bottom: 1px solid var(--grid-line); display: flex; align-items: center; }
+  .gl-tl-row { position: relative; border-bottom: 1px solid var(--grid-line); }
   .gl-tl-row.goal { height: 46px; }
   .gl-tl-row.ms { height: 34px; }
   .gl-tl-lab { display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 13px; overflow: hidden; }
@@ -1914,7 +1927,7 @@
   .gl-tl-todaytag { position: absolute; top: 3px; font-family: 'DM Mono', monospace; font-size: 9px; line-height: 12px; background: var(--gold); color: var(--ink); padding: 2px 7px; border-radius: 999px; z-index: 3; pointer-events: none; }
   .gl-seg { display: flex; background: var(--cream); border-radius: 10px; padding: 3px; }
   .gl-seg button { font-family: 'DM Sans', sans-serif; border: none; background: transparent; font-size: 13px; padding: 5px 11px; border-radius: 8px; color: var(--ink-light); cursor: pointer; }
-  .gl-seg button.on { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(35,30,51,0.12); }
+  .gl-seg button.on { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(35,30,51,0.12); }
   .gl-upnext { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
   .gl-mobile-only { display: none; }
   /* Goal tasks inside the Weekly Planner */
@@ -1927,13 +1940,13 @@
   .gl-wtask:hover .gl-wtask-more { opacity: 1; }
   .gl-wtask .task-check { margin-top: 1px; }
   .gl-wtask-menu { position: absolute; z-index: 400; top: 100%; right: 0; width: 220px; background: var(--paper); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 28px var(--shadow-lg); padding: 8px; display: flex; flex-direction: column; gap: 6px; cursor: default; }
-  .gl-next { border: 1px solid var(--border); background: #fff; border-radius: 10px; padding: 8px 10px; cursor: pointer; text-align: left; width: 100%; font-family: 'DM Sans', sans-serif; color: var(--ink); }
+  .gl-next { border: 1px solid var(--border); background: var(--surface); border-radius: 10px; padding: 8px 10px; cursor: pointer; text-align: left; width: 100%; font-family: 'DM Sans', sans-serif; color: var(--ink); }
   .gl-next:hover { box-shadow: 0 2px 8px var(--shadow-md); }
   .gl-next.late { background: #fdf3f1; border-color: #f0c9c3; }
   /* Mobile "More" sheet */
   .more-sheet-overlay { position: fixed; inset: 0; background: rgba(35,30,51,0.35); z-index: 95; }
   .more-sheet { position: fixed; left: 0; right: 0; bottom: 56px; z-index: 96; background: var(--paper); border-radius: 18px 18px 0 0; padding: 10px 16px 12px; box-shadow: 0 -8px 24px rgba(35,30,51,0.18); }
-  .more-sheet-btn { width: 100%; display: flex; align-items: center; gap: 14px; min-height: 52px; border: none; background: transparent; font-size: 15px; font-family: 'DM Sans', sans-serif; color: var(--ink); text-align: left; cursor: pointer; border-bottom: 1px solid #f1f0f5; }
+  .more-sheet-btn { width: 100%; display: flex; align-items: center; gap: 14px; min-height: 52px; border: none; background: transparent; font-size: 15px; font-family: 'DM Sans', sans-serif; color: var(--ink); text-align: left; cursor: pointer; border-bottom: 1px solid var(--neutral-line); }
   .more-sheet-btn:last-child { border-bottom: none; }
   .more-sheet-btn.active { color: var(--accent); font-weight: 600; }
   .mobile-bottom-nav-btn svg { display: block; }
@@ -1957,6 +1970,62 @@
     .gl-input, .gl-inline { font-size: 16px; } /* 16px prevents iOS auto-zoom */
   }
   @media (min-width: 768px) { .more-sheet, .more-sheet-overlay { display: none !important; } }
+  /* ═══════════════════════════════════════════════════════════════
+     v4.4.0 DARK MODE — "Dusk Violet" dark. Active when <html data-theme="dark">
+     (set by the head script + App). Light mode is untouched by this block.
+     ═══════════════════════════════════════════════════════════════ */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --cream: #14121b;
+    --paper: #1d1b25;
+    --surface: #26232f;
+    --ink: #e8e6ef;
+    --ink-light: #aeacb8;
+    --ink-faint: #75727f;
+    --accent: #876cca;
+    --accent-light: #302844;
+    --gold: #e5b15b;
+    --gold-light: #2d220f;
+    --border: #383541;
+    --shadow: rgba(0,0,0,0.25);
+    --shadow-md: rgba(0,0,0,0.35);
+    --shadow-lg: rgba(0,0,0,0.45);
+    --card-shadow: 0 1px 3px rgba(0,0,0,0.35);
+    --red-light: #381f1b; --blue-light: #152839; --purple-light: #2c2135;
+    --orange-light: #362113; --teal-light: #0d2d25;
+    --tint: #3a3154;
+    --neutral-bg: #312f37;
+    --neutral-line: #29282e;
+    --grid-line: #5b5965;
+    --tile-empty: #2e2b37;
+    --tile-multi: #6b6880;
+    --tile-num: #8e8b99;
+    --hc-pct: 58%;
+    --gl-ink-pct: 55%; --gl-ink-to: #fff;
+  }
+  /* Pastel task / event colors: dim them so light text stays readable */
+  [data-theme="dark"] .task-card,
+  [data-theme="dark"] .monthly-event-chip {
+    background-image: linear-gradient(rgba(20,18,27,0.66), rgba(20,18,27,0.66)) !important;
+  }
+  [data-theme="dark"] .task-color-swatch { filter: brightness(0.75); }
+  /* Status chips and notices that had light pastel fills */
+  [data-theme="dark"] .gl-health.ontrack { color: #7fd1a3; background: #16301f; }
+  [data-theme="dark"] .gl-health.atrisk { color: #e5b15b; background: #2d220f; }
+  [data-theme="dark"] .gl-health.behind { color: #f08a7e; background: #381f1b; }
+  [data-theme="dark"] .gl-sched.set { background: #302844; color: #c9b8f5; }
+  [data-theme="dark"] .gl-next.late { background: #2a1a1a; border-color: #5a2e2a; }
+  [data-theme="dark"] .gl-chip.on { background: var(--accent); border-color: var(--accent); }
+  [data-theme="dark"] .modal-btn.danger { background: #381f1b; color: #f08a7e; }
+  [data-theme="dark"] .month-event-item.pending:hover { background: #3a2d14; }
+  [data-theme="dark"] .pages-folder-row.swipe-reveal { background: #381f1b; }
+  /* Generic dark-on-light hairlines become light-on-dark */
+  [data-theme="dark"] .cal-day:hover,
+  [data-theme="dark"] .monthly-cell:hover { background: #262138; }
+  [data-theme="dark"] .monthly-cal-grid { background: #2a2832; border-color: #2a2832; }
+  [data-theme="dark"] ::placeholder { color: var(--ink-faint); }
+  .theme-btn { min-width: 0; }
+  @media (max-width: 767px) { .auth-btn.theme-btn { display: none; } }
 </style>
 </head>
 <body>
@@ -4154,7 +4223,7 @@ function PeopleChecklist({ items, weekDays, onUpdate, onDelete, onReorder, direc
                     <input
                       style={{width:'100%',fontSize:12.5,fontFamily:"'DM Sans',sans-serif",
                         border:'1px solid var(--border)',borderRadius:4,padding:'3px 7px',
-                        outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+                        outline:'none',background:'var(--surface)',color:'var(--ink)',boxSizing:'border-box'}}
                       value={name}
                       onChange={e=>onRenameDirectory(item.personId, e.target.value)}
                       onClick={e=>e.stopPropagation()}
@@ -4179,7 +4248,7 @@ function PeopleChecklist({ items, weekDays, onUpdate, onDelete, onReorder, direc
                 <textarea rows={2}
                   style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",
                     border:'1px solid var(--border)',borderRadius:4,padding:'4px 6px',
-                    resize:'vertical',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+                    resize:'vertical',outline:'none',background:'var(--surface)',color:'var(--ink)',boxSizing:'border-box'}}
                   placeholder="How did you connect?"
                   value={item.note||''}
                   onChange={e=>onUpdate(item.id,{note:e.target.value})}
@@ -4244,7 +4313,7 @@ function PeoplePicker({ directory, existingPersonIds, onAdd, onClose }) {
             placeholder="Search previous people…"
             style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",
               border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
-              padding:'5px 9px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+              padding:'5px 9px',outline:'none',background:'var(--surface)',color:'var(--ink)',boxSizing:'border-box'}}
           />
         </div>
         {/* Directory list */}
@@ -4264,7 +4333,7 @@ function PeoplePicker({ directory, existingPersonIds, onAdd, onClose }) {
               <div style={{
                 width:15,height:15,border:'1.5px solid',flexShrink:0,borderRadius:3,
                 borderColor: selectedIds.has(p.id) ? 'var(--accent)' : 'var(--border)',
-                background: selectedIds.has(p.id) ? 'var(--accent)' : 'white',
+                background: selectedIds.has(p.id) ? 'var(--accent)' : 'var(--surface)',
                 display:'flex',alignItems:'center',justifyContent:'center',transition:'all 0.12s',
               }}>
                 {selectedIds.has(p.id) && <span style={{color:'white',fontSize:9,lineHeight:1}}>✓</span>}
@@ -4281,7 +4350,7 @@ function PeoplePicker({ directory, existingPersonIds, onAdd, onClose }) {
             placeholder="Name (comma-separate for multiple)"
             style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",
               border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
-              padding:'5px 9px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+              padding:'5px 9px',outline:'none',background:'var(--surface)',color:'var(--ink)',boxSizing:'border-box'}}
           />
         </div>
         {/* Footer */}
@@ -4403,7 +4472,7 @@ function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitComp
                 {done && <span style={{color:'white', fontSize:9, lineHeight:1}}>✓</span>}
               </div>
               <span style={{flex:1, fontSize:12, fontFamily:"'DM Sans',sans-serif", fontWeight:500,
-                color: done ? g.color : 'var(--ink)', textDecoration: done ? 'line-through' : 'none',
+                color: done ? hcText(g.color) : 'var(--ink)', textDecoration: done ? 'line-through' : 'none',
                 opacity: done ? 0.7 : 1}}>
                 {g.name}
               </span>
@@ -4424,7 +4493,7 @@ function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitComp
                     placeholder="—"
                     style={{width:60, fontSize:11, fontFamily:"'DM Mono',monospace",
                       border:'1px solid var(--border)', borderRadius:3, padding:'2px 4px',
-                      background:'white', color:'var(--ink)', outline:'none'}}
+                      background:'var(--surface)', color:'var(--ink)', outline:'none'}}
                   />
                 </div>
                 <div style={{display:'flex', flexDirection:'column', gap:2}}>
@@ -4432,7 +4501,7 @@ function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitComp
                   <textarea rows={2}
                     style={{width:'100%', fontSize:11, fontFamily:"'DM Sans',sans-serif",
                       border:'1px solid var(--border)', borderRadius:3, padding:'3px 5px',
-                      resize:'vertical', outline:'none', background:'white', color:'var(--ink)',
+                      resize:'vertical', outline:'none', background:'var(--surface)', color:'var(--ink)',
                       boxSizing:'border-box'}}
                     placeholder="Notes for today…"
                     value={getNoteVal(g.id)}
@@ -4703,7 +4772,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
                 onChange={e=>onUpdate({invitees:e.target.value.split(',').map(s=>s.trim()).filter(Boolean)})}
                 style={{width:'100%',fontSize:11,fontFamily:"'DM Sans',sans-serif",
                   border:'1px solid var(--border)',borderRadius:4,padding:'4px 7px',
-                  background:'white',color:'var(--ink)',outline:'none',boxSizing:'border-box'}}
+                  background:'var(--surface)',color:'var(--ink)',outline:'none',boxSizing:'border-box'}}
               />
             </div>
           )}
@@ -4824,7 +4893,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
                         style={{
                           flex:'1 1 0', minWidth:0, height:30, borderRadius:6, border:'1.5px solid',
                           borderColor: isCurrentDay ? 'var(--accent)' : (isToday ? 'var(--gold)' : 'var(--border)'),
-                          background: isCurrentDay ? 'var(--accent)' : 'white',
+                          background: isCurrentDay ? 'var(--accent)' : 'var(--surface)',
                           color: isCurrentDay ? 'white' : 'var(--ink-light)',
                           fontFamily:"'DM Mono',monospace", fontSize:8, fontWeight:600,
                           cursor: isCurrentDay ? 'default' : 'pointer',
@@ -5029,19 +5098,19 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
           placeholder="Title (e.g. 100 Days of Practice)"
           value={newCdTitle} onChange={e=>setNewCdTitle(e.target.value)}
           style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
-            borderRadius:4,padding:'4px 7px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+            borderRadius:4,padding:'4px 7px',outline:'none',background:'var(--surface)',color:'var(--ink)',boxSizing:'border-box'}}
           onKeyDown={e=>e.key==='Enter'&&saveCountdown()}
         />
         <div style={{display:'flex',gap:6}}>
           <div style={{flex:1,display:'flex',flexDirection:'column',gap:2}}>
             <label style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.05em'}}>Start</label>
             <input type="date" value={newCdStart} onChange={e=>setNewCdStart(e.target.value)}
-              style={{width:'100%',fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',outline:'none',background:'white',boxSizing:'border-box'}}/>
+              style={{width:'100%',fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',outline:'none',background:'var(--surface)',boxSizing:'border-box'}}/>
           </div>
           <div style={{flex:1,display:'flex',flexDirection:'column',gap:2}}>
             <label style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'uppercase',letterSpacing:'0.05em'}}>End *</label>
             <input type="date" value={newCdEnd} onChange={e=>setNewCdEnd(e.target.value)}
-              style={{width:'100%',fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',outline:'none',background:'white',boxSizing:'border-box'}}/>
+              style={{width:'100%',fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',outline:'none',background:'var(--surface)',boxSizing:'border-box'}}/>
           </div>
         </div>
         <div style={{display:'flex',gap:4,alignItems:'center'}}>
@@ -5297,7 +5366,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
               title={filterGoal===goal.id?'Click to show all goals':'Click to filter by this goal'}>
               <ColorPicker value={goal.color} onChange={c=>{updateGoal(goal.id,{color:c});}} />
               <div className={`goal-check ${isCompleted(goal.id,selectedDayKey)?'checked':''}`}
-                style={{color:goal.color}}
+                style={{color:hcText(goal.color)}}
                 onClick={e=>{e.stopPropagation();toggleCompletion(goal.id,selectedDayKey);}} />
               <input className="goal-name-input" value={goal.name}
                 onChange={e=>updateGoal(goal.id,{name:e.target.value})}
@@ -5337,7 +5406,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                   <div style={{display:'flex',flexDirection:'column',gap:3}}>
                     <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Link exercises (any qualifies):</span>
                     <div style={{display:'flex',flexDirection:'column',gap:2,maxHeight:80,overflowY:'auto',
-                      border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'white'}}>
+                      border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'var(--surface)'}}>
                       {fitnessExercises.map(e => {
                         const ids = goal.linkedExerciseIds || (goal.linkedExerciseId ? [goal.linkedExerciseId] : []);
                         const checked = ids.includes(e.id);
@@ -5382,7 +5451,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                   <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Notes:</span>
                   <textarea
                     rows={2}
-                    style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:4,padding:'4px 6px',resize:'vertical',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+                    style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:4,padding:'4px 6px',resize:'vertical',outline:'none',background:'var(--surface)',color:'var(--ink)',boxSizing:'border-box'}}
                     placeholder="Notes for today…"
                     value={getNote(goal.id)}
                     onChange={e=>setGoalNote(goal.id, e.target.value)}
@@ -5429,7 +5498,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
           {goals.map(g=>(
             <div key={g.id} className={`goal-filter-chip ${filterGoal===g.id?'active':''}`}
               onClick={()=>setFilterGoal(filterGoal===g.id?null:g.id)}
-              style={filterGoal===g.id?{}:{borderColor:g.color, color:g.color}}>
+              style={filterGoal===g.id?{}:{borderColor:g.color, color:hcText(g.color)}}>
               <span style={{width:8,height:8,borderRadius:'50%',background:g.color,display:'inline-block'}}/>
               {g.name}
             </div>
@@ -5617,11 +5686,11 @@ function QtySection({ goal, items, getQty, setGoalQty, addQtyEntry, removeQtyEnt
                 <>
                   <input type="number" min="0" step="any" inputMode="decimal" value={editAmount}
                     onChange={e=>setEditAmount(e.target.value)}
-                    style={{width:60,fontSize:13,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:3,padding:'2px 5px',background:'white',color:'var(--ink)',outline:'none'}}
+                    style={{width:60,fontSize:13,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:3,padding:'2px 5px',background:'var(--surface)',color:'var(--ink)',outline:'none'}}
                     autoFocus />
                   <input type="text" value={editNote} onChange={e=>setEditNote(e.target.value)}
                     placeholder="note…"
-                    style={{flex:1,fontSize:13,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:3,padding:'2px 5px',background:'white',color:'var(--ink)',outline:'none',minWidth:0}}
+                    style={{flex:1,fontSize:13,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:3,padding:'2px 5px',background:'var(--surface)',color:'var(--ink)',outline:'none',minWidth:0}}
                     onKeyDown={e=>{if(e.key==='Enter')commitEdit();if(e.key==='Escape')setEditingId(null);}} />
                   <button onClick={commitEdit} style={{fontSize:14,background:'var(--accent)',color:'white',border:'none',borderRadius:4,padding:'3px 8px',cursor:'pointer',fontFamily:"'DM Mono',monospace",flexShrink:0}}>✓</button>
                 </>
@@ -5645,12 +5714,12 @@ function QtySection({ goal, items, getQty, setGoalQty, addQtyEntry, removeQtyEnt
           onChange={e=>setAddAmount(e.target.value)}
           placeholder={prefix+'0'}
           onKeyDown={e=>{if(e.key==='Enter')commitAdd();}}
-          style={{width:60,fontSize:11,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:3,padding:'2px 4px',background:'white',color:'var(--ink)',outline:'none'}}
+          style={{width:60,fontSize:11,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:3,padding:'2px 4px',background:'var(--surface)',color:'var(--ink)',outline:'none'}}
         />
         <input type="text" value={addNote} onChange={e=>setAddNote(e.target.value)}
           placeholder="note (optional)"
           onKeyDown={e=>{if(e.key==='Enter')commitAdd();}}
-          style={{flex:1,fontSize:11,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:3,padding:'2px 4px',background:'white',color:'var(--ink)',outline:'none',minWidth:0}}
+          style={{flex:1,fontSize:11,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:3,padding:'2px 4px',background:'var(--surface)',color:'var(--ink)',outline:'none',minWidth:0}}
         />
         <button onClick={e=>{e.stopPropagation();commitAdd();}}
           style={{fontSize:13,background:'var(--accent)',color:'white',border:'none',borderRadius:4,padding:'2px 8px',cursor:'pointer',fontWeight:700,flexShrink:0,lineHeight:1.5}}
@@ -5818,7 +5887,7 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                   />
                 ) : (
                   <span className="mhc-name"
-                    style={{color: done ? g.color : 'var(--ink)', flex:1}}>
+                    style={{color: done ? hcText(g.color) : 'var(--ink)', flex:1}}>
                     {g.name}
                   </span>
                 )}
@@ -5878,7 +5947,7 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                     <div style={{display:'flex',flexDirection:'column',gap:3}}>
                       <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Link exercises (any qualifies):</span>
                       <div style={{display:'flex',flexDirection:'column',gap:2,maxHeight:80,overflowY:'auto',
-                        border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'white'}}>
+                        border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'var(--surface)'}}>
                         {fitnessExercises.map(e => {
                           const ids = g.linkedExerciseIds || (g.linkedExerciseId ? [g.linkedExerciseId] : []);
                           const checked = ids.includes(e.id);
@@ -5929,7 +5998,7 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                     <div style={{display:'flex',flexDirection:'column',gap:2}}>
                       <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Notes:</span>
                       <textarea rows={2}
-                        style={{width:'100%',fontSize:13,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:4,padding:'4px 6px',resize:'vertical',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+                        style={{width:'100%',fontSize:13,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:4,padding:'4px 6px',resize:'vertical',outline:'none',background:'var(--surface)',color:'var(--ink)',boxSizing:'border-box'}}
                         placeholder="Notes for today…"
                         value={getNote(g.id)}
                         onChange={e=>setGoalNote(g.id, e.target.value)}
@@ -6035,7 +6104,7 @@ function MonthlyView({date, selected, goals, completions, onDayClick, today, qty
                 const qtyDisplay = qtyVal ? ((g.qtyMode||'qty')==='$' ? '$'+qtyVal : String(qtyVal)) : '';
                 return (
                   <div style={{marginTop:2,padding:'1px 3px'}}>
-                    {qtyDisplay && <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:g.color,fontWeight:700,lineHeight:1.3}}>{qtyDisplay}</div>}
+                    {qtyDisplay && <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:hcText(g.color),fontWeight:700,lineHeight:1.3}}>{qtyDisplay}</div>}
                     {liNotes.map((n,i)=>(
                       <div key={i} style={{fontSize:8,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)',lineHeight:1.3,overflow:'hidden',whiteSpace:'nowrap',textOverflow:'ellipsis'}}>{n}</div>
                     ))}
@@ -6095,7 +6164,7 @@ function WeeklyHabitView({date, selected, goals, completions, today, onDayClick,
                       overflow:'hidden',
                     }}>
                       {isSingle && !!qtyVal && (
-                        <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:done?'white':g.color,lineHeight:1.3}}>{(g.qtyMode||'qty')==='$'?'$':''}{qtyVal}</div>
+                        <div style={{fontSize:10,fontFamily:"'DM Mono',monospace",fontWeight:700,color:done?'white':hcText(g.color),lineHeight:1.3}}>{(g.qtyMode||'qty')==='$'?'$':''}{qtyVal}</div>
                       )}
                       {isSingle && liNotes.map((n,i)=>(
                         <div key={i} style={{fontSize:9,fontFamily:"'DM Sans',sans-serif",color:done?'rgba(255,255,255,0.85)':'var(--ink-light)',lineHeight:1.3,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{n}</div>
@@ -6140,9 +6209,9 @@ function YearlyView({date, selected, goals, completions, today, onDayClick}) {
                   const done=goals.filter(g=>(completions[dk]||[]).includes(g.id));
                   const isToday=isSameDay(d,today);
                   const isSelected=isSameDay(d,selected);
-                  const bgColor = done.length===0 ? '#d8d0c4' : done.length===1 ? done[0].color : 'var(--ink)';
+                  const bgColor = done.length===0 ? 'var(--tile-empty)' : done.length===1 ? done[0].color : 'var(--tile-multi)';
                   const tileOpacity = done.length>0 ? 0.85 : 1;
-                  const numColor = done.length>0 ? 'rgba(255,255,255,0.9)' : 'rgba(60,50,40,0.7)';
+                  const numColor = done.length>0 ? 'rgba(255,255,255,0.9)' : 'var(--tile-num)';
                   return (
                     <div key={i} style={{
                       width:'100%',paddingTop:'100%',borderRadius:2,background:bgColor,
@@ -6190,7 +6259,7 @@ function DailyView({date, goals, completions, onToggle}) {
               <div className="daily-goal-icon" style={{background:g.color+'33',display:'flex',alignItems:'center',justifyContent:'center'}}>
                 <span style={{fontSize:16}}>{done?'✓':'○'}</span>
               </div>
-              <div className="daily-goal-name" style={{color:g.color}}>{g.name}</div>
+              <div className="daily-goal-name" style={{color:hcText(g.color)}}>{g.name}</div>
             </div>
           );
         })}
@@ -6990,11 +7059,11 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
         <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap',justifyContent:'flex-end'}}>
           <input type="date" value={dateRange.start}
             onChange={e=>setDateRange(r=>({...r,start:e.target.value}))}
-            style={{fontFamily:"'DM Mono',monospace",fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'white',color:'var(--ink)'}} />
+            style={{fontFamily:"'DM Mono',monospace",fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'var(--surface)',color:'var(--ink)'}} />
           <span style={{fontSize:11,color:'var(--ink-faint)'}}>–</span>
           <input type="date" value={dateRange.end}
             onChange={e=>setDateRange(r=>({...r,end:e.target.value}))}
-            style={{fontFamily:"'DM Mono',monospace",fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'white',color:'var(--ink)'}} />
+            style={{fontFamily:"'DM Mono',monospace",fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'var(--surface)',color:'var(--ink)'}} />
         </div>
       </div>
 
@@ -7013,7 +7082,7 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
                 placeholder="—"
                 style={{width:64,fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,
                         border:'1px solid var(--border)',borderRadius:5,padding:'3px 6px',
-                        background:'white',color:'#c0392b',textAlign:'center'}} />
+                        background:'var(--surface)',color:'#c0392b',textAlign:'center'}} />
             </div>
           </div>
           <div style={{height:220,position:'relative'}}>
@@ -7033,7 +7102,7 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
                 placeholder="—"
                 style={{width:72,fontFamily:"'DM Mono',monospace",fontSize:12,fontWeight:600,
                         border:'1px solid var(--border)',borderRadius:5,padding:'3px 6px',
-                        background:'white',color:'#7d3c98',textAlign:'center'}} />
+                        background:'var(--surface)',color:'#7d3c98',textAlign:'center'}} />
             </div>
           </div>
           <div style={{height:220,position:'relative'}}>
@@ -7295,7 +7364,9 @@ function glRgb(hex) {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 function glTint(hex, a) { const [r, g, b] = glRgb(hex); return `rgba(${r},${g},${b},${a})`; }
-function glInk(hex) { const [r, g, b] = glRgb(hex); return `rgb(${Math.round(r * 0.6)},${Math.round(g * 0.6)},${Math.round(b * 0.6)})`; } // darker shade for text on a tint
+function glInk(hex) { const [r, g, b] = glRgb(hex); return `color-mix(in srgb, rgb(${r},${g},${b}) var(--gl-ink-pct), var(--gl-ink-to))`; } // darker shade for text on a tint (lighter in dark mode, v4.4.0)
+// v4.4.0: text drawn in a user-picked color (habit names, chips) — lightened in dark mode so it stays readable
+function hcText(c) { return c ? `color-mix(in srgb, ${c} var(--hc-pct), #fff)` : c; }
 function glMsProgress(m) { if (m.done) return 1; const t = m.tasks || []; return t.length ? t.filter(x => x.done).length / t.length : 0; }
 function glProgress(g) {
   if (g.status === 'done') return 1;
@@ -7573,7 +7644,7 @@ function GlTimeline({ goals, onOpenGoal }) {
           </div>
           <div className="gl-tl-area">
             {range.cols.slice(1).map((c, i) => (
-              <div key={i} aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: ((c.start - range.start) / total * 100) + '%', width: 1, background: '#878491' }} />
+              <div key={i} aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: ((c.start - range.start) / total * 100) + '%', width: 1, background: 'var(--grid-line)' }} />
             ))}
             <div className="gl-tl-head" style={{ position: 'relative' }}>
               {range.cols.map((c, i) => (
@@ -7593,7 +7664,7 @@ function GlTimeline({ goals, onOpenGoal }) {
                       style={{ top: 13, height: 20, left: bar.left + '%', width: bar.width + '%', background: glTint(g.color, 0.2) }} />}
                     {fill && <div className="gl-tl-bar" onClick={() => onOpenGoal(g.id)}
                       style={{ top: 13, height: 20, left: fill.left + '%', width: fill.width + '%', background: g.color, borderRadius: '9px 0 0 9px' }} />}
-                    {dia != null && <div className="gl-tl-dia" style={{ top: 17.5, left: `calc(${dia}% - 5.5px)`, background: '#fff', border: `2px solid ${g.color}` }} />}
+                    {dia != null && <div className="gl-tl-dia" style={{ top: 17.5, left: `calc(${dia}% - 5.5px)`, background: 'var(--surface)', border: `2px solid ${g.color}` }} />}
                   </div>
                 );
               }
@@ -7617,7 +7688,7 @@ function GlTimeline({ goals, onOpenGoal }) {
                     </div>
                   )}
                   {dia != null && <div className="gl-tl-dia" style={{ top: 11.5, left: `calc(${dia}% - 5.5px)`,
-                    background: late ? 'var(--red)' : current ? g.color : '#fff', border: late || current ? 'none' : `2px solid ${g.color}` }} />}
+                    background: late ? 'var(--red)' : current ? g.color : 'var(--surface)', border: late || current ? 'none' : `2px solid ${g.color}` }} />}
                 </div>
               );
             })}
@@ -7977,7 +8048,7 @@ function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, sele
               <section className="gl-card gl-mobile-only" style={{ flexDirection: 'column', overflow: 'hidden' }}>
                 <div className="gl-label" style={{ padding: '12px 14px 6px' }}>This week · goal tasks</div>
                 {weekItems.map(({ goal, ms, task }) => (
-                  <label key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 48, padding: '0 14px', borderTop: '1px solid #f1f0f5', cursor: 'pointer' }}>
+                  <label key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 48, padding: '0 14px', borderTop: '1px solid var(--neutral-line)', cursor: 'pointer' }}>
                     <input type="checkbox" checked={!!task.done} style={{ width: 20, height: 20, accentColor: goal.color }}
                       onChange={() => setGoals(gs => glPatchTask(gs, goal.id, ms.id, task.id, { done: !task.done }))} />
                     <span style={{ flex: 1, fontSize: 15, textDecoration: task.done ? 'line-through' : 'none', color: task.done ? 'var(--ink-light)' : 'var(--ink)' }}>{task.title || 'Untitled task'}</span>
@@ -7999,7 +8070,7 @@ function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, sele
                     const t = m.tasks || [];
                     return (
                       <button key={m.id} onClick={() => setSelectedId(g.id)} className="gl-goal-card"
-                        style={{ background: late ? '#fdf3f1' : '#fff', borderColor: late ? '#f0c9c3' : undefined }}>
+                        style={{ background: late ? 'var(--red-light)' : 'var(--surface)', borderColor: late ? '#f0c9c3' : undefined }}>
                         <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: late ? '#b03a2e' : 'var(--ink-light)' }}>{tag}</div>
                         <div style={{ fontWeight: 600, fontSize: 14, margin: '4px 0 2px', display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span className="gl-dot" style={{ background: g.color, width: 8, height: 8 }} />{m.title || 'Untitled milestone'}
@@ -8048,6 +8119,27 @@ function App() {
   const setSelectedGoalId = (id) => { if(id) sessionStorage.setItem('lp_selectedGoalId', id); else sessionStorage.removeItem('lp_selectedGoalId'); setSelectedGoalIdRaw(id); };
   const openGoal = (id) => { setSelectedGoalId(id || null); setPage('goals'); };
   const [moreOpen, setMoreOpen] = useState(false); // mobile bottom-nav "More" sheet
+  // v4.4.0: theme preference — 'auto' (follow device) | 'light' | 'dark'; per device, like the swipe toggle
+  const [themePref, setThemePref] = useState(() => { try { return localStorage.getItem('lp_theme') || 'auto'; } catch { return 'auto'; } });
+  useEffect(() => {
+    const mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+    const apply = () => {
+      const dark = themePref === 'dark' || (themePref === 'auto' && !!(mq && mq.matches));
+      document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      if (window.Chart && window.Chart.defaults) {
+        window.Chart.defaults.color = dark ? '#aeacb8' : '#666';
+        window.Chart.defaults.borderColor = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)';
+      }
+    };
+    apply();
+    try { localStorage.setItem('lp_theme', themePref); } catch {}
+    if (themePref === 'auto' && mq) {
+      if (mq.addEventListener) { mq.addEventListener('change', apply); return () => mq.removeEventListener('change', apply); }
+      if (mq.addListener) { mq.addListener(apply); return () => mq.removeListener(apply); }
+    }
+  }, [themePref]);
+  const cycleTheme = () => setThemePref(p => p === 'auto' ? 'light' : p === 'light' ? 'dark' : 'auto');
+  const themeLabel = themePref === 'auto' ? '◐ Auto' : themePref === 'light' ? '☀ Light' : '☾ Dark';
 
   // Auth & sync state
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
@@ -8445,7 +8537,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.3.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.4.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -8458,6 +8550,7 @@ function App() {
         </div>
         <div className="auth-area">
           {saveLabel && <span className={`save-status ${saveClass || saveStatus}`}>{saveLabel}</span>}
+          <button className="auth-btn theme-btn" onClick={cycleTheme} title="Appearance: Auto follows your device. Click to switch Auto → Light → Dark.">{themeLabel}</button>
           {authUser ? (
             <>
               {googleReauth && (
@@ -8558,6 +8651,10 @@ function App() {
           <button className={`more-sheet-btn ${page==='pages'?'active':''}`} onClick={()=>{setPage('pages');setMoreOpen(false);}}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6a50a7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
             Pages
+          </button>
+          <button className="more-sheet-btn" onClick={cycleTheme}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6a50a7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 0 0 16z" fill="#6a50a7"/></svg>
+            Appearance: {themePref === 'auto' ? 'Auto' : themePref === 'light' ? 'Light' : 'Dark'}
           </button>
           {authUser && (
             <button className="more-sheet-btn" disabled={syncing} onClick={()=>{setMoreOpen(false);handleSyncCalendar();}}>
@@ -8927,7 +9024,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     return (
       <div key={goal.id} style={{
         padding:'10px 12px', marginBottom:8,
-        background:'white', borderRadius:'var(--radius-sm)',
+        background:'var(--surface)', borderRadius:'var(--radius-sm)',
         border:`1px solid ${done?'var(--gold)':ahead?'var(--accent)':'var(--border)'}`,
         boxShadow:'0 1px 3px var(--shadow)',
       }}>
@@ -9183,7 +9280,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                     const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal, selectedDate);
                     const pct=Math.min(100,(actual/goal.target)*100),done=pct>=100,ahead=aheadBehind>=0;
                     return (
-                      <div key={goal.id} style={{marginBottom:6,padding:'6px 8px',background:'white',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)',boxShadow:'0 1px 2px var(--shadow)'}}>
+                      <div key={goal.id} style={{marginBottom:6,padding:'6px 8px',background:'var(--surface)',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)',boxShadow:'0 1px 2px var(--shadow)'}}>
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
                           <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700,
                             background:goal.period==='week'?'var(--blue-light)':goal.period==='month'?'var(--accent-light)':'var(--gold-light)',
@@ -9640,7 +9737,7 @@ function GoalManager({ goals, exercises, onAddVersion, onEdit, onEnd, onDelete, 
                   const isActive = (!g.startDate||g.startDate<=fmt(today))&&(!g.endDate||g.endDate>=fmt(today));
                   const isEditing = editingId===g.id;
                   return (
-                    <div key={g.id} style={{padding:'6px 8px',marginBottom:4,background:isActive?'var(--accent-light)':g.endDate?'var(--cream)':'white',
+                    <div key={g.id} style={{padding:'6px 8px',marginBottom:4,background:isActive?'var(--accent-light)':g.endDate?'var(--cream)':'var(--surface)',
                       borderRadius:'var(--radius-sm)',border:`1px solid ${isActive?'var(--accent)':'var(--border)'}`}}>
                       {isEditing ? (
                         <div style={{display:'flex',flexDirection:'column',gap:6}}>
@@ -9648,7 +9745,7 @@ function GoalManager({ goals, exercises, onAddVersion, onEdit, onEnd, onDelete, 
                             <input type="number" value={editTarget} onChange={e=>setEditTarget(e.target.value)}
                               style={{width:70,fontSize:12,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',outline:'none'}}/>
                             <select value={editUnit} onChange={e=>setEditUnit(e.target.value)}
-                              style={{flex:1,fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',background:'white',outline:'none'}}>
+                              style={{flex:1,fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',background:'var(--surface)',outline:'none'}}>
                               <option value="reps">Reps</option>
                               <option value="sets">Sets</option>
                               <option value="volume">Volume (lbs)</option>
@@ -9724,18 +9821,18 @@ function GoalManager({ goals, exercises, onAddVersion, onEdit, onEnd, onDelete, 
           ) : (
             <div style={{display:'flex',flexDirection:'column',gap:7}}>
               <select value={exId} onChange={e=>setExId(e.target.value)}
-                style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 8px',background:'white',color:'var(--ink)',outline:'none'}}>
+                style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 8px',background:'var(--surface)',color:'var(--ink)',outline:'none'}}>
                 {exercises.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
               <div style={{display:'flex',gap:6}}>
                 <select value={period} onChange={e=>setPeriod(e.target.value)}
-                  style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 6px',background:'white',color:'var(--ink)',outline:'none'}}>
+                  style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 6px',background:'var(--surface)',color:'var(--ink)',outline:'none'}}>
                   <option value="week">Per Week</option>
                   <option value="month">Per Month</option>
                   <option value="year">Per Year</option>
                 </select>
                 <select value={unit} onChange={e=>setUnit(e.target.value)}
-                  style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 6px',background:'white',color:'var(--ink)',outline:'none'}}>
+                  style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 6px',background:'var(--surface)',color:'var(--ink)',outline:'none'}}>
                   <option value="reps">Reps</option>
                   <option value="sets">Sets</option>
                   <option value="volume">Volume (lbs)</option>
@@ -9746,7 +9843,7 @@ function GoalManager({ goals, exercises, onAddVersion, onEdit, onEnd, onDelete, 
               <div style={{display:'flex',gap:6}}>
                 <input type="number" min="1" value={target} onChange={e=>setTarget(e.target.value)}
                   placeholder="Target amount"
-                  style={{flex:1,fontSize:12,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 8px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}/>
+                  style={{flex:1,fontSize:12,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 8px',outline:'none',background:'var(--surface)',color:'var(--ink)',boxSizing:'border-box'}}/>
                 <button onClick={()=>{if(exId&&target){onAddVersion(exId,period,target,unit);setTarget('');}}}
                   disabled={!exId||!target}
                   style={{background:exId&&target?'var(--accent)':'var(--border)',border:'none',borderRadius:'var(--radius-sm)',
@@ -9800,7 +9897,7 @@ function ExercisePicker({ exercises, onAdd, onAddNew, onClose }) {
             placeholder="Search exercises…"
             style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",
               border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
-              padding:'5px 9px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+              padding:'5px 9px',outline:'none',background:'var(--surface)',color:'var(--ink)',boxSizing:'border-box'}}
           />
         </div>
         <div style={{flex:1,overflowY:'auto',padding:'4px 8px'}}>
@@ -9834,11 +9931,11 @@ function ExercisePicker({ exercises, onAdd, onAddNew, onClose }) {
               placeholder="Exercise name"
               style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",
                 border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
-                padding:'5px 8px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+                padding:'5px 8px',outline:'none',background:'var(--surface)',color:'var(--ink)',boxSizing:'border-box'}}
             />
             <select value={newCat} onChange={e=>setNewCat(e.target.value)}
               style={{fontSize:11,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
-                borderRadius:'var(--radius-sm)',padding:'4px 6px',background:'white',color:'var(--ink)',outline:'none'}}>
+                borderRadius:'var(--radius-sm)',padding:'4px 6px',background:'var(--surface)',color:'var(--ink)',outline:'none'}}>
               {FITNESS_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
             </select>
           </div>
@@ -9900,11 +9997,11 @@ function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose 
                         onBlur={()=>setEditId(null)}
                         onKeyDown={e=>{ if(e.key==='Enter'||e.key==='Escape') setEditId(null); }}
                         style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--accent)',
-                          borderRadius:4,padding:'3px 6px',outline:'none',background:'white',color:'var(--ink)'}}
+                          borderRadius:4,padding:'3px 6px',outline:'none',background:'var(--surface)',color:'var(--ink)'}}
                       />
                       <select value={ex.category||'Other'} onChange={e=>onUpdate(ex.id,{category:e.target.value})}
                         style={{fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',
-                          background:'white',color:'var(--ink)',outline:'none'}}>
+                          background:'var(--surface)',color:'var(--ink)',outline:'none'}}>
                         {FITNESS_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
                       </select>
                     </>
@@ -9936,11 +10033,11 @@ function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose 
               onKeyDown={e=>{ if(e.key==='Enter'&&newName.trim()){onAdd(newName.trim(),newCat);setNewName('');} }}
               placeholder="Name"
               style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
-                borderRadius:'var(--radius-sm)',padding:'5px 8px',outline:'none',background:'white',color:'var(--ink)',boxSizing:'border-box'}}
+                borderRadius:'var(--radius-sm)',padding:'5px 8px',outline:'none',background:'var(--surface)',color:'var(--ink)',boxSizing:'border-box'}}
             />
             <select value={newCat} onChange={e=>setNewCat(e.target.value)}
               style={{fontSize:11,border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',
-                padding:'4px 6px',background:'white',color:'var(--ink)',outline:'none'}}>
+                padding:'4px 6px',background:'var(--surface)',color:'var(--ink)',outline:'none'}}>
               {FITNESS_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
             </select>
             <button onClick={()=>{ if(newName.trim()){onAdd(newName.trim(),newCat);setNewName('');} }}
