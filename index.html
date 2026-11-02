@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.0.0 -->
+<!-- LP Planner v5.1.0 -->
+<!-- v5.1.0 — Pages editor: text colour, highlight, font, font size, alignment and inline code (palettes work on light and dark). Stored as inline styles in the same HTML format. -->
 <!-- v5.0.0 — Pages editor rebuilt on Quill 2 (self-hosted quill.js/quill.css): reliable checklists and lists, tap anywhere on a row to place the cursor, undo/redo buttons. Pages still save in the same HTML format, so older versions can read them. -->
 <!-- v4.9.0 — Offline mode: a service worker (sw.js) keeps the app itself available with no connection; edits are saved on the device and upload when you reconnect; calm "Offline" notice instead of an error. -->
 <!-- v4.8.0 — Goals can link Weight and Calories (roll-up with trend line; weight uses a 7-day average); a milestone can complete itself when your weight reaches a number (needs 3+ weigh-ins in 7 days since the goal began); target defaults to the chart's weight target. -->
@@ -1767,6 +1768,18 @@
   .pages-body .ql-editor s { text-decoration: line-through; opacity: 0.5; }
   .pages-body .ql-editor blockquote { border-left: 3px solid var(--border); margin: 8px 0; padding: 2px 0 2px 14px; color: var(--ink-light); }
   .pages-body .ql-editor img { max-width: 100%; }
+  .pages-body .ql-editor code { font-family: 'DM Mono', monospace; font-size: 0.88em; background: rgba(127,127,127,0.2); border-radius: 4px; padding: 1px 5px; }
+  /* Toolbar popovers (colour, highlight, font, size, align) */
+  .pages-pop { background: var(--paper); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,0.22); padding: 10px; width: 258px; max-height: 70vh; overflow-y: auto; }
+  .pages-pop-title { font-family: 'DM Mono', monospace; font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); margin: 13px 2px 6px; }
+  .pages-pop-title:first-child { margin-top: 0; }
+  .pages-pop-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .pages-swatch { height: 34px; border-radius: 8px; border: 1px solid rgba(127,127,127,0.35); cursor: pointer; padding: 0; font: 700 14px 'DM Sans', sans-serif; color: var(--ink); }
+  .pages-swatch.on { box-shadow: 0 0 0 2px var(--accent); }
+  .pages-pop-item { display: block; width: 100%; text-align: left; border: none; background: none; padding: 9px 10px; min-height: 40px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--ink); }
+  .pages-pop-item:hover { background: var(--cream); }
+  .pages-pop-item.on { background: var(--accent-light); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .pages-pop-clear { margin-top: 8px; width: 100%; padding: 8px; border-radius: 8px; border: 1px dashed var(--border); background: none; color: var(--ink-light); cursor: pointer; font-size: 12px; }
   .pages-body h1 { font-family: 'DM Sans', sans-serif; font-size: 22px; font-weight: 700; margin: 16px 0 8px; color: var(--ink); letter-spacing: -0.02em; }
   .pages-body h2 { font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 600; margin: 12px 0 6px; color: var(--ink); }
   .pages-body h3 { font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; margin: 10px 0 5px; color: var(--ink); }
@@ -10108,7 +10121,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.0.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.1.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -11676,6 +11689,35 @@ function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose 
 // ─────────────────────────────────────────────
 // PAGES VIEW
 // ─────────────────────────────────────────────
+// ── Pages editor: formatting options ─────────────────────────────────────────────────────
+// Text colours: mid-tones read on both light and dark pages; the darker/lighter rows are for one mode.
+const PAGES_TEXT_COLORS = [
+  { title: 'Mid-tone — readable on light and dark', colors: ['#e5484d','#f76b15','#d6a300','#46a758','#12a594','#3b82f6','#6e56cf','#a855f7','#e5539b','#a07a4f','#8b8d98','#64748b'] },
+  { title: 'Darker — best on light pages', colors: ['#1a1a1a','#b42318','#b54708','#1f7a4d','#0f766e','#1d4ed8','#6b21a8','#9d174d'] },
+  { title: 'Lighter — best on dark pages', colors: ['#ffffff','#ff9592','#ffc53d','#86e8b0','#7ee7d7','#8ec8ff','#d7b5ff','#ffa8d1'] },
+];
+// Highlights are see-through tints, so the text on them stays readable in both modes.
+const PAGES_HIGHLIGHTS = ['rgba(250, 204, 21, 0.4)','rgba(251, 146, 60, 0.4)','rgba(248, 113, 113, 0.4)','rgba(244, 114, 182, 0.4)','rgba(192, 132, 252, 0.4)','rgba(96, 165, 250, 0.4)','rgba(45, 212, 191, 0.4)','rgba(74, 222, 128, 0.4)','rgba(148, 163, 184, 0.4)'];
+const PAGES_FONTS = [
+  { label: 'Default', value: '', css: "'DM Sans', sans-serif" },
+  { label: 'Serif', value: 'Georgia, serif', css: 'Georgia, serif' },
+  { label: 'Display', value: 'Playfair Display, serif', css: "'Playfair Display', serif" },
+  { label: 'Mono', value: 'DM Mono, monospace', css: "'DM Mono', monospace" },
+];
+const PAGES_SIZES = [
+  { label: 'Small', value: '12px' }, { label: 'Normal', value: '' }, { label: 'Large', value: '18px' },
+  { label: 'X-Large', value: '24px' }, { label: 'Huge', value: '32px' },
+];
+const PAGES_ALIGNS = [{ label: 'Left', value: '' }, { label: 'Center', value: 'center' }, { label: 'Right', value: 'right' }, { label: 'Justify', value: 'justify' }];
+let _pagesQuillReady = false;
+function pagesQuillSetup() {      // once: store colour/size/font/align as inline styles (what the saved HTML uses)
+  if (_pagesQuillReady || typeof Quill === 'undefined') return;
+  _pagesQuillReady = true;
+  Quill.import('attributors/style/size').whitelist = PAGES_SIZES.map(x => x.value).filter(Boolean);
+  Quill.import('attributors/style/font').whitelist = PAGES_FONTS.map(x => x.value).filter(Boolean);
+  ['color', 'background', 'align', 'size', 'font'].forEach(n => Quill.register(Quill.import('attributors/style/' + n), true));
+}
+
 // ── Pages editor: stored HTML ⇄ Quill delta ─────────────────────────────────────────────
 // Pages keep saving the app's original HTML dialect (so TEST and live read each other's pages):
 //   checklist: <ul class="pages-checklist"><li class="pages-chk-li [checked]" data-checked="true|false"><input type=checkbox class="pages-chk-input" [checked]> text</li></ul>
@@ -11684,6 +11726,7 @@ function pagesHtmlToDelta(quill, html) {
   const doc = new DOMParser().parseFromString('<body>' + (html || '') + '</body>', 'text/html').body;
   const BLOCK = /^(P|DIV|H[1-6]|BLOCKQUOTE|UL|OL|LI|PRE)$/;
   const isListEl = n => n.nodeType === 1 && (n.tagName === 'UL' || n.tagName === 'OL');
+  const alignOf = el => { const a = el.style && el.style.textAlign; return (a === 'center' || a === 'right' || a === 'justify') ? { align: a } : {}; };
   let out = new Delta();
   const inline = (nodes) => {
     const box = doc.ownerDocument.createElement('div');
@@ -11712,10 +11755,10 @@ function pagesHtmlToDelta(quill, html) {
         flush();
         const t = n.tagName;
         if (isListEl(n)) lists(n, 0, null);
-        else if (t === 'BLOCKQUOTE') walk(n, { ...(extra || {}), blockquote: true });
-        else if (/^H[1-6]$/.test(t)) line(Array.from(n.childNodes), { ...(extra || {}), header: +t[1] });
-        else if (Array.from(n.childNodes).some(c => c.nodeType === 1 && BLOCK.test(c.tagName))) walk(n, extra);
-        else line(Array.from(n.childNodes), extra);
+        else if (t === 'BLOCKQUOTE') walk(n, { ...(extra || {}), ...alignOf(n), blockquote: true });
+        else if (/^H[1-6]$/.test(t)) line(Array.from(n.childNodes), { ...(extra || {}), ...alignOf(n), header: +t[1] });
+        else if (Array.from(n.childNodes).some(c => c.nodeType === 1 && BLOCK.test(c.tagName))) walk(n, { ...(extra || {}), ...alignOf(n) });
+        else line(Array.from(n.childNodes), { ...(extra || {}), ...alignOf(n) });
       } else buf.push(n);
     }
     flush();
@@ -11733,7 +11776,7 @@ function pagesHtmlToDelta(quill, html) {
         kind = done ? 'checked' : 'unchecked';
       }
       const own = Array.from(li.childNodes).filter(c => !isListEl(c) && !(c.nodeType === 1 && c.tagName === 'INPUT'));
-      line(own, { list: kind, ...(depth ? { indent: depth } : {}) });
+      line(own, { list: kind, ...(depth ? { indent: depth } : {}), ...alignOf(li) });
       for (const c of Array.from(li.childNodes)) if (isListEl(c)) lists(c, depth + 1, isCheck && c.classList.contains('pages-checklist') ? true : null);
     }
   };
@@ -11758,10 +11801,17 @@ function pagesDeltaToHtml(delta) {
   const seg = s => {
     if (s.img) return '<img src="' + pagesEsc(s.img) + '">';
     let h = pagesEsc(s.t), a = s.a;
+    if (a.code) h = '<code>' + h + '</code>';
     if (a.strike) h = '<s>' + h + '</s>';
     if (a.underline) h = '<u>' + h + '</u>';
     if (a.italic) h = '<i>' + h + '</i>';
     if (a.bold) h = '<b>' + h + '</b>';
+    const st = [];
+    if (a.color) st.push('color:' + a.color);
+    if (a.background) st.push('background-color:' + a.background);
+    if (a.size) st.push('font-size:' + a.size);
+    if (a.font) st.push('font-family:' + a.font);
+    if (st.length) h = '<span style="' + pagesEsc(st.join(';')) + '">' + h + '</span>';
     if (a.link) h = '<a href="' + pagesEsc(String(a.link)) + '">' + h + '</a>';
     return h;
   };
@@ -11769,6 +11819,7 @@ function pagesDeltaToHtml(delta) {
   const closeTo = n => { while (stack.length > n) { html += '</li></' + stack.pop().tag + '>'; } };
   for (const L of lines) {
     const a = L.a, body = L.segs.map(seg).join('');
+    const al = a.align ? ' style="text-align:' + a.align + '"' : '';
     if (a.list) {
       const check = a.list === 'checked' || a.list === 'unchecked';
       const tag = a.list === 'ordered' ? 'ol' : 'ul';
@@ -11784,14 +11835,14 @@ function pagesDeltaToHtml(delta) {
       }
       if (check) {
         const done = a.list === 'checked';
-        html += '<li class="pages-chk-li' + (done ? ' checked' : '') + '" data-checked="' + done + '"><input type="checkbox" class="pages-chk-input" contenteditable="false"' + (done ? ' checked' : '') + '> ' + body;
-      } else html += '<li>' + body;
+        html += '<li class="pages-chk-li' + (done ? ' checked' : '') + '" data-checked="' + done + '"' + al + '><input type="checkbox" class="pages-chk-input" contenteditable="false"' + (done ? ' checked' : '') + '> ' + body;
+      } else html += '<li' + al + '>' + body;
       continue;
     }
     closeTo(0);
-    if (a.header) html += '<h' + a.header + '>' + (body || '<br>') + '</h' + a.header + '>';
-    else if (a.blockquote) html += '<blockquote>' + (body || '<br>') + '</blockquote>';
-    else html += '<p>' + (body || '<br>') + '</p>';
+    if (a.header) html += '<h' + a.header + al + '>' + (body || '<br>') + '</h' + a.header + '>';
+    else if (a.blockquote) html += '<blockquote' + al + '>' + (body || '<br>') + '</blockquote>';
+    else html += '<p' + al + '>' + (body || '<br>') + '</p>';
   }
   closeTo(0);
   return html;
@@ -11806,13 +11857,23 @@ function PagesQuill({ docId, html, apiRef, onInput, onFmt, onText, onGone }) {
   useEffect(() => {
     const host = hostRef.current;
     if (!host || missing) return;
+    pagesQuillSetup();
     const q = new Quill(host, {
-      formats: ['bold', 'italic', 'underline', 'strike', 'header', 'blockquote', 'list', 'indent', 'link', 'image'],
+      formats: ['bold', 'italic', 'underline', 'strike', 'code', 'header', 'blockquote', 'list', 'indent', 'link', 'image', 'color', 'background', 'size', 'font', 'align'],
       placeholder: 'Start writing…',
       modules: { toolbar: false, history: { userOnly: true, delay: 1000, maxStack: 200 } },
     });
     q.setContents(pagesHtmlToDelta(q, html), 'silent');
     q.history.clear();
+    // Pasted web text often carries black/white colours that vanish in the other mode — drop those, keep deliberate colours.
+    const Delta = Quill.import('delta');
+    const plain = c => { const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c || ''); if (!m) return /^(black|white)$/i.test(c || ''); const r = +m[1], g = +m[2], b = +m[3]; return (r < 45 && g < 45 && b < 45) || (r > 210 && g > 210 && b > 210); };
+    q.clipboard.addMatcher(Node.ELEMENT_NODE, (node, delta) => {
+      const strip = {};
+      if (plain(node.style && node.style.color)) strip.color = null;
+      if (plain(node.style && node.style.backgroundColor)) strip.background = null;
+      return Object.keys(strip).length ? delta.compose(new Delta().retain(delta.length(), strip)) : delta;
+    });
     const api = {
       quill: q,
       getHtml() {
@@ -11848,6 +11909,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   const quillApi = useRef(null);
   const getBodyHtml = () => (quillApi.current ? quillApi.current.getHtml() : null);
   const [qFmt, setQFmt] = useState({});
+  const [qPop, setQPop] = useState(null);     // open toolbar popover: { kind, x, y }
   const titleRef = useRef(null);
   const debounceRef = useRef(null);
   // Always-current ref to selectedId so flush fn closure never goes stale
@@ -12063,6 +12125,19 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     const on = type === 'check' ? (cur === 'checked' || cur === 'unchecked') : cur === type;
     q.format('list', on ? false : (type === 'check' ? 'unchecked' : type), 'user');
   });
+  function qOpenPop(kind, e) {
+    const r = e.currentTarget.getBoundingClientRect();
+    setQPop(p => (p && p.kind === kind) ? null : { kind, x: r.left, y: r.bottom + 6 });
+  }
+  const qSet = (name, value) => { qDo(q => q.format(name, value || false, 'user')); setQPop(null); };
+  useEffect(() => {
+    if (!qPop) return;
+    const close = e => { if (e.type === 'mousedown' && e.target.closest && e.target.closest('.pages-pop, .pages-toolbar')) return; setQPop(null); };
+    const esc = e => { if (e.key === 'Escape') setQPop(null); };
+    document.addEventListener('mousedown', close); document.addEventListener('keydown', esc); window.addEventListener('scroll', close, true); window.addEventListener('resize', close);
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', esc); window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close); };
+  }, [qPop]);
+  const qNoQuote = v => String(v || '').replace(/["']/g, '');
   const qQuote = () => qDo(q => q.format('blockquote', !q.getFormat().blockquote, 'user'));
   const qLink = () => qDo(q => {
     const r = q.getSelection(true);
@@ -12556,6 +12631,12 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                   <button className={'pages-toolbar-btn'+(qFmt.italic?' active':'')} onMouseDown={e=>{e.preventDefault();qToggle('italic');}} title="Italic"><i>I</i></button>
                   <button className={'pages-toolbar-btn'+(qFmt.underline?' active':'')} onMouseDown={e=>{e.preventDefault();qToggle('underline');}} title="Underline"><u>U</u></button>
                   <button className={'pages-toolbar-btn'+(qFmt.strike?' active':'')} onMouseDown={e=>{e.preventDefault();qToggle('strike');}} title="Strikethrough"><s>S</s></button>
+                  <button className={'pages-toolbar-btn'+(qFmt.code?' active':'')} onMouseDown={e=>{e.preventDefault();qToggle('code');}} title="Inline code"><span style={{fontFamily:"'DM Mono',monospace",fontSize:12}}>&lt;/&gt;</span></button>
+                  <div className="pages-toolbar-sep"/>
+                  <button className={'pages-toolbar-btn'+(qFmt.font?' active':'')} onMouseDown={e=>{e.preventDefault();qOpenPop('font',e);}} title="Font">Font ▾</button>
+                  <button className={'pages-toolbar-btn'+(qFmt.size?' active':'')} onMouseDown={e=>{e.preventDefault();qOpenPop('size',e);}} title="Font size">Size ▾</button>
+                  <button className={'pages-toolbar-btn'+(qFmt.color?' active':'')} onMouseDown={e=>{e.preventDefault();qOpenPop('color',e);}} title="Text colour"><span style={{fontWeight:700,lineHeight:1,borderBottom:'3px solid '+(qFmt.color||'var(--ink-light)')}}>A</span></button>
+                  <button className={'pages-toolbar-btn'+(qFmt.background?' active':'')} onMouseDown={e=>{e.preventDefault();qOpenPop('bg',e);}} title="Highlight"><span style={{fontWeight:600,padding:'0 4px',borderRadius:3,background:qFmt.background||'rgba(250, 204, 21, 0.4)'}}>ab</span></button>
                   <div className="pages-toolbar-sep"/>
                   <button className={'pages-toolbar-btn'+(qFmt.header===1?' active':'')} onMouseDown={e=>{e.preventDefault();qHeader(1);}} title="Heading 1">H1</button>
                   <button className={'pages-toolbar-btn'+(qFmt.header===2?' active':'')} onMouseDown={e=>{e.preventDefault();qHeader(2);}} title="Heading 2">H2</button>
@@ -12567,9 +12648,42 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                   <button className={'pages-toolbar-btn'+((qFmt.list==='checked'||qFmt.list==='unchecked')?' active':'')} onMouseDown={e=>{e.preventDefault();qList('check');}} title="Checklist">☑</button>
                   <button className={'pages-toolbar-btn'+(qFmt.blockquote?' active':'')} onMouseDown={e=>{e.preventDefault();qQuote();}} title="Quote">"</button>
                   <div className="pages-toolbar-sep"/>
+                  <button className={'pages-toolbar-btn'+(qFmt.align?' active':'')} onMouseDown={e=>{e.preventDefault();qOpenPop('align',e);}} title="Alignment">≡ ▾</button>
+                  <div className="pages-toolbar-sep"/>
                   <button className={'pages-toolbar-btn'+(qFmt.link?' active':'')} onMouseDown={e=>{e.preventDefault();qLink();}} title="Link">🔗</button>
                   <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();qClear();}} title="Clear formatting">✕</button>
                 </div>
+                {qPop && ReactDOM.createPortal(
+                  <div className="pages-pop" onMouseDown={e=>e.preventDefault()}
+                    style={{position:'fixed', zIndex:9000, left:Math.max(8, Math.min(qPop.x, window.innerWidth-270)), top:Math.min(qPop.y, window.innerHeight-120)}}>
+                    {qPop.kind === 'color' && (<>
+                      {PAGES_TEXT_COLORS.map(g => (
+                        <div key={g.title}>
+                          <div className="pages-pop-title">{g.title}</div>
+                          <div className="pages-pop-grid">
+                            {g.colors.map(c => <button key={c} className={'pages-swatch'+(qFmt.color && qFmt.color.toLowerCase()===c?' on':'')} style={{background:c}} onMouseDown={e=>{e.preventDefault();qSet('color',c);}} title={c}/>)}
+                          </div>
+                        </div>
+                      ))}
+                      <button className="pages-pop-clear" onMouseDown={e=>{e.preventDefault();qSet('color',false);}}>Default colour</button>
+                    </>)}
+                    {qPop.kind === 'bg' && (<>
+                      <div className="pages-pop-title">Highlight</div>
+                      <div className="pages-pop-grid">
+                        {PAGES_HIGHLIGHTS.map(c => <button key={c} className={'pages-swatch'+(qFmt.background===c?' on':'')} style={{background:c}} onMouseDown={e=>{e.preventDefault();qSet('background',c);}}>Ab</button>)}
+                      </div>
+                      <button className="pages-pop-clear" onMouseDown={e=>{e.preventDefault();qSet('background',false);}}>No highlight</button>
+                    </>)}
+                    {qPop.kind === 'font' && PAGES_FONTS.map(f => (
+                      <button key={f.label} className={'pages-pop-item'+(qNoQuote(qFmt.font)===f.value?' on':'')} style={{fontFamily:f.css}} onMouseDown={e=>{e.preventDefault();qSet('font',f.value);}}>{f.label}</button>
+                    ))}
+                    {qPop.kind === 'size' && PAGES_SIZES.map(z => (
+                      <button key={z.label} className={'pages-pop-item'+((qFmt.size||'')===z.value?' on':'')} style={{fontSize:z.value||'14px'}} onMouseDown={e=>{e.preventDefault();qSet('size',z.value);}}>{z.label}</button>
+                    ))}
+                    {qPop.kind === 'align' && PAGES_ALIGNS.map(a => (
+                      <button key={a.label} className={'pages-pop-item'+((qFmt.align||'')===a.value?' on':'')} style={{textAlign:a.value||'left'}} onMouseDown={e=>{e.preventDefault();qSet('align',a.value);}}>{a.label}</button>
+                    ))}
+                  </div>, document.body)}
               </div>
             </div>
             {/* Scrollable area — flex:1, bounded by pages-main overflow:hidden */}
