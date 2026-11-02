@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.7.1 -->
+<!-- LP Planner v4.8.0 -->
+<!-- v4.8.0 — Goals can link Weight and Calories (roll-up with trend line; weight uses a 7-day average); a milestone can complete itself when your weight reaches a number (needs 3+ weigh-ins in 7 days since the goal began); target defaults to the chart's weight target. -->
 <!-- v4.7.1 — Weekly Review can review any week (arrows in its header; defaults to last week on Sun/Mon); drag date tip readable in dark mode; Drop in the review now works on a week other than the one displayed. -->
 <!-- v4.7.0 — Weekly Review (4-step guided close-out of the week); goals link to habits & exercises with a weekly roll-up; Goals timeline bars drag to move and resize, with undo. -->
 <!-- v4.6.0 — Undo toast for deletes; habits on certain days or N× a week (streaks by week); richer repeat rules (every N, monthly nth/last, end after N/date, scope dialog, rolling top-up). -->
@@ -2538,7 +2539,7 @@ function fitWeekStats(exerciseId, fitnessLog, weekStart) {
 }
 // Everything a goal links to, resolved against the current habit and exercise lists.
 // Links to things that have since been deleted are skipped rather than shown as blanks.
-function glLinks(goal, habitGoals, fitnessExercises, completions, fitnessLog, weekStart) {
+function glLinks(goal, habitGoals, fitnessExercises, completions, fitnessLog, weekStart, mctx) {
   const out = [];
   (goal.linkedHabitIds || []).forEach(id => {
     const h = (habitGoals || []).find(x => x.id === id);
@@ -2556,9 +2557,109 @@ function glLinks(goal, habitGoals, fitnessExercises, completions, fitnessLog, we
       detail: w.sessions ? `${w.sessions} session${w.sessions === 1 ? '' : 's'} · ${w.sets} set${w.sets === 1 ? '' : 's'}` : 'Not trained this week',
       pct: w.sessions ? Math.min(1, w.sessions / 3) : 0, sessions: w.sessions });
   });
+  if (mctx) (goal.linkedMetrics || []).forEach(id => { const l = glMetricLink(id, goal, mctx, weekStart); if (l) out.push(l); });
   return out;
 }
-function glHasLinks(goal) { return !!((goal.linkedHabitIds || []).length || (goal.linkedExerciseIds || []).length); }
+function glHasLinks(goal) { return !!((goal.linkedHabitIds || []).length || (goal.linkedExerciseIds || []).length || (goal.linkedMetrics || []).length); }
+
+// ── MEASUREMENTS (v4.8.0) ──
+// Weight and calories live in `habitMetrics` ({dateKey: {weight, cals}}, values stored as strings)
+// with a single global weightTarget / calsTarget that also draw the chart reference lines. A goal
+// can link either one (goal.linkedMetrics: ['weight','cals']) for a roll-up, and a milestone can
+// complete itself from weight (m.metric = {id:'weight', op:'<='|'>=', value}).
+// Everything takes `mctx = {metrics, weightTarget, calsTarget}` so it is one prop to carry around.
+// Weight bounces day to day, so anything that decides "have I reached it" uses a 7-day average and
+// needs at least GL_MIN_READINGS readings in that window — one low weigh-in never counts.
+const GL_METRICS = { weight: { label: 'Weight', icon: '⚖' }, cals: { label: 'Calories', icon: '🍽' } };
+const GL_MIN_READINGS = 3;
+function mNum(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : null; }
+function mRound(x) { return String(Math.round(x * 10) / 10); }
+// Readings of one series between two local dates (inclusive), oldest first
+function metricSeries(metrics, id, from, to) {
+  const key = id === 'weight' ? 'weight' : 'cals';
+  const out = [];
+  for (let d = new Date(from), i = 0; d <= to && i < 800; d = addDays(d, 1), i++) {
+    const v = mNum(((metrics || {})[fmt(d)] || {})[key]);
+    if (v !== null && (id !== 'weight' || v > 0)) out.push({ dk: fmt(d), v });
+  }
+  return out;
+}
+// 7-day average of weight ending asOf. sinceKey (local 'YYYY-MM-DD') ignores readings from before a goal began.
+function smoothWeight(metrics, asOf, sinceKey) {
+  let from = addDays(asOf, -6);
+  const since = sinceKey ? parseLocal(sinceKey) : null;
+  if (since && since > from) from = since;
+  const r = from <= asOf ? metricSeries(metrics, 'weight', from, asOf) : [];
+  return { n: r.length, avg: r.length >= GL_MIN_READINGS ? r.reduce((s, x) => s + x.v, 0) / r.length : null };
+}
+// Where the goal started: the average of the first week of readings on or after its start date
+function weightBaseline(metrics, startKey, asOf) {
+  const start = (startKey && parseLocal(startKey)) || addDays(asOf, -365);
+  const first = metricSeries(metrics, 'weight', start, asOf)[0];
+  if (!first) return null;
+  const r0 = parseLocal(first.dk);
+  const wk = metricSeries(metrics, 'weight', r0, addDays(r0, 6));
+  return { value: wk.reduce((s, x) => s + x.v, 0) / wk.length, dk: first.dk };
+}
+// One roll-up row for a linked measurement, for the week starting weekStart
+function glMetricLink(id, goal, mctx, weekStart) {
+  const meta = GL_METRICS[id];
+  if (!meta) return null;
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const weekEnd = addDays(weekStart, 6);
+  const asOf = weekEnd < now ? weekEnd : now;
+  const base = { kind: 'metric', id, name: meta.label, icon: meta.icon, color: null, spark: [] };
+  if (id === 'weight') {
+    const tgt = mNum(mctx.weightTarget);
+    const cur = smoothWeight(mctx.metrics, asOf);
+    const spark = metricSeries(mctx.metrics, 'weight', addDays(asOf, -20), asOf).map(r => r.v);
+    if (cur.avg === null) return { ...base, spark, pct: null, detail: cur.n ? `${cur.n} of ${GL_MIN_READINGS} readings` : 'No recent readings' };
+    const b = weightBaseline(mctx.metrics, goal.startDate, asOf);
+    const change = b ? cur.avg - b.value : null;
+    let detail = mRound(cur.avg) + (tgt !== null ? ` → ${mRound(tgt)}` : '');
+    if (change !== null && Math.abs(change) >= 0.05) detail += ` · ${change > 0 ? '+' : '−'}${mRound(Math.abs(change))}`;
+    const span = b && tgt !== null ? b.value - tgt : 0;
+    const pct = Math.abs(span) > 0.05 ? Math.max(0, Math.min(1, (b.value - cur.avg) / span)) : null;
+    return { ...base, spark, pct, detail };
+  }
+  const series = metricSeries(mctx.metrics, 'cals', weekStart, asOf);
+  if (!series.length) return { ...base, pct: null, detail: 'No entries this week' };
+  const tgt = mNum(mctx.calsTarget);
+  if (tgt === null) return { ...base, pct: null, detail: `avg ${Math.round(series.reduce((s, x) => s + x.v, 0) / series.length)} kcal` };
+  const under = series.filter(x => x.v <= tgt).length;
+  return { ...base, pct: under / series.length, detail: `${under}/${series.length} days under ${tgt}` };
+}
+// Has a milestone's weight condition been met right now?
+function glMetricMet(m, goal, mctx, asOf) {
+  const c = m.metric;
+  if (!c || c.id !== 'weight') return false;
+  const v = mNum(c.value);
+  if (v === null) return false;
+  const cur = smoothWeight(mctx.metrics, asOf, goal.startDate);
+  if (cur.avg === null) return false;
+  return c.op === '>=' ? cur.avg >= v : cur.avg <= v;
+}
+// Complete any open weight milestones whose condition is met. Returns the SAME goals array when
+// nothing changed (so React does no work) plus what was reached, for the Undo toast.
+// Only active goals; a milestone you reopened by hand (metricHold) is left alone.
+function glAutoComplete(goals, mctx, asOf) {
+  const reached = [];
+  let changed = false;
+  const out = (goals || []).map(g => {
+    if (g.status === 'done' || g.status === 'parked') return g;
+    let touched = false;
+    const ms = (g.milestones || []).map(m => {
+      if (m.done || m.metricHold || !m.metric || !glMetricMet(m, g, mctx, asOf)) return m;
+      touched = true;
+      reached.push({ gid: g.id, mid: m.id, title: m.title, goal: g.title });
+      return { ...m, done: true, completedAt: Date.now(), autoDone: true };
+    });
+    if (!touched) return g;
+    changed = true;
+    return { ...g, milestones: ms };
+  });
+  return { goals: changed ? out : goals, reached };
+}
 
 // ─────────────────────────────────────────────
 // CONFIG — the only values that differ between the TEST app and the live app
@@ -3697,7 +3798,7 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
 // cross-week moves, calendar sync and Undo all behave exactly as they do elsewhere.
 // ─────────────────────────────────────────────
 function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletions, fitnessLog,
-                      fitnessExercises, onMoveTask, onDeleteTask, onAddTask, onSetWD, onNavWeek,
+                      fitnessExercises, mctx, onMoveTask, onDeleteTask, onAddTask, onSetWD, onNavWeek,
                       onGoToWeek, onOpenGoal, onClose }) {
   const [step, setStep] = useState(1);
   const [custom, setCustom] = useState(null);     // id of the row whose date picker is open
@@ -3904,7 +4005,7 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
                     <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)', minWidth: 34, textAlign: 'right', flexShrink: 0 }}>{Math.round(v * 100)}%</span>
                   </div>
                 ))}
-                <GlLinksRow goal={g} habitGoals={habitGoals} fitnessExercises={fitnessExercises}
+                <GlLinksRow goal={g} habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
                   habitCompletions={habitCompletions} fitnessLog={fitnessLog} weekStart={weekStart} />
                 {m && <div style={{ fontSize: 12.5, color: 'var(--ink-light)' }}>Next: {m.title || 'Untitled milestone'}{m.dueDate ? ` · due ${glShort(m.dueDate)}` : ''}</div>}
                 <div style={{ display: 'flex', gap: 7 }}>
@@ -3955,7 +4056,7 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
   );
 }
 
-function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal, fitnessLog, fitnessExercises, reviewOpen, setReviewOpen }) {
+function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
@@ -4933,7 +5034,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       {reviewOpen && reviewWeek && (
         <WeekReview weekStart={reviewWeek} wd={wdFor(reviewWeek)} goals={goals} setGoals={setGoals}
           habitGoals={habitGoals} habitCompletions={habitCompletions}
-          fitnessLog={fitnessLog} fitnessExercises={fitnessExercises}
+          fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx}
           onMoveTask={(from, to, id) => moveTaskBetweenDays(from, to, id, null)}
           onDeleteTask={deleteTask} onAddTask={prependTask}
           onSetWD={fn => setWDFor(reviewWeek, fn)}
@@ -8551,8 +8652,16 @@ function GlHealthPill({ h }) { return <span className={`gl-health ${h.key}`}>{h.
 // ── Linked habits & training (v4.7.0) ──
 // Read-only roll-up of the habits and exercises a goal is built on. Shown in the goal detail,
 // on the goal card and in the Weekly Review. Does not feed glProgress — milestones still do that.
-function GlLinksRow({ goal, habitGoals, fitnessExercises, habitCompletions, fitnessLog, weekStart, compact }) {
-  const links = glLinks(goal, habitGoals, fitnessExercises, habitCompletions, fitnessLog, weekStart);
+// Tiny trend line for a measurement (v4.8.0)
+function GlSpark({ vals, color }) {
+  if (!vals || vals.length < 3) return null;
+  const w = 64, h = 18, lo = Math.min(...vals), hi = Math.max(...vals);
+  const pts = vals.map((v, i) => `${(i / (vals.length - 1) * w).toFixed(1)},${(h - 2 - (hi === lo ? 0.5 : (v - lo) / (hi - lo)) * (h - 4)).toFixed(1)}`).join(' ');
+  return <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden="true" style={{ flexShrink: 0 }}>
+    <polyline fill="none" stroke={color || 'currentColor'} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" points={pts} /></svg>;
+}
+function GlLinksRow({ goal, habitGoals, fitnessExercises, habitCompletions, fitnessLog, weekStart, compact, mctx }) {
+  const links = glLinks(goal, habitGoals, fitnessExercises, habitCompletions, fitnessLog, weekStart, mctx);
   if (!links.length) return null;
   const c = goal.color || '#7c3f6e';
   if (compact) {
@@ -8560,7 +8669,7 @@ function GlLinksRow({ goal, habitGoals, fitnessExercises, habitCompletions, fitn
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
         {links.map(l => (
           <span key={l.kind + l.id} className="gl-chip" style={{ cursor: 'default', fontSize: 11, padding: '3px 8px' }}>
-            {l.kind === 'habit' ? '◷' : '◆'} {l.name} · {l.detail}
+            {l.kind === 'metric' ? l.icon : l.kind === 'habit' ? '◷' : '◆'} {l.name} · {l.detail}
           </span>
         ))}
       </div>
@@ -8568,7 +8677,24 @@ function GlLinksRow({ goal, habitGoals, fitnessExercises, habitCompletions, fitn
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {links.map(l => (
+      {links.map(l => l.kind === 'metric' ? (
+        // Measurements get two lines: name + value, then progress bar + trend
+        <div key={l.kind + l.id} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span aria-hidden="true" style={{ fontSize: 12, color: 'var(--ink-faint)', width: 12, flexShrink: 0 }}>{l.icon}</span>
+            <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--ink)' }}>{l.name}</span>
+            <span className="gl-mono" style={{ fontSize: 11, color: 'var(--ink-light)', textAlign: 'right' }}>{l.detail}</span>
+          </div>
+          {(l.pct != null || l.spark.length > 2) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingLeft: 22 }}>
+              {l.pct != null
+                ? <div className="gl-bar" style={{ flex: 1, height: 6, background: glTint(c, 0.15) }}><div style={{ width: Math.round(l.pct * 100) + '%', background: c }} /></div>
+                : <div style={{ flex: 1 }} />}
+              <GlSpark vals={l.spark} color={c} />
+            </div>
+          )}
+        </div>
+      ) : (
         <div key={l.kind + l.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span aria-hidden="true" style={{ fontSize: 11, color: 'var(--ink-faint)', width: 12, flexShrink: 0 }}>{l.kind === 'habit' ? '◷' : '◆'}</span>
           <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
@@ -8590,14 +8716,22 @@ function GlLinksRow({ goal, habitGoals, fitnessExercises, habitCompletions, fitn
 function GlLinkPicker({ goal, onChange, habitGoals, fitnessExercises }) {
   const habitIds = goal.linkedHabitIds || [];
   const exIds = goal.linkedExerciseIds || [];
+  const metricIds = goal.linkedMetrics || [];
   const toggle = (key, id) => onChange(g => {
     const cur = g[key] || [];
     return { ...g, [key]: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] };
   });
-  const hasAny = (habitGoals || []).length || (fitnessExercises || []).length;
-  if (!hasAny) return <span style={{ fontSize: 13, color: 'var(--ink-light)' }}>Add habits or exercises first and you can link them here.</span>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Measurements</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+          {Object.entries(GL_METRICS).map(([id, mm]) => (
+            <button key={id} className={`gl-chip ${metricIds.includes(id) ? 'on' : ''}`}
+              aria-pressed={metricIds.includes(id)} onClick={() => toggle('linkedMetrics', id)}>{mm.icon} {mm.label}</button>
+          ))}
+        </div>
+      </div>
       {(habitGoals || []).length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Habits</span>
@@ -9013,7 +9147,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
 }
 
 // One milestone in the goal editor: header row plus (when open) its tasks.
-function GlMilestoneEditor({ m, color, open, onToggleOpen, onChange, onDelete }) {
+function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete }) {
   const today = glToday();
   const [newTask, setNewTask] = useState('');
   const [focusId, setFocusId] = useState(null);
@@ -9039,7 +9173,9 @@ function GlMilestoneEditor({ m, color, open, onToggleOpen, onChange, onDelete })
       <div className="gl-ms-head" style={{ background: open ? glTint(color, 0.06) : late ? '#fdf3f1' : undefined }}>
         <button className="gl-caret" aria-label={open ? 'Collapse milestone' : 'Expand milestone'} onClick={onToggleOpen}>{open ? '▾' : '▸'}</button>
         <button className={`gl-check ${m.done ? 'on' : ''}`} aria-label={m.done ? 'Mark milestone not done' : 'Mark milestone done'}
-          onClick={() => onChange(mm => ({ ...mm, done: !mm.done, completedAt: !mm.done ? Date.now() : null }))}>{m.done ? '✓' : ''}</button>
+          onClick={() => onChange(mm => ({ ...mm, done: !mm.done, completedAt: !mm.done ? Date.now() : null,
+            // Reopening a weight milestone by hand must stick, or the next check would just re-complete it
+            ...(mm.done && mm.metric ? { metricHold: true, autoDone: false } : {}) }))}>{m.done ? '✓' : ''}</button>
         <input className="gl-inline" style={{ flex: '1 1 160px', fontSize: 14, fontWeight: open ? 600 : 500, textDecoration: m.done ? 'line-through' : 'none', color: m.done ? 'var(--ink-light)' : late ? '#b03a2e' : 'var(--ink)' }}
           placeholder="Milestone name" value={m.title} autoFocus={!m.title}
           onChange={e => onChange(mm => ({ ...mm, title: e.target.value }))} />
@@ -9058,6 +9194,49 @@ function GlMilestoneEditor({ m, color, open, onToggleOpen, onChange, onDelete })
       </div>
       {open && (
         <div>
+          {/* v4.8.0 — complete this milestone from my weight */}
+          {(() => {
+            const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
+            const c = m.metric;
+            const cur = mctx ? smoothWeight(mctx.metrics, asOf, goal && goal.startDate) : { n: 0, avg: null };
+            const setMetric = patch => onChange(mm => ({ ...mm, metric: { ...mm.metric, ...patch }, metricHold: false }));
+            function enable(on) {
+              if (!on) { onChange(mm => { const { metric, metricHold, autoDone, ...rest } = mm; return rest; }); return; }
+              // Default the value to the chart's weight target (one source of truth); direction from where you started
+              const tgt = mctx ? mNum(mctx.weightTarget) : null;
+              const b = mctx && goal ? weightBaseline(mctx.metrics, goal.startDate, asOf) : null;
+              const ref = b ? b.value : cur.avg;
+              const op = ref !== null && tgt !== null && ref < tgt ? '>=' : '<=';
+              onChange(mm => ({ ...mm, metric: { id: 'weight', op, value: tgt !== null ? String(tgt) : '' }, metricHold: false }));
+            }
+            return (
+              <div className="gl-task" style={{ flexWrap: 'wrap', rowGap: 6 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink)', minHeight: 32, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={!!c} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }}
+                    onChange={e => enable(e.target.checked)} />
+                  ⚖ Complete automatically from my weight
+                </label>
+                {c && (
+                  <>
+                    <select className="gl-input" style={{ padding: '4px 6px', fontSize: 12 }} aria-label="Direction" value={c.op}
+                      onChange={e => setMetric({ op: e.target.value })}>
+                      <option value="<=">drops to</option>
+                      <option value=">=">rises to</option>
+                    </select>
+                    <input type="number" step="0.1" inputMode="decimal" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, width: 78 }}
+                      aria-label="Weight to reach" placeholder="weight" value={c.value}
+                      onChange={e => setMetric({ value: e.target.value })} />
+                    <span style={{ fontSize: 11.5, color: 'var(--ink-light)', flexBasis: '100%', paddingLeft: 24 }}>
+                      {m.metricHold ? 'Auto-complete is paused because you reopened this. Change the number to turn it back on.'
+                        : m.autoDone && m.done ? 'Completed automatically.'
+                        : cur.avg !== null ? `Now ${mRound(cur.avg)} (7-day average).`
+                        : `Needs ${GL_MIN_READINGS} weigh-ins in 7 days since the goal started${cur.n ? ` — has ${cur.n}` : ''}. One reading never counts.`}
+                    </span>
+                  </>
+                )}
+              </div>
+            );
+          })()}
           {tasks.map(t => (
             <div key={t.id} className="gl-task">
               <button className={`gl-check ${t.done ? 'on' : ''}`} aria-label={t.done ? 'Mark task not done' : 'Mark task done'}
@@ -9088,7 +9267,7 @@ function GlMilestoneEditor({ m, color, open, onToggleOpen, onChange, onDelete })
   );
 }
 
-function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog }) {
+function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const linkWeekStart = getWeekStart(new Date());
   const [openMs, setOpenMs] = useState(() => { const n = glNextMilestone(goal); return n ? { [n.id]: true } : {}; });
@@ -9137,7 +9316,7 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, hab
             </div>
             {!ms.length && <div style={{ fontSize: 13, color: 'var(--ink-light)', padding: '6px 2px' }}>Break the goal into milestones — checkpoints with dates — then add tasks under each one and schedule them into your weeks.</div>}
             {ms.map(m => (
-              <GlMilestoneEditor key={m.id} m={m} color={c} open={!!openMs[m.id]}
+              <GlMilestoneEditor key={m.id} m={m} goal={goal} mctx={mctx} color={c} open={!!openMs[m.id]}
                 onToggleOpen={() => setOpenMs(o => ({ ...o, [m.id]: !o[m.id] }))}
                 onChange={fn => setMs(m.id, fn)}
                 onDelete={() => onChange(g => ({ ...g, milestones: (g.milestones || []).filter(x => x.id !== m.id) }))} />
@@ -9213,7 +9392,7 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, hab
               <GlLinkPicker goal={goal} onChange={onChange} habitGoals={habitGoals} fitnessExercises={fitnessExercises} />
             ) : glHasLinks(goal) ? (
               <>
-                <GlLinksRow goal={goal} habitGoals={habitGoals} fitnessExercises={fitnessExercises}
+                <GlLinksRow goal={goal} habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
                   habitCompletions={habitCompletions} fitnessLog={fitnessLog} weekStart={linkWeekStart} />
                 <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>This week. Shown alongside the milestones — it doesn't change the goal's progress.</span>
               </>
@@ -9248,7 +9427,7 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, hab
   );
 }
 
-function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog }) {
+function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const [statusTab, setStatusTab] = useState('active');
   const [sideCollapsed, setSideCollapsedRaw] = useState(() => lsGet('glSideCollapsed') === '1'); // desktop only; per device
@@ -9345,7 +9524,7 @@ function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, sele
                 </div>
               )}
               {g.status === 'active' && (
-                <GlLinksRow compact goal={g} habitGoals={habitGoals} fitnessExercises={fitnessExercises}
+                <GlLinksRow compact goal={g} habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
                   habitCompletions={habitCompletions} fitnessLog={fitnessLog} weekStart={getWeekStart(new Date())} />
               )}
             </button>
@@ -9362,7 +9541,7 @@ function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, sele
       <main className="gl-main">
         {sel ? (
           <GlDetail key={sel.id} goal={sel} pagesData={pagesData} onOpenPage={onOpenPage}
-            habitGoals={habitGoals} fitnessExercises={fitnessExercises}
+            habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
             habitCompletions={habitCompletions} fitnessLog={fitnessLog}
             onChange={fn => changeGoal(sel.id, fn)}
             onBack={() => setSelectedId(null)}
@@ -9442,6 +9621,22 @@ function App() {
   const [fitnessGoals, setFitnessGoals] = useSynced('fitnessGoals', []); // [{id, exerciseId, period, target, unit}]
   const [countdowns, setCountdowns] = useSynced('countdowns', []); // [{id, title, startDate, endDate, color}]
   const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
+  // Weight / calorie readings and their targets, bundled for the goal views (v4.8.0)
+  const mctx = { metrics: habitMetrics, weightTarget, calsTarget };
+  // Complete weight milestones whose condition is met (7-day average, 3+ readings since the goal began).
+  // Debounced; writes only when something changed. The Undo toast reopens it and holds auto-complete.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
+      const ctx = { metrics: habitMetrics, weightTarget, calsTarget };
+      const r = glAutoComplete(goals, ctx, asOf);
+      if (r.goals === goals) return;
+      setGoals(gs => glAutoComplete(gs, ctx, asOf).goals);
+      r.reached.forEach(x => Undo.push(`Reached: ${x.title || 'milestone'}`, () => setGoals(gs => glPatchGoal(gs, x.gid, g =>
+        glPatchMs(g, x.mid, m => ({ ...m, done: false, completedAt: null, autoDone: false, metricHold: true }))))));
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [goals, habitMetrics, weightTarget]);
   // Keep "never ends" repeating tasks topped up as time passes (v4.6.0). Debounced; only writes when something was added.
   useEffect(() => {
     const t = setTimeout(() => {
@@ -9874,7 +10069,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.7.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.8.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -9951,7 +10146,7 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
@@ -9973,7 +10168,7 @@ function App() {
       {page==='goals' && <GoalsView goals={goals} setGoals={setGoals} pagesData={pagesData}
         countdowns={countdowns} setCountdowns={setCountdowns}
         selectedId={selectedGoalId} setSelectedId={setSelectedGoalId}
-        habitGoals={habitGoals} fitnessExercises={fitnessExercises}
+        habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
         habitCompletions={habitCompletions} fitnessLog={fitnessLog}
         onOpenPage={(id)=>{ setSelectedPagesId(id); setPage('pages'); }} />}
       </div>
