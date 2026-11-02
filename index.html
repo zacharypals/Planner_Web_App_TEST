@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.9.0 -->
+<!-- LP Planner v5.0.0 -->
+<!-- v5.0.0 — Pages editor rebuilt on Quill 2 (self-hosted quill.js/quill.css): reliable checklists and lists, tap anywhere on a row to place the cursor, undo/redo buttons. Pages still save in the same HTML format, so older versions can read them. -->
 <!-- v4.9.0 — Offline mode: a service worker (sw.js) keeps the app itself available with no connection; edits are saved on the device and upload when you reconnect; calm "Offline" notice instead of an error. -->
 <!-- v4.8.0 — Goals can link Weight and Calories (roll-up with trend line; weight uses a 7-day average); a milestone can complete itself when your weight reaches a number (needs 3+ weigh-ins in 7 days since the goal began); target defaults to the chart's weight target. -->
 <!-- v4.7.1 — Weekly Review can review any week (arrows in its header; defaults to last week on Sun/Mon); drag date tip readable in dark mode; Drop in the review now works on a week other than the one displayed. -->
@@ -23,6 +24,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="quill.css">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-512.png">
 <meta name="theme-color" content="#3a2960">
@@ -37,6 +39,7 @@
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.26.5/babel.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="quill.js"></script>
 
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1722,7 +1725,7 @@
     font-family: 'DM Sans', sans-serif; font-weight: 500;
   }
   .pages-toolbar-btn:hover { background: var(--cream); color: var(--ink); }
-  .pages-toolbar-btn.active { background: var(--accent); color: white; }
+  .pages-toolbar-btn.active { background: var(--accent-light); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--accent); }
   .pages-toolbar-sep { width: 1px; background: rgba(0,0,0,0.08); margin: 3px 3px; align-self: stretch; }
 
   /* ── Rich text body ── */
@@ -1736,6 +1739,34 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.05);
   }
   .pages-body:focus { box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 0 0 2px var(--accent); }
+  .pages-body:focus-within { box-shadow: 0 1px 4px rgba(0,0,0,0.05), 0 0 0 2px var(--accent); }
+  /* ── Quill editor body (v5.0.0) ── */
+  .pages-body.ql-container { height: auto; font: inherit; }
+  .pages-body .ql-editor { padding: 0; min-height: 200px; height: auto; overflow: visible; font: inherit; line-height: inherit; color: inherit; }
+  .pages-body .ql-editor.ql-blank::before { left: 0; right: 0; color: var(--ink-faint); font-style: normal; }
+  .pages-body .ql-editor p { margin: 6px 0; }
+  .pages-body .ql-editor h1 { font-family: 'DM Sans', sans-serif; font-size: 22px; font-weight: 700; margin: 16px 0 8px; color: var(--ink); letter-spacing: -0.02em; }
+  .pages-body .ql-editor h2 { font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 600; margin: 12px 0 6px; color: var(--ink); }
+  .pages-body .ql-editor h3 { font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; margin: 10px 0 5px; color: var(--ink); }
+  .pages-body .ql-editor ol { padding-left: 0; margin: 2px 0; }
+  .pages-body .ql-editor li { margin: 2px 0; padding-left: 1.7em; }
+  .pages-body .ql-editor li > .ql-ui:before { width: 1.3em; margin-left: -1.7em; margin-right: .4em; font-size: 1.05em; }
+  .pages-body .ql-editor li[data-list=unchecked] > .ql-ui { color: var(--ink-light); }
+  .pages-body .ql-editor li[data-list=checked] > .ql-ui { color: var(--accent); }
+  .pages-body .ql-editor li[data-list=checked] { text-decoration: line-through; opacity: 0.5; }
+  .pages-body .ql-editor li[data-list=bullet] > .ql-ui { color: var(--ink-light); }
+  .pages-body .ql-editor li.ql-indent-1:not(.ql-direction-rtl) { padding-left: calc(1.7em + 1.5em); }
+  .pages-body .ql-editor li.ql-indent-2:not(.ql-direction-rtl) { padding-left: calc(1.7em + 3.0em); }
+  .pages-body .ql-editor li.ql-indent-3:not(.ql-direction-rtl) { padding-left: calc(1.7em + 4.5em); }
+  .pages-body .ql-editor li.ql-indent-4:not(.ql-direction-rtl) { padding-left: calc(1.7em + 6.0em); }
+  .pages-body .ql-editor li.ql-indent-5:not(.ql-direction-rtl) { padding-left: calc(1.7em + 7.5em); }
+  .pages-body .ql-editor li.ql-indent-6:not(.ql-direction-rtl) { padding-left: calc(1.7em + 9.0em); }
+  .pages-body .ql-editor li.ql-indent-7:not(.ql-direction-rtl) { padding-left: calc(1.7em + 10.5em); }
+  .pages-body .ql-editor li.ql-indent-8:not(.ql-direction-rtl) { padding-left: calc(1.7em + 12.0em); }
+  .pages-body .ql-editor a { color: var(--accent); text-decoration: underline; }
+  .pages-body .ql-editor s { text-decoration: line-through; opacity: 0.5; }
+  .pages-body .ql-editor blockquote { border-left: 3px solid var(--border); margin: 8px 0; padding: 2px 0 2px 14px; color: var(--ink-light); }
+  .pages-body .ql-editor img { max-width: 100%; }
   .pages-body h1 { font-family: 'DM Sans', sans-serif; font-size: 22px; font-weight: 700; margin: 16px 0 8px; color: var(--ink); letter-spacing: -0.02em; }
   .pages-body h2 { font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 600; margin: 12px 0 6px; color: var(--ink); }
   .pages-body h3 { font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; margin: 10px 0 5px; color: var(--ink); }
@@ -1988,7 +2019,7 @@
   }
   .pages-body { border-radius: var(--radius-md); }
   .sidebar-textarea:focus, .modal-input:focus, .modal-textarea:focus,
-  .review-textarea:focus, .pages-body:focus {
+  .review-textarea:focus, .pages-body:focus, .pages-body:focus-within {
     border-color: var(--accent); box-shadow: 0 0 0 3px rgba(106,80,167,0.12);
   }
 
@@ -10077,7 +10108,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.9.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.0.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -11645,10 +11676,178 @@ function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose 
 // ─────────────────────────────────────────────
 // PAGES VIEW
 // ─────────────────────────────────────────────
+// ── Pages editor: stored HTML ⇄ Quill delta ─────────────────────────────────────────────
+// Pages keep saving the app's original HTML dialect (so TEST and live read each other's pages):
+//   checklist: <ul class="pages-checklist"><li class="pages-chk-li [checked]" data-checked="true|false"><input type=checkbox class="pages-chk-input" [checked]> text</li></ul>
+function pagesHtmlToDelta(quill, html) {
+  const Delta = Quill.import('delta');
+  const doc = new DOMParser().parseFromString('<body>' + (html || '') + '</body>', 'text/html').body;
+  const BLOCK = /^(P|DIV|H[1-6]|BLOCKQUOTE|UL|OL|LI|PRE)$/;
+  const isListEl = n => n.nodeType === 1 && (n.tagName === 'UL' || n.tagName === 'OL');
+  let out = new Delta();
+  const inline = (nodes) => {
+    const box = doc.ownerDocument.createElement('div');
+    nodes.forEach(n => box.appendChild(n.cloneNode(true)));
+    let d = box.innerHTML.trim() === '' ? new Delta() : quill.clipboard.convert({ html: box.innerHTML });
+    const ops = d.ops.slice();                       // drop a trailing newline the converter may add
+    const last = ops[ops.length - 1];
+    if (last && typeof last.insert === 'string' && last.insert.endsWith('\n') && !last.attributes) {
+      last.insert = last.insert.slice(0, -1); if (!last.insert) ops.pop();
+    }
+    return new Delta(ops.map(o => typeof o.insert === 'string' ? { ...o, insert: o.insert.replace(/ /g, ' ') } : o));
+  };
+  const line = (nodes, attrs) => {
+    let d = inline(nodes);
+    if (d.length() === 0 && nodes.length && !nodes.some(n => n.nodeType === 1 && n.querySelector && n.querySelector('img')) && nodes.every(n => n.nodeType !== 3 || !n.textContent.trim())) d = new Delta();
+    out = out.concat(d).insert('\n', attrs && Object.keys(attrs).length ? attrs : undefined);
+  };
+  const walk = (parent, extra) => {
+    let buf = [];
+    const flush = () => {
+      if (buf.length && (buf.some(n => n.nodeType === 1) || buf.some(n => n.textContent.trim()))) line(buf, extra);
+      buf = [];
+    };
+    for (const n of Array.from(parent.childNodes)) {
+      if (n.nodeType === 1 && BLOCK.test(n.tagName)) {
+        flush();
+        const t = n.tagName;
+        if (isListEl(n)) lists(n, 0, null);
+        else if (t === 'BLOCKQUOTE') walk(n, { ...(extra || {}), blockquote: true });
+        else if (/^H[1-6]$/.test(t)) line(Array.from(n.childNodes), { ...(extra || {}), header: +t[1] });
+        else if (Array.from(n.childNodes).some(c => c.nodeType === 1 && BLOCK.test(c.tagName))) walk(n, extra);
+        else line(Array.from(n.childNodes), extra);
+      } else buf.push(n);
+    }
+    flush();
+  };
+  const lists = (ul, depth, inheritedCheck) => {
+    const check = inheritedCheck || ul.classList.contains('pages-checklist');
+    for (const li of Array.from(ul.childNodes)) {
+      if (isListEl(li)) { lists(li, depth + 1, check); continue; }      // <ul><ul> produced by execCommand('indent')
+      if (li.nodeType !== 1 || li.tagName !== 'LI') continue;
+      const box = li.querySelector(':scope > input[type=checkbox]');
+      const isCheck = check || li.classList.contains('pages-chk-li') || !!box;
+      let kind = ul.tagName === 'OL' ? 'ordered' : 'bullet';
+      if (isCheck) {
+        const done = li.getAttribute('data-checked') === 'true' || li.classList.contains('checked') || (box && box.hasAttribute('checked'));
+        kind = done ? 'checked' : 'unchecked';
+      }
+      const own = Array.from(li.childNodes).filter(c => !isListEl(c) && !(c.nodeType === 1 && c.tagName === 'INPUT'));
+      line(own, { list: kind, ...(depth ? { indent: depth } : {}) });
+      for (const c of Array.from(li.childNodes)) if (isListEl(c)) lists(c, depth + 1, isCheck && c.classList.contains('pages-checklist') ? true : null);
+    }
+  };
+  walk(doc, null);
+  if (out.length() === 0) return new Delta().insert('\n');
+  return out;
+}
+
+function pagesEsc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function pagesDeltaToHtml(delta) {
+  const lines = []; let cur = [];
+  for (const op of delta.ops) {
+    if (typeof op.insert === 'string') {
+      const parts = op.insert.split('\n');
+      parts.forEach((txt, i) => {
+        if (txt) cur.push({ t: txt, a: op.attributes || {} });
+        if (i < parts.length - 1) { lines.push({ segs: cur, a: op.attributes || {} }); cur = []; }
+      });
+    } else if (op.insert && op.insert.image) cur.push({ img: op.insert.image });
+  }
+  if (cur.length) lines.push({ segs: cur, a: {} });       // text after the last newline (shouldn't happen in Quill)
+  const seg = s => {
+    if (s.img) return '<img src="' + pagesEsc(s.img) + '">';
+    let h = pagesEsc(s.t), a = s.a;
+    if (a.strike) h = '<s>' + h + '</s>';
+    if (a.underline) h = '<u>' + h + '</u>';
+    if (a.italic) h = '<i>' + h + '</i>';
+    if (a.bold) h = '<b>' + h + '</b>';
+    if (a.link) h = '<a href="' + pagesEsc(String(a.link)) + '">' + h + '</a>';
+    return h;
+  };
+  let html = '', stack = [];     // stack of open lists: { tag, check }
+  const closeTo = n => { while (stack.length > n) { html += '</li></' + stack.pop().tag + '>'; } };
+  for (const L of lines) {
+    const a = L.a, body = L.segs.map(seg).join('');
+    if (a.list) {
+      const check = a.list === 'checked' || a.list === 'unchecked';
+      const tag = a.list === 'ordered' ? 'ol' : 'ul';
+      const d = a.indent || 0;
+      closeTo(d + 1);
+      if (stack.length === d + 1 && (stack[d].tag !== tag || stack[d].check !== check)) closeTo(d);
+      if (stack.length === d + 1) html += '</li>';
+      while (stack.length < d + 1) {
+        const top = stack.length === d, c = top ? check : false, t = top ? tag : 'ul';
+        html += '<' + t + (c ? ' class="pages-checklist"' : '') + '>';
+        stack.push({ tag: t, check: c });
+        if (stack.length < d + 1) html += '<li>';
+      }
+      if (check) {
+        const done = a.list === 'checked';
+        html += '<li class="pages-chk-li' + (done ? ' checked' : '') + '" data-checked="' + done + '"><input type="checkbox" class="pages-chk-input" contenteditable="false"' + (done ? ' checked' : '') + '> ' + body;
+      } else html += '<li>' + body;
+      continue;
+    }
+    closeTo(0);
+    if (a.header) html += '<h' + a.header + '>' + (body || '<br>') + '</h' + a.header + '>';
+    else if (a.blockquote) html += '<blockquote>' + (body || '<br>') + '</blockquote>';
+    else html += '<p>' + (body || '<br>') + '</p>';
+  }
+  closeTo(0);
+  return html;
+}
+
+// The editor itself. Remounted (key=docId) for each page; the page's saved HTML is read once on mount.
+function PagesQuill({ docId, html, apiRef, onInput, onFmt, onText, onGone }) {
+  const hostRef = useRef(null);
+  const cb = useRef({});
+  cb.current = { onInput, onFmt, onText, onGone };
+  const missing = typeof Quill === 'undefined';
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host || missing) return;
+    const q = new Quill(host, {
+      formats: ['bold', 'italic', 'underline', 'strike', 'header', 'blockquote', 'list', 'indent', 'link', 'image'],
+      placeholder: 'Start writing…',
+      modules: { toolbar: false, history: { userOnly: true, delay: 1000, maxStack: 200 } },
+    });
+    q.setContents(pagesHtmlToDelta(q, html), 'silent');
+    q.history.clear();
+    const api = {
+      quill: q,
+      getHtml() {
+        const ops = q.getContents().ops;
+        if (ops.length === 1 && ops[0].insert === '\n' && !ops[0].attributes) return '';
+        return pagesDeltaToHtml(q.getContents());
+      },
+    };
+    apiRef.current = api;
+    cb.current.onText(q.getText());
+    q.on('text-change', (d, o, source) => {
+      cb.current.onText(q.getText());
+      if (source !== 'user') return;
+      cb.current.onInput();
+      cb.current.onFmt(q.getFormat());
+    });
+    q.on('selection-change', r => { if (r) cb.current.onFmt(q.getFormat(r)); });
+    return () => {
+      let h = null;
+      try { h = api.getHtml(); } catch {}
+      if (apiRef.current === api) apiRef.current = null;
+      cb.current.onGone(docId, h);
+      host.innerHTML = ''; host.className = 'pages-body';
+    };
+  }, []); // eslint-disable-line
+  if (missing) return <div className="pages-body" style={{color:'var(--red)'}}>The editor didn't load — check your connection and reload the page.</div>;
+  return <div ref={hostRef} className="pages-body" />;
+}
+
 function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekData, setWeekData, selectedId, setSelectedId }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileView, setMobileView] = useState(() => selectedId ? 'editor' : 'list');
-  const bodyRef = useRef(null);
+  const quillApi = useRef(null);
+  const getBodyHtml = () => (quillApi.current ? quillApi.current.getHtml() : null);
+  const [qFmt, setQFmt] = useState({});
   const titleRef = useRef(null);
   const debounceRef = useRef(null);
   // Always-current ref to selectedId so flush fn closure never goes stale
@@ -11676,8 +11875,8 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     _bodyFlushRef.fn = () => {
       if (debounceRef.current) { clearTimeout(debounceRef.current); debounceRef.current = null; }
       const id = selectedIdRef.current;
-      if (!id || !bodyRef.current) return;
-      const html = bodyRef.current.innerHTML;
+      const html = getBodyHtml();
+      if (!id || html == null) return;
       const now = new Date().toISOString();
       // Write directly to local storage synchronously so the hide/close upload picks it up
       try {
@@ -11692,27 +11891,20 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     return () => { _bodyFlushRef.fn = null; };
   }, []); // eslint-disable-line — setPagesData is stable
 
-  // Flush body when switching documents so the previous doc's last keystrokes aren't lost
-  useEffect(() => {
-    return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-        debounceRef.current = null;
-        const id = selectedIdRef.current;
-        if (id && bodyRef.current) {
-          const html = bodyRef.current.innerHTML;
-          const now = new Date().toISOString();
-          try {
-            const stored = lsGet('pagesData');
-            const pages = stored ? JSON.parse(stored) : [];
-            const updated = pages.map(d => d.id === id ? {...d, body: html, lastModified: now} : d);
-            lsSet('pagesData', JSON.stringify(updated));
-          } catch {}
-          setPagesData(p => p.map(d => d.id === id ? {...d, body: html, lastModified: now} : d));
-        }
-      }
-    };
-  }, [selectedId]); // cleanup runs with OLD selectedId before switching to new one
+  // The editor calls this as it goes away (switching pages, leaving Pages) so the last keystrokes aren't lost.
+  function flushDocBody(id, html) {
+    if (!debounceRef.current) return;
+    clearTimeout(debounceRef.current);
+    debounceRef.current = null;
+    if (!id || html == null) return;
+    const now = new Date().toISOString();
+    try {
+      const stored = lsGet('pagesData');
+      const pages = stored ? JSON.parse(stored) : [];
+      lsSet('pagesData', JSON.stringify(pages.map(d => d.id === id ? {...d, body: html, lastModified: now} : d)));
+    } catch {}
+    setPagesData(p => p.map(d => d.id === id ? {...d, body: html, lastModified: now} : d));
+  }
 
   function countWords(text) {
     return text.trim() === '' ? 0 : text.trim().split(/\s+/).length;
@@ -11847,260 +12039,57 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     });
   }
 
-  function exec(cmd, val) {
-    bodyRef.current?.focus();
-    document.execCommand(cmd, false, val || null);
-  }
-
-  // ── Checklist helpers ────────────────────────────────────────────────────
-  // Helper: get the closest pages-chk-li ancestor of the current selection
-  function getChkLi(sel) {
-    if (!sel || sel.rangeCount === 0) return null;
-    const node = sel.getRangeAt(0).startContainer;
-    const el = node.nodeType === 3 ? node.parentElement : node;
-    return el ? el.closest('li.pages-chk-li') : null;
-  }
-
-  // Build a fresh checklist li with a native checkbox
-  function makeChkLi() {
-    const li = document.createElement('li');
-    li.className = 'pages-chk-li';
-    li.setAttribute('data-checked', 'false');
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.className = 'pages-chk-input';
-    cb.setAttribute('contenteditable', 'false');
-    cb.addEventListener('change', () => {
-      li.setAttribute('data-checked', String(cb.checked));
-      if (cb.checked) li.classList.add('checked'); else li.classList.remove('checked');
-      setTimeout(() => onBodyInput(), 0);
-    });
-    li.appendChild(cb);
-    li.appendChild(document.createTextNode(' '));
-    return li;
-  }
-
-  function insertChecklistItem() {
-    bodyRef.current?.focus();
-    const sel = window.getSelection();
-    if (getChkLi(sel)) {
-      handleEnterInChecklist(getChkLi(sel), sel);
-      return;
-    }
-    const ul = document.createElement('ul');
-    ul.className = 'pages-checklist';
-    const li = makeChkLi();
-    ul.appendChild(li);
-    // Use a marker span to inject at cursor position
-    const markerId = 'chk_m_' + Date.now();
-    document.execCommand('insertHTML', false, '<span id="' + markerId + '"></span>');
-    const markerEl = bodyRef.current?.querySelector('#' + markerId);
-    if (markerEl) {
-      markerEl.parentNode.insertBefore(ul, markerEl);
-      markerEl.remove();
-    } else {
-      bodyRef.current?.appendChild(ul);
-    }
-    // Cursor goes to the text node after the checkbox
-    const textNode = li.lastChild;
-    const r = document.createRange();
-    r.setStart(textNode, 0);
-    r.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(r);
-    onBodyInput();
-  }
-
-  function handleEnterInChecklist(li, sel) {
-    const textContent = Array.from(li.childNodes)
-      .filter(n => n.nodeType === 3).map(n => n.textContent)
-      .join('').replace(/ /g, '').replace(/ /g, '').trim();
-    if (textContent === '') {
-      // Empty item — exit the checklist
-      // Walk up to find the topmost ul in case we're nested after an outdent
-      let ul = li.parentNode;
-      while (ul && ul.tagName === 'UL') {
-        const parent = ul.parentNode;
-        if (!parent || parent === bodyRef.current || parent.tagName !== 'UL') break;
-        ul = parent;
-      }
-      const insertAfter = (ul && ul !== li) ? ul : li;
-      const p = document.createElement('p');
-      p.appendChild(document.createTextNode(' '));
-      insertAfter.parentNode.insertBefore(p, insertAfter.nextSibling);
-      li.remove();
-      if (ul && ul !== li && ul.children.length === 0) ul.remove();
-      const r = document.createRange();
-      r.setStart(p.firstChild, 0);
-      r.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(r);
-    } else {
-      // Split the li at cursor: text after cursor moves to new li
-      const range = sel.getRangeAt(0);
-      const afterRange = document.createRange();
-      afterRange.setStart(range.startContainer, range.startOffset);
-      afterRange.setEnd(li, li.childNodes.length);
-      const afterFragment = afterRange.extractContents();
-      // Collect only text (strip any checkbox inputs swept up by extractContents)
-      let afterText = '';
-      const tw = document.createTreeWalker(afterFragment, NodeFilter.SHOW_TEXT, null);
-      while (tw.nextNode()) afterText += tw.currentNode.textContent;
-
-      const newLi = makeChkLi();
-      if (newLi.lastChild && newLi.lastChild.nodeType === 3) {
-        newLi.lastChild.textContent = afterText;
-      } else {
-        newLi.appendChild(document.createTextNode(afterText));
-      }
-      li.parentNode.insertBefore(newLi, li.nextSibling);
-      const textNode = newLi.lastChild;
-      const r = document.createRange();
-      r.setStart(textNode, 0);
-      r.collapse(true);
-      sel.removeAllRanges();
-      sel.addRange(r);
-    }
-    setTimeout(() => onBodyInput(), 0);
-  }
-
-  function handleBodyKeyDown(e) {
-    const sel = window.getSelection();
-
-    // Space shortcut: "- " at start of line → bullet list, "1. " → numbered list
-    // Works even if there's text after the cursor — that text becomes the list item content
-    if (e.key === ' ' && sel && sel.rangeCount > 0 && bodyRef.current) {
-      const range = sel.getRangeAt(0);
-      const node = range.startContainer;
-      const block = node.nodeType === 3 ? node.parentElement : node;
-      const blockEl = block?.closest('p,div,h1,h2,h3') || block;
-      if (blockEl && !blockEl.closest('ul,ol,blockquote') && bodyRef.current.contains(blockEl)) {
-        // Get text from the very start of the block up to the cursor
-        const preRange = document.createRange();
-        preRange.setStart(blockEl, 0);
-        preRange.setEnd(range.startContainer, range.startOffset);
-        const textBeforeCursor = preRange.toString();
-
-        let listCmd = null;
-        if (textBeforeCursor === '-') listCmd = 'insertUnorderedList';
-        else if (textBeforeCursor === '1.') listCmd = 'insertOrderedList';
-
-        if (listCmd) {
-          e.preventDefault();
-          // Select just the prefix ("-" or "1.") and delete it, leaving rest of text intact
-          sel.removeAllRanges();
-          sel.addRange(preRange);
-          document.execCommand('delete');
-          // Now convert the block (with remaining text) into a list item
-          document.execCommand(listCmd);
-          setTimeout(() => onBodyInput(), 0);
-          return;
-        }
-      }
-    }
-
-    // Tab in regular ul/ol list items — indent/outdent regardless of checklist
-    if (e.key === 'Tab' && sel && sel.rangeCount > 0) {
-      const node = sel.getRangeAt(0).startContainer;
-      const el = node.nodeType === 3 ? node.parentElement : node;
-      const regularLi = el?.closest('li:not(.pages-chk-li)');
-      if (regularLi) {
-        e.preventDefault();
-        document.execCommand(e.shiftKey ? 'outdent' : 'indent');
-        setTimeout(() => onBodyInput(), 0);
-        return;
-      }
-    }
-
-    const li = getChkLi(sel);
-    if (!li) return;
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleEnterInChecklist(li, sel);
-    } else if (e.key === 'Tab') {
-      e.preventDefault();
-      if (e.shiftKey) {
-        document.execCommand('outdent');
-      } else {
-        document.execCommand('indent');
-      }
-      // After indent/outdent the browser may recreate the <li> without our class.
-      // Re-apply it so getChkLi() keeps working for subsequent Enter/Tab/Backspace.
-      requestAnimationFrame(() => {
-        const s = window.getSelection();
-        if (s && s.rangeCount > 0) {
-          const node = s.getRangeAt(0).startContainer;
-          const el = node.nodeType === 3 ? node.parentElement : node;
-          const currentLi = el?.closest('li');
-          if (currentLi && !currentLi.classList.contains('pages-chk-li')) {
-            currentLi.classList.add('pages-chk-li');
-            currentLi.setAttribute('data-checked', 'false');
-          }
-        }
-        onBodyInput();
-      });
-    } else if (e.key === 'Backspace') {
-      const textContent = Array.from(li.childNodes)
-        .filter(n => n.nodeType === 3).map(n => n.textContent)
-        .join('').replace(/ /g, '').trim();
-      if (textContent === '') {
-        e.preventDefault();
-        const ul = li.closest('ul.pages-checklist');
-        const prev = li.previousElementSibling || (ul ? ul.previousSibling : null);
-        li.remove();
-        if (ul && ul.children.length === 0) ul.remove();
-        if (prev) {
-          const r = document.createRange();
-          r.selectNodeContents(prev);
-          r.collapse(false);
-          sel.removeAllRanges();
-          sel.addRange(r);
-        }
-        setTimeout(() => onBodyInput(), 0);
-      }
-    }
-  }
-
+  // ── Editor (Quill) ───────────────────────────────────────────────────────────────────
   function onBodyInput() {
-    // Markdown shortcut: "- " at start of a block → bullet list
-    const sel = window.getSelection();
-    if (sel && sel.rangeCount > 0 && bodyRef.current) {
-      const range = sel.getRangeAt(0);
-      const node = range.startContainer;
-      const block = node.nodeType === 3 ? node.parentElement : node;
-      const blockEl = block?.closest('p,div,li') || block;
-      // Only apply in plain paragraphs/divs, not already inside a list
-      if (blockEl && !blockEl.closest('ul,ol')) {
-        const text = blockEl.textContent || '';
-        if (text === '- ' || text === ' - ' || text.match(/^- $/)) {
-          // Clear the block content first
-          blockEl.textContent = '';
-          bodyRef.current.focus();
-          document.execCommand('insertUnorderedList');
-          // Don't let the debounce save stale HTML — use ref so closure is always current
-          setTimeout(() => { if (bodyRef.current && selectedIdRef.current) updateDoc(selectedIdRef.current, { body: bodyRef.current.innerHTML }); }, 0);
-          return;
-        }
-      }
-    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      if (bodyRef.current && selectedId) {
-        updateDoc(selectedId, { body: bodyRef.current.innerHTML });
-      }
+      debounceRef.current = null;
+      const html = getBodyHtml(), id = selectedIdRef.current;
+      if (html != null && id) updateDoc(id, { body: html });
     }, 300);
   }
-
-  useEffect(() => {
-    if (bodyRef.current && selectedDoc) {
-      if (bodyRef.current.innerHTML !== selectedDoc.body) {
-        bodyRef.current.innerHTML = selectedDoc.body || '';
-      }
-      setWordCount(countWords(bodyRef.current.innerText || ''));
-    } else {
-      setWordCount(0);
-    }
-  }, [selectedId]);
+  function qDo(fn) {
+    const q = quillApi.current && quillApi.current.quill;
+    if (!q) return;
+    q.focus();
+    fn(q);
+    setQFmt(q.getFormat());
+  }
+  const qToggle = name => qDo(q => q.format(name, !q.getFormat()[name], 'user'));
+  const qHeader = n => qDo(q => q.format('header', q.getFormat().header === n ? false : n, 'user'));
+  const qNormal = () => qDo(q => { q.format('header', false, 'user'); q.format('blockquote', false, 'user'); q.format('list', false, 'user'); });
+  const qList = type => qDo(q => {
+    const cur = q.getFormat().list;
+    const on = type === 'check' ? (cur === 'checked' || cur === 'unchecked') : cur === type;
+    q.format('list', on ? false : (type === 'check' ? 'unchecked' : type), 'user');
+  });
+  const qQuote = () => qDo(q => q.format('blockquote', !q.getFormat().blockquote, 'user'));
+  const qLink = () => qDo(q => {
+    const r = q.getSelection(true);
+    const cur = q.getFormat(r).link;
+    let url = prompt('Enter URL (leave blank to remove the link):', cur || 'https://');
+    if (url === null) return;
+    url = url.trim();
+    if (!url || url === 'https://') { if (r.length) q.formatText(r.index, r.length, 'link', false, 'user'); return; }
+    if (!/^([a-z][a-z0-9+.-]*:)/i.test(url)) url = 'https://' + url;
+    if (r.length) q.formatText(r.index, r.length, 'link', url, 'user');
+    else { q.insertText(r.index, url, { link: url }, 'user'); q.setSelection(r.index + url.length, 0); }
+  });
+  const qClear = () => qDo(q => {
+    const r = q.getSelection(true);
+    if (r.length) q.removeFormat(r.index, r.length, 'user');
+    else { const [line] = q.getLine(r.index); if (line) q.removeFormat(q.getIndex(line), Math.max(line.length() - 1, 0), 'user'); }
+  });
+  // Swipe a list row right/left to indent/outdent (touch).
+  const swipeRef = useRef(null);
+  function onEditorTouchStart(e) { swipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }
+  function onEditorTouchEnd(e) {
+    const st = swipeRef.current; swipeRef.current = null;
+    const q = quillApi.current && quillApi.current.quill;
+    if (!st || !q) return;
+    const dx = e.changedTouches[0].clientX - st.x, dy = Math.abs(e.changedTouches[0].clientY - st.y);
+    if (Math.abs(dx) >= 44 && dy < 30 && q.getFormat().list) { q.format('indent', dx > 0 ? '+1' : '-1', 'user'); setQFmt(q.getFormat()); }
+  }
 
   const fmtDocDate = (iso) => {
     if (!iso) return '';
@@ -12560,30 +12549,26 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
               {/* Toolbar — sticky in header so it's always visible */}
               <div style={{padding:'8px 0 0'}}>
                 <div className="pages-toolbar">
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('bold');}} title="Bold"><b>B</b></button>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('italic');}} title="Italic"><i>I</i></button>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('underline');}} title="Underline"><u>U</u></button>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('strikeThrough');}} title="Strikethrough"><s>S</s></button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();qDo(q=>q.history.undo());}} title="Undo">↶</button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();qDo(q=>q.history.redo());}} title="Redo">↷</button>
                   <div className="pages-toolbar-sep"/>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h1');}} title="Heading 1">H1</button>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h2');}} title="Heading 2">H2</button>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','h3');}} title="Heading 3">H3</button>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','p');}} title="Normal text">¶</button>
+                  <button className={'pages-toolbar-btn'+(qFmt.bold?' active':'')} onMouseDown={e=>{e.preventDefault();qToggle('bold');}} title="Bold"><b>B</b></button>
+                  <button className={'pages-toolbar-btn'+(qFmt.italic?' active':'')} onMouseDown={e=>{e.preventDefault();qToggle('italic');}} title="Italic"><i>I</i></button>
+                  <button className={'pages-toolbar-btn'+(qFmt.underline?' active':'')} onMouseDown={e=>{e.preventDefault();qToggle('underline');}} title="Underline"><u>U</u></button>
+                  <button className={'pages-toolbar-btn'+(qFmt.strike?' active':'')} onMouseDown={e=>{e.preventDefault();qToggle('strike');}} title="Strikethrough"><s>S</s></button>
                   <div className="pages-toolbar-sep"/>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('insertUnorderedList');}} title="Bullet list">• —</button>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('insertOrderedList');}} title="Numbered list">1.</button>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{
-                    e.preventDefault();
-                    insertChecklistItem();
-                  }} title="Checklist">☑</button>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('formatBlock','blockquote');}} title="Quote">"</button>
+                  <button className={'pages-toolbar-btn'+(qFmt.header===1?' active':'')} onMouseDown={e=>{e.preventDefault();qHeader(1);}} title="Heading 1">H1</button>
+                  <button className={'pages-toolbar-btn'+(qFmt.header===2?' active':'')} onMouseDown={e=>{e.preventDefault();qHeader(2);}} title="Heading 2">H2</button>
+                  <button className={'pages-toolbar-btn'+(qFmt.header===3?' active':'')} onMouseDown={e=>{e.preventDefault();qHeader(3);}} title="Heading 3">H3</button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();qNormal();}} title="Normal text">¶</button>
                   <div className="pages-toolbar-sep"/>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{
-                    e.preventDefault();
-                    const url = prompt('Enter URL:');
-                    if (url) exec('createLink', url);
-                  }} title="Link">🔗</button>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();exec('removeFormat');}} title="Clear formatting">✕</button>
+                  <button className={'pages-toolbar-btn'+(qFmt.list==='bullet'?' active':'')} onMouseDown={e=>{e.preventDefault();qList('bullet');}} title="Bullet list">• —</button>
+                  <button className={'pages-toolbar-btn'+(qFmt.list==='ordered'?' active':'')} onMouseDown={e=>{e.preventDefault();qList('ordered');}} title="Numbered list">1.</button>
+                  <button className={'pages-toolbar-btn'+((qFmt.list==='checked'||qFmt.list==='unchecked')?' active':'')} onMouseDown={e=>{e.preventDefault();qList('check');}} title="Checklist">☑</button>
+                  <button className={'pages-toolbar-btn'+(qFmt.blockquote?' active':'')} onMouseDown={e=>{e.preventDefault();qQuote();}} title="Quote">"</button>
+                  <div className="pages-toolbar-sep"/>
+                  <button className={'pages-toolbar-btn'+(qFmt.link?' active':'')} onMouseDown={e=>{e.preventDefault();qLink();}} title="Link">🔗</button>
+                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();qClear();}} title="Clear formatting">✕</button>
                 </div>
               </div>
             </div>
@@ -12592,85 +12577,10 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
             <div className="pages-editor">
 
 
-              <div ref={bodyRef} className="pages-body" contentEditable suppressContentEditableWarning
-                onInput={e=>{onBodyInput();setWordCount(countWords(bodyRef.current?.innerText||''));}}
-                onKeyDown={e=>handleBodyKeyDown(e)}
-                onMouseDown={e=>{
-                  if(e.target.classList.contains('pages-chk-input')){
-                    // Native checkbox — let it handle normally
-                    return;
-                  }
-                  const li = e.target.closest('li.pages-chk-li');
-                  if(li){
-                    // If clicking directly on a text node, let the browser place the cursor naturally
-                    if(e.target.nodeType === 3 || e.target.closest('span,b,i,u,strong,em')){
-                      return;
-                    }
-                    // Clicking on the li itself or its label area (not on text):
-                    // check if the click is past the end of the text content
-                    const range = document.caretRangeFromPoint
-                      ? document.caretRangeFromPoint(e.clientX, e.clientY)
-                      : null;
-                    // If browser can place a caret at the click point inside this li, let it
-                    if(range && li.contains(range.startContainer) && range.startContainer.nodeType === 3){
-                      return; // browser will place cursor correctly between characters
-                    }
-                    // Otherwise (click is in whitespace past end of text, or on the li padding):
-                    // prevent the default and move cursor to end of text
-                    e.preventDefault();
-                    bodyRef.current?.focus();
-                    const walker = document.createTreeWalker(li, NodeFilter.SHOW_TEXT, null);
-                    let lastText = null;
-                    while(walker.nextNode()) lastText = walker.currentNode;
-                    const r = document.createRange();
-                    if(lastText){
-                      r.setStart(lastText, lastText.length);
-                    } else {
-                      // Empty li — place after the checkbox
-                      r.selectNodeContents(li);
-                      r.collapse(false);
-                    }
-                    r.collapse(true);
-                    const s = window.getSelection();
-                    s.removeAllRanges();
-                    s.addRange(r);
-                  }
-                }}
-                onTouchStart={e=>{ bodyRef._touchStartX = e.touches[0].clientX; bodyRef._touchStartY = e.touches[0].clientY; }}
-                onTouchEnd={e=>{
-                  const dx = e.changedTouches[0].clientX - (bodyRef._touchStartX || 0);
-                  const dy = Math.abs(e.changedTouches[0].clientY - (bodyRef._touchStartY || 0));
-                  // Only treat as intentional horizontal swipe: ≥44px horizontal, <30px vertical drift
-                  if (Math.abs(dx) >= 44 && dy < 30) {
-                    const sel = window.getSelection();
-                    if (sel && sel.rangeCount > 0) {
-                      const node = sel.getRangeAt(0).startContainer;
-                      const el = node.nodeType === 3 ? node.parentElement : node;
-                      const inLi = el?.closest('li');
-                      if (inLi) {
-                        e.preventDefault();
-                        document.execCommand(dx > 0 ? 'indent' : 'outdent');
-                        // Re-apply checklist class if needed
-                        requestAnimationFrame(() => {
-                          const s2 = window.getSelection();
-                          if (s2 && s2.rangeCount > 0) {
-                            const n2 = s2.getRangeAt(0).startContainer;
-                            const el2 = n2.nodeType === 3 ? n2.parentElement : n2;
-                            const li2 = el2?.closest('li');
-                            if (li2 && inLi.classList.contains('pages-chk-li') && !li2.classList.contains('pages-chk-li')) {
-                              li2.classList.add('pages-chk-li');
-                              li2.setAttribute('data-checked', 'false');
-                            }
-                          }
-                          onBodyInput();
-                        });
-                      }
-                    }
-                  }
-                }}
-                data-placeholder="Start writing…"
-                style={{minHeight:180}}
-              />
+              <div onTouchStart={onEditorTouchStart} onTouchEnd={onEditorTouchEnd}>
+                <PagesQuill key={selectedDoc.id} docId={selectedDoc.id} html={selectedDoc.body} apiRef={quillApi}
+                  onInput={onBodyInput} onFmt={setQFmt} onText={t=>setWordCount(countWords(t))} onGone={flushDocBody} />
+              </div>
               <div style={{textAlign:'right',fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--ink-faint)',padding:'4px 2px',marginTop:2}}>
                 {wordCount} {wordCount===1?'word':'words'}
               </div>

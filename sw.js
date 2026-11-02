@@ -3,8 +3,8 @@
    - Pinned CDN libraries, fonts, icons: cache-first (their URLs are versioned, so they never change).
    - API calls (the Worker, Google) are never touched: the app's own sync layer handles those.
    Bump CACHE when this file's strategy changes. */
-const CACHE = 'lp-shell-v1';
-const SHELL = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png'];
+const CACHE = 'lp-shell-v2';
+const SHELL = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'quill.js', 'quill.css'];
 const LIBS = [
   'https://unpkg.com/react@18.3.1/umd/react.development.js',
   'https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js',
@@ -17,7 +17,7 @@ self.addEventListener('install', e => {
   e.waitUntil((async () => {
     const c = await caches.open(CACHE);
     // Shell files must succeed; CDN libs are best-effort (they also get cached on first use).
-    await c.addAll(SHELL).catch(() => {});
+    await Promise.all(SHELL.map(u => c.add(u).catch(() => {})));
     await Promise.all(LIBS.map(u => fetch(u, { mode: 'cors', signal: AbortSignal.timeout(15000) }).then(r => r.ok && c.put(u, r)).catch(() => {})));
     self.skipWaiting();
   })());
