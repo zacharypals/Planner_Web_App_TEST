@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.6.0 -->
+<!-- LP Planner v4.7.0 -->
+<!-- v4.7.0 — Weekly Review (4-step guided close-out of the week); goals link to habits & exercises with a weekly roll-up; Goals timeline bars drag to move and resize, with undo. -->
 <!-- v4.6.0 — Undo toast for deletes; habits on certain days or N× a week (streaks by week); richer repeat rules (every N, monthly nth/last, end after N/date, scope dialog, rolling top-up). -->
 <!-- v4.5.5 — Fitness "+ Exercise" picker lists exercises A→Z within each group (display only; library order unchanged). -->
 <!-- v4.5.4 — Fitness cardio rows: Sec, min/mi and Done headers line up over their columns (Done centered over the check, same as strength rows). -->
@@ -1247,6 +1248,82 @@
   .rp-scope-opt.on { border-color: var(--accent); background: var(--accent-light); }
   .rp-scope-opt input { width: 18px; height: 18px; accent-color: var(--accent); margin: 2px 0 0; flex-shrink: 0; }
 
+  /* ── WEEKLY REVIEW (v4.7.0) ── */
+  .wr-overlay {
+    position: fixed; inset: 0; z-index: 9995; background: rgba(28,22,40,0.55);
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .wr-box {
+    background: var(--paper); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+    width: min(680px, 100%); max-height: min(860px, 94vh); display: flex; flex-direction: column; overflow: hidden;
+  }
+  .wr-head { padding: 16px 22px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .wr-step { font: 600 10px 'DM Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
+  .wr-title { font-family: 'Playfair Display', serif; font-size: 23px; font-weight: 600; color: var(--ink); margin-top: 2px; }
+  .wr-sub { font-size: 12.5px; color: var(--ink-light); margin-top: 3px; }
+  .wr-body { padding: 18px 22px; overflow-y: auto; flex: 1; display: flex; flex-direction: column; gap: 16px; }
+  .wr-foot {
+    padding: 12px 22px; border-top: 1px solid var(--border); flex-shrink: 0;
+    display: flex; align-items: center; gap: 10px; justify-content: space-between; background: var(--paper);
+  }
+  .wr-dots { display: flex; gap: 5px; }
+  .wr-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--border); display: block; }
+  .wr-dots i.on { background: var(--accent); }
+  .wr-btn {
+    font-family: 'DM Sans', sans-serif; font-size: 14px; min-height: 42px; padding: 0 18px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink); cursor: pointer;
+  }
+  .wr-btn:hover { background: var(--cream); }
+  .wr-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+  .wr-btn.primary:hover { filter: brightness(1.08); }
+  .wr-btn.ghost { border-color: transparent; background: transparent; color: var(--ink-light); }
+  .wr-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .wr-stat { background: var(--cream); border-radius: var(--radius-md); padding: 12px 10px; text-align: center; }
+  .wr-stat b { display: block; font-family: 'Playfair Display', serif; font-size: 26px; font-weight: 600; color: var(--ink); line-height: 1.1; }
+  .wr-stat span { display: block; font-size: 11px; color: var(--ink-light); margin-top: 3px; line-height: 1.3; }
+  .wr-stat em { font-style: normal; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-faint); }
+  .wr-sec-label { font: 600 10px 'DM Mono', monospace; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+  .wr-item {
+    border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--surface);
+  }
+  .wr-item .t { flex: 1 1 180px; min-width: 0; font-size: 14px; color: var(--ink); }
+  .wr-item .from { font-size: 11px; color: var(--ink-faint); font-family: 'DM Mono', monospace; }
+  .wr-mini {
+    font-family: 'DM Sans', sans-serif; font-size: 12px; min-height: 32px; padding: 0 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink); cursor: pointer; flex-shrink: 0;
+  }
+  .wr-mini:hover { border-color: var(--accent); color: var(--accent); }
+  .wr-mini.drop:hover { border-color: var(--red); color: var(--red); }
+  .wr-mini.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .wr-ta {
+    width: 100%; box-sizing: border-box; min-height: 68px; resize: vertical; padding: 9px 11px;
+    border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface);
+    color: var(--ink); font: 14px 'DM Sans', sans-serif; line-height: 1.5;
+  }
+  .wr-ta:focus, .wr-in:focus { outline: none; border-color: var(--accent); }
+  .wr-in {
+    width: 100%; box-sizing: border-box; min-height: 40px; padding: 0 11px;
+    border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface);
+    color: var(--ink); font: 14px 'DM Sans', sans-serif;
+  }
+  .wr-goal { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+  .wr-done { text-align: center; padding: 22px 10px; color: var(--ink-light); font-size: 14px; }
+  .wr-review-btn {
+    display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; min-height: 38px;
+    margin: 8px 0 2px; border-radius: var(--radius-md); cursor: pointer; font: 600 13px 'DM Sans', sans-serif;
+    border: 1px solid var(--border); background: var(--surface); color: var(--ink-light);
+  }
+  .wr-review-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .wr-review-btn.due { background: var(--gold-light); border-color: var(--gold); color: #8a6a05; }
+  @media (max-width: 767px) {
+    .wr-overlay { padding: 0; align-items: stretch; }
+    .wr-box { width: 100%; max-height: 100%; border-radius: 0; }
+    .wr-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .wr-btn { min-height: 44px; }
+    .wr-mini { min-height: 38px; }
+  }
+
   /* ── UNDO TOAST (v4.6.0) ── */
   .undo-toast {
     position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; z-index: 9990;
@@ -1992,6 +2069,17 @@
   .gl-tl-lab { display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 13px; overflow: hidden; }
   .gl-tl-lab span.t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gl-tl-bar { position: absolute; border-radius: 9px; cursor: pointer; overflow: hidden; box-sizing: border-box; }
+  /* v4.7.0 — drag to reschedule */
+  .gl-tl-bar.grab { cursor: grab; touch-action: none; }
+  .gl-tl-bar.dragging { cursor: grabbing; overflow: visible; box-shadow: 0 2px 10px rgba(35,30,51,0.28); z-index: 4; }
+  .gl-tl-grip { position: absolute; top: 0; bottom: 0; width: 9px; cursor: ew-resize; touch-action: none; }
+  .gl-tl-grip.l { left: 0; } .gl-tl-grip.r { right: 0; }
+  .gl-tl-bar.grab:hover .gl-tl-grip { background: rgba(255,255,255,0.45); box-shadow: inset 0 0 0 1px rgba(35,30,51,0.22); }
+  .gl-tl-drag-tip {
+    position: absolute; top: -4px; z-index: 6; pointer-events: none;
+    background: var(--ink); color: #fff; border-radius: 6px; padding: 2px 7px; white-space: nowrap;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+  }
   .gl-tl-dia { position: absolute; width: 11px; height: 11px; transform: rotate(45deg); box-sizing: border-box; pointer-events: none; }
   .gl-tl-today { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--gold); pointer-events: none; z-index: 2; }
   .gl-tl-todaytag { position: absolute; top: 3px; font-family: 'DM Mono', monospace; font-size: 9px; line-height: 12px; background: var(--gold); color: var(--ink); padding: 2px 7px; border-radius: 999px; z-index: 3; pointer-events: none; }
@@ -2391,6 +2479,64 @@ function repeatExtend(wd, todayKey) {
   });
   return out || wd;
 }
+
+// ── GOAL ↔ HABIT / FITNESS LINKS (v4.7.0) ──
+// A goal may point at habits and at fitness exercises it is built on:
+//   goal.linkedHabitIds: [habitId]      — habits from the Habit Tracker
+//   goal.linkedExerciseIds: [exerciseId] — exercises from the Fitness library
+// These are read-only roll-ups: they never change glProgress or glHealth, which stay driven by
+// milestones. They answer "is the underlying practice actually happening?" alongside "is the
+// checklist moving?". Date keys here use fmt (UTC-ISO), matching habitCompletions and fitnessLog.
+//
+// How a habit did in the 7 days from weekStart: {done, target, pct}
+function habitWeekStats(goal, completions, weekStart) {
+  let done = 0;
+  for (let i = 0; i < 7; i++) if (((completions || {})[fmt(addDays(weekStart, i))] || []).includes(goal.id)) done++;
+  const f = goal.freq;
+  const target = !f ? 7
+    : f.type === 'perWeek' ? Math.max(1, parseInt(f.n, 10) || 1)
+    : f.type === 'days' ? ((f.days || []).length || 7)
+    : 7;
+  return { done, target, pct: target ? Math.min(1, done / target) : 0 };
+}
+// Sessions and completed sets for one exercise in the 7 days from weekStart
+function fitWeekStats(exerciseId, fitnessLog, weekStart) {
+  let sessions = 0, sets = 0;
+  for (let i = 0; i < 7; i++) {
+    let hit = false;
+    ((fitnessLog || {})[fmt(addDays(weekStart, i))] || []).forEach(w =>
+      (w.exercises || []).forEach(ex => {
+        if (ex.exerciseId !== exerciseId) return;
+        hit = true;
+        sets += (ex.sets || []).filter(s => s.done).length;
+      }));
+    if (hit) sessions++;
+  }
+  return { sessions, sets };
+}
+// Everything a goal links to, resolved against the current habit and exercise lists.
+// Links to things that have since been deleted are skipped rather than shown as blanks.
+function glLinks(goal, habitGoals, fitnessExercises, completions, fitnessLog, weekStart) {
+  const out = [];
+  (goal.linkedHabitIds || []).forEach(id => {
+    const h = (habitGoals || []).find(x => x.id === id);
+    if (!h) return;
+    const w = habitWeekStats(h, completions, weekStart);
+    out.push({ kind: 'habit', id, name: h.name || 'Habit', color: h.color,
+      detail: `${w.done}/${w.target} this week`, pct: w.pct,
+      streak: habitStreak(h, completions, new Date()), perWeek: !!(h.freq && h.freq.type === 'perWeek') });
+  });
+  (goal.linkedExerciseIds || []).forEach(id => {
+    const ex = (fitnessExercises || []).find(x => x.id === id);
+    if (!ex) return;
+    const w = fitWeekStats(id, fitnessLog, weekStart);
+    out.push({ kind: 'exercise', id, name: ex.name || 'Exercise', color: null,
+      detail: w.sessions ? `${w.sessions} session${w.sessions === 1 ? '' : 's'} · ${w.sets} set${w.sets === 1 ? '' : 's'}` : 'Not trained this week',
+      pct: w.sessions ? Math.min(1, w.sessions / 3) : 0, sessions: w.sessions });
+  });
+  return out;
+}
+function glHasLinks(goal) { return !!((goal.linkedHabitIds || []).length || (goal.linkedExerciseIds || []).length); }
 
 // ─────────────────────────────────────────────
 // CONFIG — the only values that differ between the TEST app and the live app
@@ -3521,7 +3667,248 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
   );
 }
 
-function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal }) {
+// ─────────────────────────────────────────────
+// WEEKLY REVIEW (v4.7.0)
+// A four-step guided close-out of the displayed week: how it went → where unfinished tasks go →
+// a goals check-in → reflect and set next week's top 3. Reads the week it is given, so reviewing
+// an older week works the same way. Writes go through the Weekly Planner's own task helpers, so
+// cross-week moves, calendar sync and Undo all behave exactly as they do elsewhere.
+// ─────────────────────────────────────────────
+function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletions, fitnessLog,
+                      fitnessExercises, onMoveTask, onDeleteTask, onAddTask, onSetWD, onOpenGoal, onClose }) {
+  const [step, setStep] = useState(1);
+  const [custom, setCustom] = useState(null);     // id of the row whose date picker is open
+  const [top3, setTop3] = useState(['', '', '']);
+  const [goalDraft, setGoalDraft] = useState({}); // goalId -> text of the task being added
+  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  const nextMon = addDays(weekStart, 8);          // weekStart is Sunday, so +8 is next Monday
+  const nextMonKey = fmt(nextMon);
+  const label = `${fmtDisplay(days[0])} – ${fmtDisplay(days[6])}`;
+  // Goal task scheduledDate uses fmtLocal while weekData day keys use fmt; in a negative UTC
+  // offset these agree, but match on both so a goal task is never missed. (See KI-4.)
+  const dayKeys = days.map(d => fmt(d));
+  const inWeek = new Set([...dayKeys, ...days.map(d => fmtLocal(d))]);
+
+  // ── What happened this week ──
+  const rows = [];
+  dayKeys.forEach((dk, i) => ((wd.tasks || {})[dk] || []).forEach(t => {
+    if ((t.title || '').trim()) rows.push({ kind: 'task', id: t.id, dk, dayIdx: i, title: t.title, done: !!t.done, task: t });
+  }));
+  (goals || []).forEach(g => (g.milestones || []).forEach(m => (m.tasks || []).forEach(t => {
+    if (!t.scheduledDate || !inWeek.has(t.scheduledDate)) return;
+    const d = parseLocal(t.scheduledDate);
+    rows.push({ kind: 'goal', id: t.id, dk: t.scheduledDate, dayIdx: d ? d.getDay() : 0,
+      title: t.title || 'Untitled task', done: !!t.done, g, m });
+  })));
+  const taskRows = rows.filter(r => r.kind === 'task');
+  const goalRows = rows.filter(r => r.kind === 'goal');
+  const unfinished = rows.filter(r => !r.done);
+  const perDay = dayKeys.map((_, i) => rows.filter(r => r.dayIdx === i && r.done).length);
+  const busiest = perDay.indexOf(Math.max(...perDay));
+  const quietest = perDay.indexOf(Math.min(...perDay));
+
+  const habitStats = (habitGoals || []).map(h => ({ h, ...habitWeekStats(h, habitCompletions, weekStart) }));
+  const habitTotal = habitStats.reduce((s, x) => s + x.target, 0);
+  const habitHit = habitStats.reduce((s, x) => s + Math.min(x.done, x.target), 0);
+  const workouts = dayKeys.filter(dk => ((fitnessLog || {})[dk] || []).length > 0).length;
+  const activeGoals = (goals || []).filter(g => g.status === 'active');
+
+  // ── Moving an unfinished task ──
+  function place(r, toKey) {
+    if (r.kind === 'task') {
+      const from = r.dk;
+      onMoveTask(from, toKey, r.id);
+      Undo.push(`Moved "${r.title.trim().slice(0, 30)}" to ${glShort(toKey)}`, () => onMoveTask(toKey, from, r.id));
+    } else {
+      const from = r.dk;
+      setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: toKey }));
+      Undo.push(`Moved "${r.title.trim().slice(0, 30)}" to ${glShort(toKey)}`,
+        () => setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: from })));
+    }
+    setCustom(null);
+  }
+  function drop(r) {
+    if (r.kind === 'task') { onDeleteTask(r.dk, r.id); return; }
+    const from = r.dk;
+    setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: '' }));
+    Undo.push(`Unscheduled "${r.title.trim().slice(0, 30)}"`,
+      () => setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: from })));
+    setCustom(null);
+  }
+  function moveAll() {
+    const list = [...unfinished];
+    list.forEach(r => {
+      if (r.kind === 'task') onMoveTask(r.dk, nextMonKey, r.id);
+      else setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: nextMonKey }));
+    });
+    Undo.push(`Moved ${list.length} task${list.length === 1 ? '' : 's'} to ${glShort(nextMonKey)}`, () => list.forEach(r => {
+      if (r.kind === 'task') onMoveTask(nextMonKey, r.dk, r.id);
+      else setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: r.dk }));
+    }));
+  }
+  function addGoalTask(g) {
+    const title = (goalDraft[g.id] || '').trim();
+    if (!title) return;
+    const m = glNextMilestone(g) || (g.milestones || [])[0];
+    if (!m) return;
+    const t = { id: glId('t'), title, scheduledDate: fmtLocal(nextMon), done: false, completedAt: null };
+    setGoals(gs => glPatchGoal(gs, g.id, gg => glPatchMs(gg, m.id, mm => ({ ...mm, tasks: [...(mm.tasks || []), t] }))));
+    setGoalDraft(d => ({ ...d, [g.id]: '' }));
+  }
+  function finish() {
+    // Top 3 become starred tasks at the top of next Monday, in the order they were typed
+    top3.map(s => s.trim()).filter(Boolean).reverse().forEach(title => onAddTask(nextMonKey, title, true));
+    onSetWD(w => ({ ...w, reviewedAt: Date.now() }));
+    onClose();
+  }
+
+  const heads = [
+    ['How the week went', label],
+    ['Unfinished tasks', unfinished.length ? `${unfinished.length} task${unfinished.length === 1 ? '' : 's'} didn't get done. Decide where each goes.` : 'Nothing left over — the whole week is closed out.'],
+    ['Goals check-in', 'Work done versus time used, per goal.'],
+    ['Reflect and plan', "Saved into this week's notes and next week's top 3."],
+  ];
+  const nextLabel = ['Next: unfinished tasks', 'Next: goals', 'Next: reflect and plan', 'Finish review'][step - 1];
+
+  return (
+    <div className="wr-overlay" onClick={onClose}>
+      <div className="wr-box" role="dialog" aria-label="Weekly review" onClick={e => e.stopPropagation()}>
+        <div className="wr-head">
+          <div className="wr-step">Week review · Step {step} of 4</div>
+          <div className="wr-title">{heads[step - 1][0]}</div>
+          <div className="wr-sub">{heads[step - 1][1]}</div>
+        </div>
+        <div className="wr-body">
+
+          {step === 1 && (<>
+            <div className="wr-stats">
+              <div className="wr-stat"><b>{taskRows.filter(r => r.done).length}</b><em>of {taskRows.length}</em><span>Tasks done</span></div>
+              <div className="wr-stat"><b>{habitTotal ? Math.round(habitHit / habitTotal * 100) : 0}%</b><em>&nbsp;</em><span>Habits completed</span></div>
+              <div className="wr-stat"><b>{workouts}</b><em>of 7 days</em><span>Workouts logged</span></div>
+              <div className="wr-stat"><b>{goalRows.filter(r => r.done).length}</b><em>of {goalRows.length}</em><span>Goal tasks done</span></div>
+            </div>
+            {habitStats.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <span className="wr-sec-label">Habits this week</span>
+                {habitStats.map(({ h, done, target, pct }) => (
+                  <div key={h.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ width: 9, height: 9, borderRadius: '50%', background: h.color || 'var(--accent)', flexShrink: 0 }} />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.name || 'Habit'}</span>
+                    <div className="gl-bar" style={{ width: 90, height: 6, flexShrink: 0 }}>
+                      <div style={{ width: Math.round(pct * 100) + '%', background: h.color || 'var(--accent)' }} />
+                    </div>
+                    <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)', minWidth: 34, textAlign: 'right', flexShrink: 0 }}>{done}/{target}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {rows.some(r => r.done) && (
+              <div style={{ fontSize: 13, color: 'var(--ink-light)', lineHeight: 1.6 }}>
+                Busiest day: <b style={{ color: 'var(--ink)' }}>{DAYS[busiest]}</b>, with {perDay[busiest]} task{perDay[busiest] === 1 ? '' : 's'} done.
+                {busiest !== quietest && <> Quietest: <b style={{ color: 'var(--ink)' }}>{DAYS[quietest]}</b>, with {perDay[quietest]}.</>}
+              </div>
+            )}
+          </>)}
+
+          {step === 2 && (unfinished.length ? (<>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <button className="wr-btn primary" onClick={moveAll}>Move all {unfinished.length} to {DAYS[1]}, {fmtDisplay(nextMon)}</button>
+              <span style={{ fontSize: 12.5, color: 'var(--ink-light)' }}>or choose for each task</span>
+            </div>
+            {unfinished.map(r => {
+              const sameDay = fmt(addDays(nextMon, (r.dayIdx + 6) % 7));   // same weekday, next week
+              return (
+                <div key={r.kind + r.id} className="wr-item">
+                  <span className="t">{r.title.trim() || 'Untitled'}</span>
+                  <span className="from">{r.kind === 'goal' ? `${r.g.title || 'Goal'} · ` : ''}From {DAYS[r.dayIdx].slice(0, 3)}</span>
+                  <button className="wr-mini" onClick={() => place(r, nextMonKey)}>Mon</button>
+                  {sameDay !== nextMonKey && <button className="wr-mini" onClick={() => place(r, sameDay)}>{DAYS[r.dayIdx].slice(0, 3)}</button>}
+                  {custom === r.kind + r.id ? (
+                    <input type="date" className="wr-mini" autoFocus defaultValue={nextMonKey}
+                      onChange={e => e.target.value && place(r, e.target.value)} onBlur={() => setCustom(null)} />
+                  ) : (
+                    <button className="wr-mini" onClick={() => setCustom(r.kind + r.id)}>Pick day</button>
+                  )}
+                  <button className="wr-mini drop" onClick={() => drop(r)}>Drop</button>
+                </div>
+              );
+            })}
+          </>) : (
+            <div className="wr-done">Nothing left over. Everything you planned this week is done or already moved.</div>
+          ))}
+
+          {step === 3 && (activeGoals.length ? activeGoals.map(g => {
+            const h = glHealth(g, glToday());
+            const m = glNextMilestone(g);
+            return (
+              <div key={g.id} className="wr-goal">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <span className="gl-dot" style={{ background: g.color }} />
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    onClick={() => { onClose(); onOpenGoal(g.id); }}>{g.title || 'Untitled goal'}</span>
+                  <GlHealthPill h={h} />
+                </div>
+                {[['Work done', h.p], ['Time used', h.used]].map(([lab, v]) => (
+                  <div key={lab} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                    <span style={{ fontSize: 12, color: 'var(--ink-light)', width: 72, flexShrink: 0 }}>{lab}</span>
+                    <div className="gl-bar" style={{ flex: 1, height: 7, background: glTint(g.color, 0.15) }}>
+                      <div style={{ width: Math.round(v * 100) + '%', background: lab === 'Work done' ? g.color : glTint(g.color, 0.45) }} />
+                    </div>
+                    <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)', minWidth: 34, textAlign: 'right', flexShrink: 0 }}>{Math.round(v * 100)}%</span>
+                  </div>
+                ))}
+                <GlLinksRow goal={g} habitGoals={habitGoals} fitnessExercises={fitnessExercises}
+                  habitCompletions={habitCompletions} fitnessLog={fitnessLog} weekStart={weekStart} />
+                {m && <div style={{ fontSize: 12.5, color: 'var(--ink-light)' }}>Next: {m.title || 'Untitled milestone'}{m.dueDate ? ` · due ${glShort(m.dueDate)}` : ''}</div>}
+                <div style={{ display: 'flex', gap: 7 }}>
+                  <input className="wr-in" style={{ flex: 1, minHeight: 34, fontSize: 13 }}
+                    placeholder={(g.milestones || []).length ? 'Add a task for next week…' : 'Add a milestone first'}
+                    disabled={!(g.milestones || []).length} value={goalDraft[g.id] || ''}
+                    onChange={e => setGoalDraft(d => ({ ...d, [g.id]: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addGoalTask(g); } }} />
+                  <button className="wr-mini" disabled={!(goalDraft[g.id] || '').trim()} onClick={() => addGoalTask(g)}>Add</button>
+                </div>
+              </div>
+            );
+          }) : (
+            <div className="wr-done">No active goals. Create one on the Goals tab and it shows up here.</div>
+          ))}
+
+          {step === 4 && (<>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <span className="wr-sec-label">This week, I was proud that I:</span>
+              <textarea className="wr-ta" placeholder="Write about your proudest moment…" value={wd.proud || ''}
+                onChange={e => { const v = e.target.value; onSetWD(w => ({ ...w, proud: v })); }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+              <span className="wr-sec-label">Best story this week</span>
+              <textarea className="wr-ta" placeholder="What's the best story from this week?" value={wd.story || ''}
+                onChange={e => { const v = e.target.value; onSetWD(w => ({ ...w, story: v })); }} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span className="wr-sec-label">Top 3 for next week</span>
+              {[0, 1, 2].map(i => (
+                <input key={i} className="wr-in" placeholder={`${i + 1}.`} value={top3[i]}
+                  onChange={e => setTop3(t => { const n = [...t]; n[i] = e.target.value; return n; })} />
+              ))}
+              <span style={{ fontSize: 11.5, color: 'var(--ink-faint)' }}>★ Added to the top of {DAYS[1]}, {fmtDisplay(nextMon)} when you finish.</span>
+            </div>
+          </>)}
+
+        </div>
+        <div className="wr-foot">
+          {step > 1
+            ? <button className="wr-btn ghost" onClick={() => setStep(s => s - 1)}>‹ Back</button>
+            : <button className="wr-btn ghost" onClick={onClose}>Close</button>}
+          <div className="wr-dots" aria-hidden="true">{[1, 2, 3, 4].map(i => <i key={i} className={i <= step ? 'on' : ''} />)}</div>
+          <button className="wr-btn primary" onClick={() => step < 4 ? setStep(s => s + 1) : finish()}>{nextLabel}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal, fitnessLog, fitnessExercises, reviewOpen, setReviewOpen }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
@@ -3600,6 +3987,8 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   }
 
   const wd = getWD();
+  // v4.7.0 — the review is "due" Sat–Mon, or any time you're looking back at a finished week
+  const reviewDue = !wd.reviewedAt && ([0, 1, 6].includes(new Date().getDay()) || weekKey < fmt(getWeekStart(new Date())));
 
   // Tasks: { [dayKey]: [{id, title, details, done, color, expanded, order}] }
   function getTasks(dayKey) { return (wd.tasks||{})[dayKey] || []; }
@@ -3992,6 +4381,19 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     });
   }
 
+  // Add a task to the TOP of a day (used by the Weekly Review's top 3). star shows a ★ on the card.
+  function prependTask(dayKey, title, star) {
+    const wk = fmt(getWeekStart(parseLocal(dayKey) || new Date(dayKey)));
+    const emptyWeek = () => ({ proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} });
+    setWeekData(allWD => {
+      const week = allWD[wk] || emptyWeek();
+      const list = (week.tasks || {})[dayKey] || [];
+      const t = { id: Date.now().toString()+Math.random().toString(36).slice(2,5), title, details:'', done:false,
+        expanded:false, colorIndex: pickTaskColorIndex(list), isEvent:false, eventTime:'', gcalId:null, star: !!star };
+      return { ...allWD, [wk]: { ...week, tasks: { ...(week.tasks||{}), [dayKey]: [t, ...list] } } };
+    });
+  }
+
   function moveTaskBetweenDays(fromDayKey, toDayKey, taskId, targetId) {
     // Capture task reference for calendar sync (needs to happen outside updater)
     const taskForSync = getTasks(fromDayKey).find(t => t.id === taskId);
@@ -4094,6 +4496,11 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         <span className="week-nav-label">{weekLabel}</span>
         <button className="nav-arrow" onClick={()=>setWeekStart(ws=>addDays(ws,7))}>›</button>
       </div>
+      {/* v4.7.0 — Weekly Review. Highlighted Sat–Mon, when closing out a week is the natural thing to do. */}
+      <button className={`wr-review-btn ${reviewDue ? 'due' : ''}`} onClick={()=>setReviewOpen(true)}>
+        <span aria-hidden="true">{wd.reviewedAt ? '✓' : '◷'}</span>
+        {wd.reviewedAt ? 'Review again' : 'Weekly review'}
+      </button>
       <a className="sidebar-link daily" href="https://penzu.com">✍️ Daily Pages</a>
       <div className="sidebar-section">
         <div className="sidebar-section-title">Proverb of the Week</div>
@@ -4438,6 +4845,14 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         />
       )}
 
+      {reviewOpen && (
+        <WeekReview weekStart={weekStart} wd={wd} goals={goals} setGoals={setGoals}
+          habitGoals={habitGoals} habitCompletions={habitCompletions}
+          fitnessLog={fitnessLog} fitnessExercises={fitnessExercises}
+          onMoveTask={(from, to, id) => moveTaskBetweenDays(from, to, id, null)}
+          onDeleteTask={deleteTask} onAddTask={prependTask} onSetWD={setWD}
+          onOpenGoal={onOpenGoal} onClose={() => setReviewOpen(false)} />
+      )}
       {repeatScope && (
         <RepeatScopeModal scope={repeatScope}
           onClose={()=>setRepeatScope(null)}
@@ -5159,6 +5574,11 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
         )}
         {task.isEvent && task.calendarInvite && task.responseStatus==='needsAction' && (
           <span className="invite-badge needsAction" style={{fontSize:8,padding:'1px 4px'}}>📨</span>
+        )}
+        {/* v4.7.0 — set by the Weekly Review's top 3; click to clear */}
+        {task.star && (
+          <span title="Top 3 for this week — click to unstar" onClick={e=>{e.stopPropagation();onUpdate({star:false});}}
+            style={{fontSize:11,color:'var(--gold)',cursor:'pointer',flexShrink:0,lineHeight:1}}>★</span>
         )}
         <div className={`task-check ${task.done?'done':''}`}
           style={{borderColor: task.done ? '#6a50a7' : undefined, color: task.done ? '#6a50a7' : undefined, background: task.done ? '#f1edff' : undefined}}
@@ -8040,6 +8460,82 @@ function glNewMilestone(g) {
 
 function GlHealthPill({ h }) { return <span className={`gl-health ${h.key}`}>{h.label}</span>; }
 
+// ── Linked habits & training (v4.7.0) ──
+// Read-only roll-up of the habits and exercises a goal is built on. Shown in the goal detail,
+// on the goal card and in the Weekly Review. Does not feed glProgress — milestones still do that.
+function GlLinksRow({ goal, habitGoals, fitnessExercises, habitCompletions, fitnessLog, weekStart, compact }) {
+  const links = glLinks(goal, habitGoals, fitnessExercises, habitCompletions, fitnessLog, weekStart);
+  if (!links.length) return null;
+  const c = goal.color || '#7c3f6e';
+  if (compact) {
+    return (
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+        {links.map(l => (
+          <span key={l.kind + l.id} className="gl-chip" style={{ cursor: 'default', fontSize: 11, padding: '3px 8px' }}>
+            {l.kind === 'habit' ? '◷' : '◆'} {l.name} · {l.detail}
+          </span>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {links.map(l => (
+        <div key={l.kind + l.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span aria-hidden="true" style={{ fontSize: 11, color: 'var(--ink-faint)', width: 12, flexShrink: 0 }}>{l.kind === 'habit' ? '◷' : '◆'}</span>
+          <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</span>
+          <div className="gl-bar" style={{ width: 70, height: 6, flexShrink: 0, background: glTint(c, 0.15) }}>
+            <div style={{ width: Math.round(l.pct * 100) + '%', background: c }} />
+          </div>
+          <span className="gl-mono" style={{ fontSize: 11, color: 'var(--ink-light)', flexShrink: 0, minWidth: 96, textAlign: 'right' }}>{l.detail}</span>
+          {l.kind === 'habit' && l.streak > 0 && (
+            <span className="gl-mono" title={l.perWeek ? 'Current streak (weeks)' : 'Current streak'}
+              style={{ fontSize: 11, color: 'var(--gold)', flexShrink: 0 }}>🔥{l.streak}{l.perWeek ? 'w' : ''}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Chip pickers for choosing which habits and exercises a goal is built on.
+function GlLinkPicker({ goal, onChange, habitGoals, fitnessExercises }) {
+  const habitIds = goal.linkedHabitIds || [];
+  const exIds = goal.linkedExerciseIds || [];
+  const toggle = (key, id) => onChange(g => {
+    const cur = g[key] || [];
+    return { ...g, [key]: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] };
+  });
+  const hasAny = (habitGoals || []).length || (fitnessExercises || []).length;
+  if (!hasAny) return <span style={{ fontSize: 13, color: 'var(--ink-light)' }}>Add habits or exercises first and you can link them here.</span>;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {(habitGoals || []).length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Habits</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+            {habitGoals.map(h => (
+              <button key={h.id} className={`gl-chip ${habitIds.includes(h.id) ? 'on' : ''}`}
+                aria-pressed={habitIds.includes(h.id)} onClick={() => toggle('linkedHabitIds', h.id)}>{h.name || 'Habit'}</button>
+            ))}
+          </div>
+        </div>
+      )}
+      {(fitnessExercises || []).length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+          <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Exercises</span>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, maxHeight: 132, overflowY: 'auto' }}>
+            {fitnessExercises.map(ex => (
+              <button key={ex.id} className={`gl-chip ${exIds.includes(ex.id) ? 'on' : ''}`}
+                aria-pressed={exIds.includes(ex.id)} onClick={() => toggle('linkedExerciseIds', ex.id)}>{ex.name || 'Exercise'}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Day picker used to schedule a goal task onto a day (Goals tab and Weekly Planner menu).
 function GlSchedulePicker({ value, onPick, onClose, extra, anchor }) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -8188,7 +8684,7 @@ function glRange(zoom, offset) {
   return { start: s, end: new Date(s.getFullYear(), s.getMonth() + count * per, 1), cols };
 }
 
-function GlTimeline({ goals, onOpenGoal }) {
+function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   const today = glToday();
   const [zoom, setZoom] = useState(() => sessionStorage.getItem('lp_glZoom') || 'month');
   const [offset, setOffset] = useState(0);
@@ -8196,6 +8692,86 @@ function GlTimeline({ goals, onOpenGoal }) {
   const [collapsed, setCollapsed] = useState({});
   const range = glRange(zoom, offset);
   const total = range.end - range.start;
+
+  // ── Drag to reschedule (v4.7.0) ──
+  // Bars move whole; their left/right edges resize one end. Snaps to whole days. Live values are
+  // kept in a ref so the window listeners never close over stale state; `drag` only mirrors it
+  // for rendering the preview. Committing pushes an Undo entry.
+  const areaRef = useRef(null);
+  const dragRef = useRef(null);
+  const suppressClick = useRef(false);
+  const [drag, setDrag] = useState(null);
+  const canDrag = !!onChangeGoal;
+  function glShift(s, e, d) {
+    if (!d || !d.days) return [s, e];
+    if (d.kind === 'move') return [glAddDays(s, d.days), glAddDays(e, d.days)];
+    if (d.kind === 'start') { const ns = glAddDays(s, d.days); return [ns > e ? e : ns, e]; }
+    const ne = glAddDays(e, d.days); return [s, ne < s ? s : ne];
+  }
+  // The live drag for this bar, or null
+  function dragOn(gid, mid) {
+    const d = drag;
+    return (d && d.moved && d.gid === gid && d.mid === mid) ? d : null;
+  }
+  function beginDrag(e, kind, gid, mid, s0, e0) {
+    if (!canDrag || !s0 || !e0 || (e.button != null && e.button !== 0)) return;
+    const el = areaRef.current;
+    if (!el) return;
+    e.preventDefault(); e.stopPropagation();
+    const w = el.getBoundingClientRect().width;
+    const totalDays = total / 86400000;
+    dragRef.current = { kind, gid, mid, s0, e0, x0: e.clientX, days: 0, moved: false,
+      pxPerDay: (w && totalDays) ? w / totalDays : 0 };
+    setDrag({ ...dragRef.current });
+  }
+  useEffect(() => {
+    if (!drag) return;
+    const onMove = ev => {
+      const d = dragRef.current;
+      if (!d || !d.pxPerDay) return;
+      const dx = ev.clientX - d.x0;
+      const days = Math.round(dx / d.pxPerDay);
+      const moved = d.moved || Math.abs(dx) > 3;
+      if (days === d.days && moved === d.moved) return;
+      d.days = days; d.moved = moved;
+      setDrag({ ...d });
+    };
+    const onUp = () => {
+      const d = dragRef.current;
+      dragRef.current = null;
+      setDrag(null);
+      if (!d || !d.moved) return;
+      suppressClick.current = true;
+      setTimeout(() => { suppressClick.current = false; }, 0);
+      const [ns, ne] = glShift(d.s0, d.e0, d);
+      if (ns === d.s0 && ne === d.e0) return;
+      const { gid, mid, s0, e0 } = d;
+      const put = (a, b) => onChangeGoal(gid, g => mid
+        ? glPatchMs(g, mid, m => ({ ...m, startDate: a, dueDate: b }))
+        : { ...g, startDate: a, targetDate: b });
+      put(ns, ne);
+      Undo.push(mid ? 'Moved milestone dates' : 'Moved goal dates', () => put(s0, e0));
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
+  }, [!!drag]);
+  const openGoal = gid => { if (!suppressClick.current) onOpenGoal(gid); };
+  // Grab handles drawn inside a bar, for resizing one end
+  function dragHandles(gid, mid, s0, e0) {
+    if (!canDrag || !s0 || !e0) return null;
+    return (
+      <>
+        <div className="gl-tl-grip l" onPointerDown={e => beginDrag(e, 'start', gid, mid, s0, e0)} />
+        <div className="gl-tl-grip r" onPointerDown={e => beginDrag(e, 'end', gid, mid, s0, e0)} />
+      </>
+    );
+  }
   const pct = (s, endOfDay) => { const d = parseLocal(s); if (!d) return null; if (endOfDay) d.setDate(d.getDate() + 1); return (d - range.start) / total * 100; };
   const clip = (a, b) => { if (a == null || b == null) return null; const l = Math.max(0, a), r = Math.min(100, b); return r > l ? { left: l, width: r - l } : null; };
 
@@ -8263,7 +8839,7 @@ function GlTimeline({ goals, onOpenGoal }) {
               </div>
             ))}
           </div>
-          <div className="gl-tl-area">
+          <div className="gl-tl-area" ref={areaRef}>
             {range.cols.slice(1).map((c, i) => (
               <div key={i} aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: ((c.start - range.start) / total * 100) + '%', width: 1, background: 'var(--grid-line)' }} />
             ))}
@@ -8275,25 +8851,35 @@ function GlTimeline({ goals, onOpenGoal }) {
             {rows.map(r => {
               if (r.type === 'goal') {
                 const g = r.g;
-                const s = pct(g.startDate), e = pct(g.targetDate, true);
+                const d = dragOn(g.id, null);
+                const [gs, ge] = glShift(g.startDate, g.targetDate, d);
+                const s = pct(gs), e = pct(ge, true);
                 const bar = clip(s, e);
                 const fill = (s != null && e != null) ? clip(s, s + (e - s) * glProgress(g)) : null;
                 const dia = e != null && e - 0.0001 <= 100 && e >= 0 ? e : null;
+                const grab = canDrag && g.startDate && g.targetDate;
                 return (
                   <div key={g.id} className="gl-tl-row goal" style={{ background: glTint(g.color, 0.04) }}>
-                    {bar && <div className="gl-tl-bar" onClick={() => onOpenGoal(g.id)} title={`${g.title || 'Goal'}: ${glShort(g.startDate)} – ${glShort(g.targetDate)}`}
-                      style={{ top: 13, height: 20, left: bar.left + '%', width: bar.width + '%', background: glTint(g.color, 0.2) }} />}
-                    {fill && <div className="gl-tl-bar" onClick={() => onOpenGoal(g.id)}
-                      style={{ top: 13, height: 20, left: fill.left + '%', width: fill.width + '%', background: g.color, borderRadius: '9px 0 0 9px' }} />}
-                    {dia != null && <div className="gl-tl-dia" style={{ top: 17.5, left: `calc(${dia}% - 5.5px)`, background: 'var(--surface)', border: `2px solid ${g.color}` }} />}
+                    {bar && <div className={`gl-tl-bar${grab ? ' grab' : ''}${d ? ' dragging' : ''}`} onClick={() => openGoal(g.id)}
+                      onPointerDown={e2 => beginDrag(e2, 'move', g.id, null, g.startDate, g.targetDate)}
+                      title={grab ? `${g.title || 'Goal'}: ${glShort(gs)} – ${glShort(ge)} · drag to move, drag an edge to resize` : `${g.title || 'Goal'}: ${glShort(gs)} – ${glShort(ge)}`}
+                      style={{ top: 13, height: 20, left: bar.left + '%', width: bar.width + '%', background: glTint(g.color, 0.2) }}>
+                      {dragHandles(g.id, null, g.startDate, g.targetDate)}
+                    </div>}
+                    {fill && <div className="gl-tl-bar" style={{ top: 13, height: 20, left: fill.left + '%', width: fill.width + '%', background: g.color, borderRadius: '9px 0 0 9px', pointerEvents: 'none' }} />}
+                    {dia != null && <div className="gl-tl-dia" style={{ top: 17.5, left: `calc(${dia}% - 5.5px)`, background: 'var(--surface)', border: `2px solid ${g.color}`, pointerEvents: 'none' }} />}
+                    {d && <span className="gl-tl-drag-tip" style={{ left: Math.max(0, Math.min(86, bar ? bar.left : 0)) + '%' }}>{glShort(gs)} – {glShort(ge)}</span>}
                   </div>
                 );
               }
               const { g, m } = r;
+              const md = dragOn(g.id, m.id);
+              const [mS, mE] = glShift(m.startDate || m.dueDate, m.dueDate, md);
               const late = glMsOverdue(m, today);
               const current = !m.done && !late && (!m.startDate || m.startDate <= today);
-              const s = pct(m.startDate || m.dueDate), e = pct(m.dueDate, true);
+              const s = pct(mS), e = pct(mE, true);
               const bar = clip(s, e);
+              const mGrab = canDrag && m.startDate && m.dueDate;
               const st = m.done ? { background: g.color, opacity: 0.55 }
                 : late ? { background: 'rgba(220,74,58,0.12)', border: '1.5px solid var(--red)' }
                 : current ? { background: glTint(g.color, 0.16), border: `1.5px solid ${g.color}` }
@@ -8303,13 +8889,17 @@ function GlTimeline({ goals, onOpenGoal }) {
               return (
                 <div key={m.id} className="gl-tl-row ms">
                   {bar && (
-                    <div className="gl-tl-bar" onClick={() => onOpenGoal(g.id)} title={`${m.title || 'Milestone'}: ${glShort(m.startDate)} – ${glShort(m.dueDate)}`}
+                    <div className={`gl-tl-bar${mGrab ? ' grab' : ''}${md ? ' dragging' : ''}`} onClick={() => openGoal(g.id)}
+                      onPointerDown={e2 => beginDrag(e2, 'move', g.id, m.id, m.startDate, m.dueDate)}
+                      title={mGrab ? `${m.title || 'Milestone'}: ${glShort(mS)} – ${glShort(mE)} · drag to move, drag an edge to resize` : `${m.title || 'Milestone'}: ${glShort(mS)} – ${glShort(mE)}`}
                       style={{ top: 10, height: 14, left: bar.left + '%', width: bar.width + '%', ...st }}>
-                      {current && prog > 0 && <div style={{ width: (prog * 100) + '%', height: '100%', background: glTint(g.color, 0.45) }} />}
+                      {current && prog > 0 && <div style={{ width: (prog * 100) + '%', height: '100%', background: glTint(g.color, 0.45), pointerEvents: 'none' }} />}
+                      {dragHandles(g.id, m.id, m.startDate, m.dueDate)}
                     </div>
                   )}
-                  {dia != null && <div className="gl-tl-dia" style={{ top: 11.5, left: `calc(${dia}% - 5.5px)`,
+                  {dia != null && <div className="gl-tl-dia" style={{ top: 11.5, left: `calc(${dia}% - 5.5px)`, pointerEvents: 'none',
                     background: late ? 'var(--red)' : current ? g.color : 'var(--surface)', border: late || current ? 'none' : `2px solid ${g.color}` }} />}
+                  {md && <span className="gl-tl-drag-tip" style={{ left: Math.max(0, Math.min(86, bar ? bar.left : 0)) + '%' }}>{glShort(mS)} – {glShort(mE)}</span>}
                 </div>
               );
             })}
@@ -8328,7 +8918,7 @@ function GlTimeline({ goals, onOpenGoal }) {
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px solid #6a50a7', boxSizing: 'border-box' }} />In progress</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px dashed #6a50a7', boxSizing: 'border-box' }} />Upcoming</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px solid var(--red)', boxSizing: 'border-box' }} />Overdue</span>
-        <span style={{ marginLeft: 'auto' }}>Click a bar or name to open the goal</span>
+        <span style={{ marginLeft: 'auto' }}>{canDrag ? 'Click to open · drag a bar to move it · drag an edge to resize' : 'Click a bar or name to open the goal'}</span>
       </div>
     </section>
   );
@@ -8410,9 +9000,11 @@ function GlMilestoneEditor({ m, color, open, onToggleOpen, onChange, onDelete })
   );
 }
 
-function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage }) {
+function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog }) {
   const today = glToday();
+  const linkWeekStart = getWeekStart(new Date());
   const [openMs, setOpenMs] = useState(() => { const n = glNextMilestone(goal); return n ? { [n.id]: true } : {}; });
+  const [linksOpen, setLinksOpen] = useState(false);
   const h = glHealth(goal, today);
   const counts = glTaskCounts(goal);
   const c = goal.color || '#7c3f6e';
@@ -8522,6 +9114,26 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage }) {
             </label>
           </div>
 
+          {/* v4.7.0 — habits and training this goal is built on */}
+          <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+              <span className="gl-label">Habits &amp; training</span>
+              <button className="gl-btn ghost" style={{ fontSize: 12, padding: '2px 6px' }}
+                onClick={() => setLinksOpen(o => !o)}>{linksOpen ? 'Done' : 'Edit'}</button>
+            </div>
+            {linksOpen ? (
+              <GlLinkPicker goal={goal} onChange={onChange} habitGoals={habitGoals} fitnessExercises={fitnessExercises} />
+            ) : glHasLinks(goal) ? (
+              <>
+                <GlLinksRow goal={goal} habitGoals={habitGoals} fitnessExercises={fitnessExercises}
+                  habitCompletions={habitCompletions} fitnessLog={fitnessLog} weekStart={linkWeekStart} />
+                <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>This week. Shown alongside the milestones — it doesn't change the goal's progress.</span>
+              </>
+            ) : (
+              <span style={{ fontSize: 13, color: 'var(--ink-light)' }}>Link the habits and exercises this goal rests on, and their weekly progress shows here.</span>
+            )}
+          </div>
+
           <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 6, borderStyle: goal.status === 'done' ? 'solid' : 'dashed' }}>
             <span className="gl-label">Retro</span>
             {goal.status === 'done' ? (
@@ -8548,7 +9160,7 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage }) {
   );
 }
 
-function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage }) {
+function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog }) {
   const today = glToday();
   const [statusTab, setStatusTab] = useState('active');
   const [sideCollapsed, setSideCollapsedRaw] = useState(() => lsGet('glSideCollapsed') === '1'); // desktop only; per device
@@ -8644,6 +9256,10 @@ function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, sele
                     : <><span style={{ color: 'var(--ink-light)' }}>Next:</span> {m.title || 'Untitled milestone'}{m.dueDate ? ` · due ${glShort(m.dueDate)}` : ''}</>}
                 </div>
               )}
+              {g.status === 'active' && (
+                <GlLinksRow compact goal={g} habitGoals={habitGoals} fitnessExercises={fitnessExercises}
+                  habitCompletions={habitCompletions} fitnessLog={fitnessLog} weekStart={getWeekStart(new Date())} />
+              )}
             </button>
           );
         })}
@@ -8658,12 +9274,14 @@ function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, sele
       <main className="gl-main">
         {sel ? (
           <GlDetail key={sel.id} goal={sel} pagesData={pagesData} onOpenPage={onOpenPage}
+            habitGoals={habitGoals} fitnessExercises={fitnessExercises}
+            habitCompletions={habitCompletions} fitnessLog={fitnessLog}
             onChange={fn => changeGoal(sel.id, fn)}
             onBack={() => setSelectedId(null)}
             onDelete={() => { setGoals(gs => gs.filter(g => g.id !== sel.id)); setSelectedId(null); }} />
         ) : (
           <>
-            <GlTimeline goals={list} onOpenGoal={setSelectedId} />
+            <GlTimeline goals={list} onOpenGoal={setSelectedId} onChangeGoal={changeGoal} />
 
             {weekItems.length > 0 && (
               <section className="gl-card gl-mobile-only" style={{ flexDirection: 'column', overflow: 'hidden' }}>
@@ -8748,6 +9366,7 @@ function App() {
   const setSelectedGoalId = (id) => { if(id) sessionStorage.setItem('lp_selectedGoalId', id); else sessionStorage.removeItem('lp_selectedGoalId'); setSelectedGoalIdRaw(id); };
   const openGoal = (id) => { setSelectedGoalId(id || null); setPage('goals'); };
   const [moreOpen, setMoreOpen] = useState(false); // mobile bottom-nav "More" sheet
+  const [reviewOpen, setReviewOpen] = useState(false); // Weekly Review overlay (v4.7.0)
   // v4.4.0: theme preference — 'auto' (follow device) | 'light' | 'dark'; per device, like the swipe toggle
   const [themePref, setThemePref] = useState(() => { try { return localStorage.getItem('lp_theme') || 'auto'; } catch { return 'auto'; } });
   useEffect(() => {
@@ -9167,7 +9786,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.6.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.7.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -9244,7 +9863,7 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
@@ -9266,6 +9885,8 @@ function App() {
       {page==='goals' && <GoalsView goals={goals} setGoals={setGoals} pagesData={pagesData}
         countdowns={countdowns} setCountdowns={setCountdowns}
         selectedId={selectedGoalId} setSelectedId={setSelectedGoalId}
+        habitGoals={habitGoals} fitnessExercises={fitnessExercises}
+        habitCompletions={habitCompletions} fitnessLog={fitnessLog}
         onOpenPage={(id)=>{ setSelectedPagesId(id); setPage('pages'); }} />}
       </div>
 
@@ -9274,6 +9895,10 @@ function App() {
       {moreOpen && (
         <div className="more-sheet" role="dialog" aria-label="More">
           <div className="mobile-sheet-handle" />
+          <button className="more-sheet-btn" onClick={()=>{setPage('planner');setMoreOpen(false);setReviewOpen(true);}}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6a50a7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+            Weekly Review
+          </button>
           <button className={`more-sheet-btn ${page==='monthly'?'active':''}`} onClick={()=>{setPage('monthly');setMoreOpen(false);}}>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6a50a7" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01"/></svg>
             Monthly Calendar
