@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.1.0 -->
+<!-- LP Planner v5.2.0 -->
+<!-- v5.2.0 — Cleanup: repeat rules with long gaps (every 20 years…) no longer truncate; "after N times" series now fill in gradually like never-ending ones; repeat-rule changes can be undone; habit "Schedule" row is now one "Show daily" toggle; closing the weekly review past step 1 counts as reviewed; Project Tasks retired from Pages (existing ones remain). -->
 <!-- v5.1.0 — Pages editor: text colour, highlight, font, font size, alignment and inline code (palettes work on light and dark). Stored as inline styles in the same HTML format. -->
 <!-- v5.0.0 — Pages editor rebuilt on Quill 2 (self-hosted quill.js/quill.css): reliable checklists and lists, tap anywhere on a row to place the cursor, undo/redo buttons. Pages still save in the same HTML format, so older versions can read them. -->
 <!-- v4.9.0 — Offline mode: a service worker (sw.js) keeps the app itself available with no connection; edits are saved on the device and upload when you reconnect; calm "Offline" notice instead of an error. -->
@@ -2390,6 +2391,7 @@ function normalizeRepeat(r) {
     count: Math.max(2, parseInt(r.count, 10) || 10),
     anchor: r.anchor || '',
     genThrough: r.genThrough || '',
+    genCount: r.genCount == null || !isFinite(+r.genCount) ? null : +r.genCount,   // count rules: occurrences written so far (incl. the first)
   };
 }
 // Is there enough information to generate copies?
@@ -2428,18 +2430,44 @@ function repeatMatches(n, a, d) {
   }
   return false;
 }
+// Next date >= cursor that could possibly match the rule. Skips whole stretches that provably can't
+// match (other weeks of a "every 3 weeks" rule, other months, other years) but never skips a real match.
+function repeatNextCandidate(n, a, cursor) {
+  const DAY = 86400000;
+  const diff = Math.round((cursor - a) / DAY);
+  if (diff < 1) return addDays(a, 1);
+  if (n.freq === 'daily') return addDays(a, Math.ceil(diff / n.interval) * n.interval);
+  if (n.freq === 'weekly') {
+    const w = Math.round((getWeekStart(cursor) - getWeekStart(a)) / (7 * DAY));
+    if (w % n.interval === 0) return cursor;
+    return addDays(getWeekStart(a), Math.ceil(w / n.interval) * n.interval * 7);
+  }
+  if (n.freq === 'monthly') {
+    const mo = (cursor.getFullYear() - a.getFullYear()) * 12 + cursor.getMonth() - a.getMonth();
+    if (mo % n.interval === 0) return cursor;
+    return new Date(a.getFullYear(), a.getMonth() + Math.ceil(mo / n.interval) * n.interval, 1);
+  }
+  if (n.freq === 'yearly') {
+    let k = Math.max(1, Math.ceil((cursor.getFullYear() - a.getFullYear()) / n.interval));
+    let cand = new Date(a.getFullYear() + k * n.interval, a.getMonth(), a.getDate());
+    while (cand < cursor) { k++; cand = new Date(a.getFullYear() + k * n.interval, a.getMonth(), a.getDate()); }
+    return cand;
+  }
+  return cursor;
+}
 // Dates (YYYY-MM-DD) strictly after afterKey, up to throughKey, that fall on the rule.
-// "After N times" counts the anchor task as time #1.
-function repeatDates(rule, anchorKey, afterKey, throughKey, max) {
+// "After N times" counts the anchor task as time #1; `have` = occurrences already written (default 1, the anchor).
+function repeatDates(rule, anchorKey, afterKey, throughKey, max, have) {
   const n = normalizeRepeat(rule);
   const a = parseLocal(anchorKey);
   const out = [];
   if (!n || !a) return out;
   const through = parseLocal(throughKey);
   const end = n.endType === 'date' && n.endDate ? parseLocal(n.endDate) : null;
-  const cap = n.endType === 'count' ? n.count - 1 : (max || 800);
+  const cap = n.endType === 'count' ? n.count - (have || 1) : (max || 800);
   let cursor = addDays(parseLocal(afterKey) || a, 1);
-  for (let i = 0; i < 6000 && out.length < cap; i++) {
+  for (let i = 0; i < 20000 && out.length < cap; i++) {
+    cursor = repeatNextCandidate(n, a, cursor);
     if (through && cursor > through) break;
     if (end && cursor > end) break;
     if (repeatMatches(n, a, cursor)) out.push(fmtLocal(cursor));
@@ -2496,11 +2524,11 @@ function repeatApply(wd, src, srcDk, rule, split, todayKey) {
   const oldId = src.repeatId || null;
   const newId = !oldId ? src.id : (split ? 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5) : oldId);
   let horizon = '';
-  if (n.endType === 'never') {
+  if (n.endType === 'never' || n.endType === 'count') {
     const base = parseLocal(todayKey) > parseLocal(srcDk) ? parseLocal(todayKey) : parseLocal(srcDk);
     horizon = fmtLocal(addDays(base, REPEAT_HORIZON_DAYS[n.freq] || 182));
   }
-  const stored = { ...n, anchor: srcDk, genThrough: horizon };
+  const stored = { ...n, anchor: srcDk, genThrough: horizon, genCount: null };
   const out = { ...wd };
   if (oldId) {
     Object.keys(wd).forEach(wk => {
@@ -2514,6 +2542,7 @@ function repeatApply(wd, src, srcDk, rule, split, todayKey) {
   }
   wdEditDay(out, srcDk, ts => ts.map(t => t.id === src.id ? { ...t, repeatId: newId, repeat: stored } : t));
   const dates = repeatDates(stored, srcDk, srcDk, horizon, 800);
+  if (n.endType === 'count') stored.genCount = 1 + dates.length;     // so repeatExtend knows how many are left to write
   dates.forEach(dk => wdEditDay(out, dk, ts => ts.some(t => t.repeatId === newId) ? ts : [...ts, repeatCopy(src, newId, dk, stored)]));
   return { wd: out, repeatId: newId, count: dates.length };
 }
@@ -2524,10 +2553,15 @@ function repeatExtend(wd, todayKey) {
   Object.keys(wd).forEach(wk => {
     const tasks = (wd[wk] && wd[wk].tasks) || {};
     Object.keys(tasks).forEach(dk => (tasks[dk] || []).forEach(t => {
-      if (!t.repeatId || !t.repeat || t.repeat.endType !== 'never') return;
-      const s = series[t.repeatId] || (series[t.repeatId] = { latestDk: '', latest: null, gen: '' });
+      if (!t.repeatId || !t.repeat) return;
+      const et = t.repeat.endType, gc = t.repeat.genCount;
+      // "never ends" series, and "after N times" series that still have occurrences left to write
+      // (series saved before v5.2.0 have no genCount: they were written in full, so they are skipped)
+      if (et !== 'never' && !(et === 'count' && gc != null)) return;
+      const s = series[t.repeatId] || (series[t.repeatId] = { latestDk: '', latest: null, gen: '', genCount: 0 });
       if (dk >= s.latestDk) { s.latestDk = dk; s.latest = t; }
       if ((t.repeat.genThrough || '') > s.gen) s.gen = t.repeat.genThrough;
+      if (gc != null && gc > s.genCount) s.genCount = gc;
     }));
   });
   const today = parseLocal(todayKey);
@@ -2535,14 +2569,16 @@ function repeatExtend(wd, todayKey) {
   Object.keys(series).forEach(id => {
     const s = series[id];
     const rule = normalizeRepeat(s.latest.repeat);
+    if (rule.endType === 'count' && s.genCount >= rule.count) return;      // every occurrence already written
     const H = REPEAT_HORIZON_DAYS[rule.freq] || 182;
     const horizon = fmtLocal(addDays(today, H));
     if (s.gen && s.gen >= fmtLocal(addDays(today, Math.floor(H * 0.6)))) return;   // still plenty ahead
     const after = s.gen && s.gen > s.latestDk ? s.gen : s.latestDk;               // never re-add skipped days
-    const dates = repeatDates(rule, rule.anchor || s.latestDk, after, horizon, 800);
+    const dates = repeatDates(rule, rule.anchor || s.latestDk, after, horizon, 800, s.genCount || 1);
     if (!dates.length) return;
     if (!out) out = { ...wd };
     const stored = { ...rule, genThrough: horizon };
+    if (rule.endType === 'count') stored.genCount = (s.genCount || 1) + dates.length;
     dates.forEach(dk => wdEditDay(out, dk, ts => ts.some(t => t.repeatId === id) ? ts : [...ts, repeatCopy(s.latest, id, dk, stored)]));
   });
   return out || wd;
@@ -2732,13 +2768,16 @@ const Undo = {
   items: [], subs: new Set(),
   push(label, restore) {
     const item = { id: Date.now() + Math.random(), label, restore };
-    this.items = [...this.items, item].slice(-5);
-    setTimeout(() => { this.items = this.items.filter(x => x.id !== item.id); this.emit(); }, 10000);
+    const all = [...this.items, item];
+    all.slice(0, -5).forEach(x => clearTimeout(x.timer));      // entries pushed out of the stack
+    this.items = all.slice(-5);
+    item.timer = setTimeout(() => { this.items = this.items.filter(x => x.id !== item.id); this.emit(); }, 10000);
     this.emit();
   },
   run() {
     const item = this.items[this.items.length - 1];
     if (!item) return;
+    clearTimeout(item.timer);
     this.items = this.items.slice(0, -1);
     this.emit();
     try { item.restore(); } catch (e) { console.error('Undo failed', e); }
@@ -3927,6 +3966,12 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
     setGoals(gs => glPatchGoal(gs, g.id, gg => glPatchMs(gg, m.id, mm => ({ ...mm, tasks: [...(mm.tasks || []), t] }))));
     setGoalDraft(d => ({ ...d, [g.id]: '' }));
   }
+  // Closing by tapping outside after step 1 still counts as having done the review (the moves
+  // and edits made along the way are already saved), so the "review due" nudge doesn't return.
+  function dismiss() {
+    if (step > 1) onSetWD(w => (w.reviewedAt ? w : { ...w, reviewedAt: Date.now() }));
+    onClose();
+  }
   function finish() {
     // Top 3 become starred tasks at the top of next Monday, in the order they were typed
     top3.map(s => s.trim()).filter(Boolean).reverse().forEach(title => onAddTask(nextMonKey, title, true));
@@ -3952,7 +3997,7 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
   const nextLabel = ['Next: unfinished tasks', 'Next: goals', 'Next: reflect and plan', 'Finish review'][step - 1];
 
   return (
-    <div className="wr-overlay" onClick={onClose}>
+    <div className="wr-overlay" onClick={dismiss}>
       <div className="wr-box" role="dialog" aria-label="Weekly review" onClick={e => e.stopPropagation()}>
         <div className="wr-head">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
@@ -4235,7 +4280,16 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   // Apply a repeat rule to a task (see repeatApply). split=true starts a new series from this task.
   function applyRepeatRule(task, dayKey, rule, split) {
     const todayKey = fmtLocal(new Date());
-    setWeekData(wd => repeatApply(wd, task, dayKey, rule, split, todayKey).wd);
+    const before = weekData;
+    const res = repeatApply(before, task, dayKey, rule, split, todayKey);
+    const touched = Object.keys(res.wd).filter(k => res.wd[k] !== before[k]);
+    setWeekData(wd => { const o = { ...wd }; touched.forEach(k => { o[k] = res.wd[k]; }); return o; });
+    // Undo puts back only the weeks the rule change touched, so edits made elsewhere in the meantime stay
+    Undo.push('Repeat rule changed', () => setWeekData(wd => {
+      const o = { ...wd };
+      touched.forEach(k => { if (before[k] === undefined) delete o[k]; else o[k] = before[k]; });
+      return o;
+    }));
   }
   // Changing the rule of a task that already has other copies asks which ones to change
   function requestApplyRepeat(task, dayKey, rule) {
@@ -6646,14 +6700,13 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                 onClick={e=>e.stopPropagation()}>
                 {/* Schedule */}
                 <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                  <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Schedule:</span>
+                  <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Weekly view:</span>
                   <div className="habit-schedule-selector">
-                    {[['none','—'],['daily','Daily'],['xweek','x/Week'],['quota','Quota']].map(([val,label])=>(
-                      <button key={val} className={`habit-schedule-btn ${(goal.schedule||'none')===val?'active':''}`}
-                        onClick={e=>{e.stopPropagation();updateGoal(goal.id,{schedule:val==='none'?undefined:val});}}>
-                        {label}
-                      </button>
-                    ))}
+                    <button className={`habit-schedule-btn ${goal.schedule==='daily'?'active':''}`} style={{minHeight:44,padding:'0 14px'}}
+                      aria-pressed={goal.schedule==='daily'}
+                      onClick={e=>{e.stopPropagation();updateGoal(goal.id,{schedule:goal.schedule==='daily'?undefined:'daily'});}}>
+                      {goal.schedule==='daily' ? '✓ Shown daily' : 'Show daily'}
+                    </button>
                   </div>
                 </div>
                 {/* How often (every day / certain days / × a week) + rest day */}
@@ -7189,14 +7242,13 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                   {/* Schedule */}
                   {onRename && (
                     <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
-                      <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Schedule:</span>
+                      <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Weekly view:</span>
                       <div className="habit-schedule-selector">
-                        {[['none','—'],['daily','Daily'],['xweek','x/Week'],['quota','Quota']].map(([val,label])=>(
-                          <button key={val} className={`habit-schedule-btn ${(g.schedule||'none')===val?'active':''}`}
-                            onClick={e=>{e.stopPropagation();onRename(g.id,{schedule:val==='none'?undefined:val});}}>
-                            {label}
-                          </button>
-                        ))}
+                        <button className={`habit-schedule-btn ${g.schedule==='daily'?'active':''}`} style={{minHeight:44,padding:'0 14px'}}
+                          aria-pressed={g.schedule==='daily'}
+                          onClick={e=>{e.stopPropagation();onRename(g.id,{schedule:g.schedule==='daily'?undefined:'daily'});}}>
+                          {g.schedule==='daily' ? '✓ Shown daily' : 'Show daily'}
+                        </button>
                       </div>
                     </div>
                   )}
@@ -10121,7 +10173,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.1.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.2.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -12034,15 +12086,6 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     if (selectedId === id) { setSelectedId(null); setMobileView('list'); }
   }
 
-  function addTask(docId) {
-    const taskId = 'ptask_' + Date.now();
-    const newTask = { id: taskId, title: '', done: false, scheduledDate: '', colorIndex: 0 };
-    setPagesData(p => p.map(d => d.id === docId
-      ? { ...d, lastModified: new Date().toISOString(), tasks: [...(d.tasks||[]), newTask] }
-      : d
-    ));
-  }
-
   function updateTask(docId, taskId, patch) {
     const now = new Date().toISOString();
     setPagesData(p => p.map(d => {
@@ -12700,16 +12743,14 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
               </div>
             </div>
 
+            {/* Project tasks were retired in v5.2.0 (Goals replaced them). Old tasks stay visible and
+                editable until deleted; there is no way to add new ones. The section disappears when empty. */}
+            {(selectedDoc.tasks||[]).length > 0 && (
             <div className="pages-tasks-section">
               <div className="pages-tasks-header">
                 <span className="pages-tasks-title">Tasks</span>
-                <button className="add-btn" onClick={()=>addTask(selectedDoc.id)} title="Add task">+</button>
+                <span style={{fontSize:11,color:'var(--ink-faint)',fontFamily:"'DM Sans',sans-serif"}}>Older project tasks — new ones now live in Goals</span>
               </div>
-              {(selectedDoc.tasks||[]).length === 0 && (
-                <div style={{fontSize:12,color:'var(--ink-faint)',fontFamily:"'DM Sans',sans-serif",padding:'4px 0'}}>
-                  No tasks yet — add one to schedule it on the weekly planner
-                </div>
-              )}
               {(selectedDoc.tasks||[]).map(task => (
                 <div key={task.id} className="pages-task-item"
                   style={task.priority ? {background:'var(--prio-bg)', borderColor:'#fca5a5'} : {}}>
@@ -12749,6 +12790,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                 </div>
               ))}
             </div>
+            )}
             </div>{/* end pages-scroll-area */}
           </div>
         )}
