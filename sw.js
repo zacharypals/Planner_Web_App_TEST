@@ -3,12 +3,11 @@
    - Pinned CDN libraries, fonts, icons: cache-first (their URLs are versioned, so they never change).
    - API calls (the Worker, Google) are never touched: the app's own sync layer handles those.
    Bump CACHE when this file's strategy changes. */
-const CACHE = 'lp-shell-v2';
+const CACHE = 'lp-shell-v3';
 const SHELL = ['./', 'index.html', 'manifest.json', 'icon-192.png', 'icon-512.png', 'quill.js', 'quill.css'];
 const LIBS = [
-  'https://unpkg.com/react@18.3.1/umd/react.development.js',
-  'https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js',
-  'https://unpkg.com/@babel/standalone@7.26.5/babel.min.js',
+  'https://unpkg.com/react@18.3.1/umd/react.production.min.js',
+  'https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js',
 ];
 const STATIC_HOSTS = ['unpkg.com', 'cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];

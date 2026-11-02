@@ -212,6 +212,15 @@ Update zips do **not** include `worker/wrangler.toml`, so your database ID is ne
 - Type in a Page, then immediately swipe the app away. Reopen it on another device and the text should be there.
 - Sign out. The wall appears, and this app's data is removed from that browser. The live app's data is not touched.
 
+## Editing the app and building (v5.3.0 and later)
+
+The app is compiled ahead of time so it starts faster (no Babel download or in-browser compile).
+
+- **`index.src.html` is the file to edit.** `index.html` is generated from it. Do not edit `index.html` by hand; the next build overwrites it.
+- Build: `node build.js` (TEST) or `node build.js --target live` (swaps the three live settings: OAuth redirect, storage prefix, environment label). Needs Node 18+ and `esbuild` (`npm i esbuild`).
+- Commit **both** files: GitHub Pages serves `index.html`, and `index.src.html` is the source of truth.
+- If the build ever misbehaves, the last pre-build version is commit `6c53fa7` (v5.2.0), which can be restored directly.
+
 ## Running the tests (optional)
 
 These need Node 22.5 or newer and nothing to install. Run from the repo root:
