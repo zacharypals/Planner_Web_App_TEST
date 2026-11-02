@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.7.0 -->
+<!-- LP Planner v4.7.1 -->
+<!-- v4.7.1 — Weekly Review can review any week (arrows in its header; defaults to last week on Sun/Mon); drag date tip readable in dark mode; Drop in the review now works on a week other than the one displayed. -->
 <!-- v4.7.0 — Weekly Review (4-step guided close-out of the week); goals link to habits & exercises with a weekly roll-up; Goals timeline bars drag to move and resize, with undo. -->
 <!-- v4.6.0 — Undo toast for deletes; habits on certain days or N× a week (streaks by week); richer repeat rules (every N, monthly nth/last, end after N/date, scope dialog, rolling top-up). -->
 <!-- v4.5.5 — Fitness "+ Exercise" picker lists exercises A→Z within each group (display only; library order unchanged). -->
@@ -1258,6 +1259,21 @@
     width: min(680px, 100%); max-height: min(860px, 94vh); display: flex; flex-direction: column; overflow: hidden;
   }
   .wr-head { padding: 16px 22px 12px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  /* v4.7.1 — which week is being reviewed, and arrows to change it */
+  .wr-weeknav { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  .wr-weeknav button {
+    min-width: 26px; min-height: 26px; border: none; background: none; cursor: pointer;
+    color: var(--ink-light); font-size: 15px; border-radius: 6px; line-height: 1;
+  }
+  .wr-weeknav button:hover { background: var(--cream); color: var(--accent); }
+  .wr-weeknav .wk {
+    font: 600 11px 'DM Mono', monospace; color: var(--ink); white-space: nowrap; padding: 0 4px;
+  }
+  .wr-open-wk {
+    border: none; background: none; cursor: pointer; padding: 0; margin-top: 4px;
+    font: 11.5px 'DM Sans', sans-serif; color: var(--accent); text-decoration: underline;
+  }
+  @media (max-width: 767px) { .wr-weeknav button { min-width: 40px; min-height: 40px; } }
   .wr-step { font: 600 10px 'DM Mono', monospace; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); }
   .wr-title { font-family: 'Playfair Display', serif; font-size: 23px; font-weight: 600; color: var(--ink); margin-top: 2px; }
   .wr-sub { font-size: 12.5px; color: var(--ink-light); margin-top: 3px; }
@@ -1326,7 +1342,10 @@
 
   /* ── UNDO TOAST (v4.6.0) ── */
   .undo-toast {
-    position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; z-index: 9990;
+    /* v4.7.1 — 9998 sits ABOVE the Weekly Review overlay (9995), which otherwise swallowed the
+       click, and below the save-error toast (10000) and sign-in wall (20000). The review leans on
+       Undo for Drop and Move, so the toast has to stay reachable while it's open. */
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; z-index: 9998;
     background: #2a2538; color: #fff; border-radius: 12px; padding: 6px 8px 6px 16px;
     display: flex; align-items: center; gap: 12px; max-width: min(92vw, 460px);
     box-shadow: 0 6px 24px rgba(0,0,0,0.35); font-family: 'DM Sans', sans-serif; font-size: 13px;
@@ -2076,9 +2095,12 @@
   .gl-tl-grip.l { left: 0; } .gl-tl-grip.r { right: 0; }
   .gl-tl-bar.grab:hover .gl-tl-grip { background: rgba(255,255,255,0.45); box-shadow: inset 0 0 0 1px rgba(35,30,51,0.22); }
   .gl-tl-drag-tip {
+    /* Fixed dark chip, like .undo-toast — var(--ink) flips to near-white in dark mode,
+       which left white text on a light pill. Do not swap this back to --ink. */
     position: absolute; top: -4px; z-index: 6; pointer-events: none;
-    background: var(--ink); color: #fff; border-radius: 6px; padding: 2px 7px; white-space: nowrap;
+    background: #2a2538; color: #fff; border-radius: 6px; padding: 2px 7px; white-space: nowrap;
     font-family: 'DM Mono', monospace; font-size: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
   }
   .gl-tl-dia { position: absolute; width: 11px; height: 11px; transform: rotate(45deg); box-sizing: border-box; pointer-events: none; }
   .gl-tl-today { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--gold); pointer-events: none; z-index: 2; }
@@ -3675,11 +3697,15 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
 // cross-week moves, calendar sync and Undo all behave exactly as they do elsewhere.
 // ─────────────────────────────────────────────
 function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletions, fitnessLog,
-                      fitnessExercises, onMoveTask, onDeleteTask, onAddTask, onSetWD, onOpenGoal, onClose }) {
+                      fitnessExercises, onMoveTask, onDeleteTask, onAddTask, onSetWD, onNavWeek,
+                      onGoToWeek, onOpenGoal, onClose }) {
   const [step, setStep] = useState(1);
   const [custom, setCustom] = useState(null);     // id of the row whose date picker is open
   const [top3, setTop3] = useState(['', '', '']);
   const [goalDraft, setGoalDraft] = useState({}); // goalId -> text of the task being added
+  // Switching weeks: the drafts belong to the week you were on, so clear them. Keep the step.
+  const wkId = fmt(weekStart);
+  useEffect(() => { setTop3(['', '', '']); setGoalDraft({}); setCustom(null); }, [wkId]);
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const nextMon = addDays(weekStart, 8);          // weekStart is Sunday, so +8 is next Monday
   const nextMonKey = fmt(nextMon);
@@ -3762,8 +3788,17 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
     onClose();
   }
 
+  // Say plainly which week this is, relative to now — the review can point anywhere (v4.7.1)
+  const curWkKey = fmt(getWeekStart(new Date()));
+  const weeksBack = Math.round((parseLocal(curWkKey) - parseLocal(wkId)) / 604800000);
+  const whichWeek = weeksBack === 0 ? 'This week — still in progress.'
+    : weeksBack === 1 ? 'Last week.'
+    : weeksBack > 1 ? `${weeksBack} weeks ago.`
+    : weeksBack === -1 ? 'Next week — it hasn’t happened yet.'
+    : `${-weeksBack} weeks ahead — it hasn’t happened yet.`;
+
   const heads = [
-    ['How the week went', label],
+    ['How the week went', whichWeek],
     ['Unfinished tasks', unfinished.length ? `${unfinished.length} task${unfinished.length === 1 ? '' : 's'} didn't get done. Decide where each goes.` : 'Nothing left over — the whole week is closed out.'],
     ['Goals check-in', 'Work done versus time used, per goal.'],
     ['Reflect and plan', "Saved into this week's notes and next week's top 3."],
@@ -3774,9 +3809,21 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
     <div className="wr-overlay" onClick={onClose}>
       <div className="wr-box" role="dialog" aria-label="Weekly review" onClick={e => e.stopPropagation()}>
         <div className="wr-head">
-          <div className="wr-step">Week review · Step {step} of 4</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+            <div className="wr-step">Week review · Step {step} of 4</div>
+            {onNavWeek && (
+              <div className="wr-weeknav">
+                <button type="button" aria-label="Review the week before" onClick={() => onNavWeek(-1)}>‹</button>
+                <span className="wk">{label}</span>
+                <button type="button" aria-label="Review the week after" onClick={() => onNavWeek(1)}>›</button>
+              </div>
+            )}
+          </div>
           <div className="wr-title">{heads[step - 1][0]}</div>
           <div className="wr-sub">{heads[step - 1][1]}</div>
+          {onGoToWeek && weeksBack !== 0 && (
+            <button type="button" className="wr-open-wk" onClick={onGoToWeek}>Open this week in the planner</button>
+          )}
         </div>
         <div className="wr-body">
 
@@ -3970,6 +4017,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const [showPeoplePicker, setShowPeoplePicker] = useState(false);
   const [showRepeatCleanup, setShowRepeatCleanup] = useState(false);
   const [repeatScope, setRepeatScope] = useState(null); // {kind:'delete'|'apply', task, dayKey, rule?}
+  const [reviewWeek, setReviewWeek] = useState(null);   // week-start Date the review is looking at
   const pendingTaskFocus = useRef(null); // {id, dayKey} — task to focus after render
   const taskTitleRefs = useRef({}); // id -> input ref (desktop)
   const taskTitleRefsMobile = useRef({}); // id -> input ref (mobile)
@@ -3987,8 +4035,26 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   }
 
   const wd = getWD();
-  // v4.7.0 — the review is "due" Sat–Mon, or any time you're looking back at a finished week
-  const reviewDue = !wd.reviewedAt && ([0, 1, 6].includes(new Date().getDay()) || weekKey < fmt(getWeekStart(new Date())));
+  // ── Weekly Review week targeting (v4.7.0) ──
+  // The review can look at ANY week, not just the displayed one, so `reviewWeek` is its own state.
+  // Default when opening: the week that just ended if you're sitting in a barely-started current
+  // week (Sunday or Monday); otherwise the week you're looking at. Arrows in the review move it.
+  function emptyWeekObj() { return { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} }; }
+  function wdFor(ws) { return weekData[fmt(ws)] || emptyWeekObj(); }
+  function setWDFor(ws, fn) {
+    const wk = fmt(ws);
+    setWeekData(all => ({ ...all, [wk]: typeof fn === 'function' ? fn(all[wk] || emptyWeekObj()) : fn }));
+  }
+  function defaultReviewWeek() {
+    const now = new Date();
+    const justStarted = [0, 1].includes(now.getDay());          // Sunday or Monday
+    const viewingCurrent = weekKey === fmt(getWeekStart(now));
+    return (viewingCurrent && justStarted) ? addDays(weekStart, -7) : weekStart;
+  }
+  useEffect(() => { setReviewWeek(reviewOpen ? defaultReviewWeek() : null); }, [reviewOpen]);
+  // The button is "due" while the week on offer hasn't been reviewed yet
+  const reviewTarget = reviewOpen && reviewWeek ? reviewWeek : defaultReviewWeek();
+  const reviewDue = !wdFor(reviewTarget).reviewedAt;
 
   // Tasks: { [dayKey]: [{id, title, details, done, color, expanded, order}] }
   function getTasks(dayKey) { return (wd.tasks||{})[dayKey] || []; }
@@ -4004,6 +4070,19 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     setWD(w => {
       const current = (w.tasks||{})[dayKey] || [];
       return { ...w, tasks: { ...(w.tasks||{}), [dayKey]: typeof fn==='function' ? fn(current) : fn } };
+    });
+  }
+  // v4.7.1 — same as setTasks/getTasks but resolving the week from the day itself rather than
+  // assuming the displayed week. The Weekly Review can point at a week other than the one on
+  // screen, and setWD/getTasks would silently read and write the wrong bucket.
+  function weekKeyOf(dayKey) { return fmt(getWeekStart(parseLocal(dayKey) || new Date(dayKey))); }
+  function getTasksAnyWeek(dayKey) { return (((weekDataRef.current[weekKeyOf(dayKey)]||{}).tasks)||{})[dayKey] || []; }
+  function setTasksAnyWeek(dayKey, fn) {
+    const wk = weekKeyOf(dayKey);
+    setWeekData(all => {
+      const week = all[wk] || { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
+      const current = (week.tasks||{})[dayKey] || [];
+      return { ...all, [wk]: { ...week, tasks: { ...(week.tasks||{}), [dayKey]: typeof fn==='function' ? fn(current) : fn } } };
     });
   }
 
@@ -4173,10 +4252,12 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     return out;
   }
   function deleteTask(dayKey, id) {
-    const dayTasks = getTasks(dayKey);
+    // Week comes from the day, not from what's on screen — the Weekly Review may be reviewing
+    // a different week than the planner is showing (v4.7.1).
+    const wk = weekKeyOf(dayKey);
+    const dayTasks = getTasksAnyWeek(dayKey);
     const idx = dayTasks.findIndex(t => t.id===id);
     const task = dayTasks[idx];
-    const wk = weekKey;
     const prevSched = task?.isProjectTask
       ? (((pagesData||[]).find(d => d.id === task.projectDocId)?.tasks||[]).find(t => t.id===id)?.scheduledDate || dayKey)
       : null;
@@ -4187,7 +4268,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         ...doc, tasks: (doc.tasks||[]).map(t => t.id===id ? {...t, scheduledDate:''} : t)
       }));
     }
-    setTasks(dayKey, t => t.filter(x=>x.id!==id));
+    setTasksAnyWeek(dayKey, t => t.filter(x=>x.id!==id));
     // Offer Undo unless it was an empty, just-created card
     if (task && ((task.title||'').trim() || (task.details||'').trim())) {
       Undo.push(`Deleted "${(task.title||'task').trim().slice(0,40) || 'task'}"`, () => {
@@ -4497,9 +4578,13 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         <button className="nav-arrow" onClick={()=>setWeekStart(ws=>addDays(ws,7))}>›</button>
       </div>
       {/* v4.7.0 — Weekly Review. Highlighted Sat–Mon, when closing out a week is the natural thing to do. */}
-      <button className={`wr-review-btn ${reviewDue ? 'due' : ''}`} onClick={()=>setReviewOpen(true)}>
-        <span aria-hidden="true">{wd.reviewedAt ? '✓' : '◷'}</span>
-        {wd.reviewedAt ? 'Review again' : 'Weekly review'}
+      <button className={`wr-review-btn ${reviewDue ? 'due' : ''}`} onClick={()=>setReviewOpen(true)}
+        title={`Reviews ${fmtDisplay(reviewTarget)} – ${fmtDisplay(addDays(reviewTarget, 6))}`}>
+        <span aria-hidden="true">{reviewDue ? '◷' : '✓'}</span>
+        {reviewDue ? 'Weekly review' : 'Review again'}
+        {fmt(reviewTarget) !== weekKey && (
+          <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",opacity:0.7}}>{fmtDisplay(reviewTarget)}</span>
+        )}
       </button>
       <a className="sidebar-link daily" href="https://penzu.com">✍️ Daily Pages</a>
       <div className="sidebar-section">
@@ -4845,12 +4930,15 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         />
       )}
 
-      {reviewOpen && (
-        <WeekReview weekStart={weekStart} wd={wd} goals={goals} setGoals={setGoals}
+      {reviewOpen && reviewWeek && (
+        <WeekReview weekStart={reviewWeek} wd={wdFor(reviewWeek)} goals={goals} setGoals={setGoals}
           habitGoals={habitGoals} habitCompletions={habitCompletions}
           fitnessLog={fitnessLog} fitnessExercises={fitnessExercises}
           onMoveTask={(from, to, id) => moveTaskBetweenDays(from, to, id, null)}
-          onDeleteTask={deleteTask} onAddTask={prependTask} onSetWD={setWD}
+          onDeleteTask={deleteTask} onAddTask={prependTask}
+          onSetWD={fn => setWDFor(reviewWeek, fn)}
+          onNavWeek={n => setReviewWeek(w => addDays(w, n * 7))}
+          onGoToWeek={() => { setWeekStart(reviewWeek); setReviewOpen(false); }}
           onOpenGoal={onOpenGoal} onClose={() => setReviewOpen(false)} />
       )}
       {repeatScope && (
@@ -9786,7 +9874,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.7.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.7.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
