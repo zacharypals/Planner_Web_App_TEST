@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.8.0 -->
+<!-- LP Planner v4.9.0 -->
+<!-- v4.9.0 — Offline mode: a service worker (sw.js) keeps the app itself available with no connection; edits are saved on the device and upload when you reconnect; calm "Offline" notice instead of an error. -->
 <!-- v4.8.0 — Goals can link Weight and Calories (roll-up with trend line; weight uses a 7-day average); a milestone can complete itself when your weight reaches a number (needs 3+ weigh-ins in 7 days since the goal began); target defaults to the chart's weight target. -->
 <!-- v4.7.1 — Weekly Review can review any week (arrows in its header; defaults to last week on Sun/Mon); drag date tip readable in dark mode; Drop in the review now works on a week other than the one displayed. -->
 <!-- v4.7.0 — Weekly Review (4-step guided close-out of the week); goals link to habits & exercises with a weekly roll-up; Goals timeline bars drag to move and resize, with undo. -->
@@ -22,7 +23,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="icon" type="image/png" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-512.png">
 <meta name="theme-color" content="#3a2960">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -9675,6 +9676,13 @@ function App() {
   // Auth & sync state
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
   const [saveStatus, setSaveStatus] = useState(''); // '', 'saving', 'saved', 'merged', 'ERR:<message>'
+  const [online, setOnline] = useState(typeof navigator === 'undefined' || navigator.onLine !== false);
+  useEffect(() => {
+    const on = () => { setOnline(true); try { Sync.pull?.(); if (Sync.pendingCount?.()) Sync.flush?.({ manual: true }); } catch {} };
+    const off = () => setOnline(false);
+    window.addEventListener('online', on); window.addEventListener('offline', off);
+    return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
+  }, []);
   const [saveRetrying, setSaveRetrying] = useState(false); // true while manual retry is in flight
   const [authError, setAuthError] = useState(false); // true when the session ended — edits wait on this device
   const [authLoading, setAuthLoading] = useState(true); // true while session restore + first load is in progress on mount
@@ -9936,7 +9944,7 @@ function App() {
     }
   }
 
-  const isErr = saveStatus.startsWith('ERR:');
+  const isErr = saveStatus.startsWith('ERR:') && online;   // offline is expected, not an error
   const errDetail = isErr ? saveStatus.slice(4) : '';
   const saveLabel = saveStatus === 'saving' ? '↑ Saving…'
     : saveStatus === 'saved' ? '✓ Saved'
@@ -10069,7 +10077,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.8.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.9.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -10081,7 +10089,8 @@ function App() {
           <button className={`nav-tab ${page==='goals'?'active':''}`} onClick={()=>setPage('goals')}>Goals</button>
         </div>
         <div className="auth-area">
-          {saveLabel && <span className={`save-status ${saveClass || saveStatus}`}>{saveLabel}</span>}
+          {!online && <span className="save-status" style={{color:'#fcd34d'}} title="No connection — changes are saved on this device and upload when you're back online">● Offline</span>}
+          {online && saveLabel && <span className={`save-status ${saveClass || saveStatus}`}>{saveLabel}</span>}
           <button className="auth-btn theme-btn" onClick={cycleTheme} title="Appearance: Auto follows your device. Click to switch Auto → Light → Dark.">{themeLabel}</button>
           {authUser ? (
             <>
@@ -12727,6 +12736,9 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
 
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
 </script>
 </body>
 </html>
