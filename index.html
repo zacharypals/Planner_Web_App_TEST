@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v4.5.5 -->
+<!-- LP Planner v4.6.0 -->
+<!-- v4.6.0 — Undo toast for deletes; habits on certain days or N× a week (streaks by week); richer repeat rules (every N, monthly nth/last, end after N/date, scope dialog, rolling top-up). -->
 <!-- v4.5.5 — Fitness "+ Exercise" picker lists exercises A→Z within each group (display only; library order unchanged). -->
 <!-- v4.5.4 — Fitness cardio rows: Sec, min/mi and Done headers line up over their columns (Done centered over the check, same as strength rows). -->
 <!-- v4.5.3 — Fitness set rows: column headers (Weight, Done) now line up exactly over their inputs and the check circle. -->
@@ -1211,8 +1212,64 @@
     .week-review { grid-template-columns: 1fr; }
   }
 
+  /* ── REPEAT PANEL (v4.6.0) ── */
+  .rp-panel { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
+  .rp-seg { display: flex; gap: 4px; flex-wrap: wrap; }
+  .rp-seg button {
+    flex: 1 1 auto; min-height: 30px; padding: 0 8px; border-radius: 8px; cursor: pointer;
+    border: 1.5px solid var(--border); background: var(--surface); color: var(--ink-light);
+    font: 600 11px 'DM Sans', sans-serif;
+  }
+  .rp-seg button:hover { border-color: var(--accent); color: var(--accent); }
+  .rp-seg button.active { background: var(--accent-light); border-color: var(--accent); color: var(--accent); }
+  .rp-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font: 12px 'DM Sans', sans-serif; color: var(--ink); }
+  .rp-num {
+    width: 48px; min-height: 30px; box-sizing: border-box; text-align: center;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--ink);
+    font: 12px 'DM Mono', monospace;
+  }
+  .rp-num:focus, .rp-date:focus { outline: none; border-color: var(--accent); }
+  .rp-date {
+    min-height: 30px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface); color: var(--ink); font: 11px 'DM Mono', monospace; padding: 0 6px;
+  }
+  .rp-days { display: flex; gap: 4px; flex-wrap: wrap; }
+  .rp-days .task-repeat-day-btn { width: 30px; height: 30px; font-size: 11px; }
+  .rp-radio { display: flex; align-items: center; gap: 8px; min-height: 30px; font: 12px 'DM Sans', sans-serif; color: var(--ink); cursor: pointer; flex-wrap: wrap; }
+  .rp-radio input[type="radio"] { width: 16px; height: 16px; accent-color: var(--accent); margin: 0; flex-shrink: 0; }
+  .rp-label { font: 600 10px 'DM Mono', monospace; color: var(--ink-light); letter-spacing: 0.04em; text-transform: uppercase; }
+  .rp-summary { background: var(--accent-light); color: var(--accent); border-radius: 8px; padding: 6px 8px; font: 600 11px 'DM Sans', sans-serif; line-height: 1.4; }
+  .rp-next { font: 11px 'DM Sans', sans-serif; color: var(--ink-light); line-height: 1.5; }
+  .rp-actions { display: flex; gap: 6px; align-items: center; }
+  .rp-apply { min-height: 32px; padding: 0 14px; border-radius: 8px; border: none; cursor: pointer; background: var(--accent); color: #fff; font: 700 12px 'DM Sans', sans-serif; }
+  .rp-apply:disabled { opacity: 0.45; cursor: default; }
+  .rp-scope-opt { display: flex; align-items: flex-start; gap: 10px; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; cursor: pointer; background: var(--paper); }
+  .rp-scope-opt.on { border-color: var(--accent); background: var(--accent-light); }
+  .rp-scope-opt input { width: 18px; height: 18px; accent-color: var(--accent); margin: 2px 0 0; flex-shrink: 0; }
+
+  /* ── UNDO TOAST (v4.6.0) ── */
+  .undo-toast {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 24px; z-index: 9990;
+    background: #2a2538; color: #fff; border-radius: 12px; padding: 6px 8px 6px 16px;
+    display: flex; align-items: center; gap: 12px; max-width: min(92vw, 460px);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.35); font-family: 'DM Sans', sans-serif; font-size: 13px;
+  }
+  .undo-toast.lift { bottom: 96px; }
+  .undo-toast-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .undo-toast-btn {
+    background: none; border: none; color: #d4c4ff; font-weight: 700; font-size: 14px; cursor: pointer;
+    min-height: 44px; padding: 0 14px; border-radius: 8px; font-family: inherit; flex-shrink: 0;
+  }
+  .undo-toast-btn:hover { background: rgba(255,255,255,0.12); }
+  .undo-toast-more { font-size: 11px; opacity: 0.7; flex-shrink: 0; }
+
   /* ── MOBILE (< 768px) ── */
   @media (max-width: 767px) {
+    .undo-toast { bottom: 68px; }
+    .undo-toast.lift { bottom: 140px; }
+    .rp-seg button, .rp-num, .rp-date, .rp-radio { min-height: 40px; }
+    .rp-days .task-repeat-day-btn { width: 38px; height: 38px; font-size: 12px; }
+    .rp-apply { min-height: 44px; }
     /* Nav bar */
     .nav-bar { flex-wrap: nowrap; gap: 4px; padding: 6px 10px; position: sticky; top: 0; z-index: 200; }
     .nav-tabs { display: none; } /* hidden — use bottom nav */
@@ -2105,6 +2162,236 @@ function qtyTotal(val) {
 }
 function genLiId() { return 'li'+Date.now()+Math.random().toString(36).slice(2,7); }
 
+// ── HABIT FREQUENCY (v4.6.0) ──
+// goal.freq: undefined = every day | {type:'days', days:[0-6]} | {type:'perWeek', n:1-7}
+// goal.restDates: ['YYYY-MM-DD'] — days that neither count toward nor break a streak.
+// Days off the schedule are neutral too; a completion on any day still counts.
+// perWeek streaks count consecutive weeks (Sun–Sat) with at least n completions; the current
+// week counts once it is met and is "pending" (never a break) until then.
+function habitStreak(goal, completions, todayDate) {
+  const done = dk => ((completions || {})[dk] || []).includes(goal.id);
+  const type = goal.freq && goal.freq.type;
+  const t0 = new Date(todayDate); t0.setHours(0,0,0,0);
+  if (type === 'perWeek') {
+    const n = Math.max(1, parseInt(goal.freq.n, 10) || 1);
+    const count = w => { let c = 0; for (let i = 0; i < 7; i++) if (done(fmt(addDays(w, i)))) c++; return c; };
+    let ws = getWeekStart(t0);
+    let streak = count(ws) >= n ? 1 : 0;
+    for (let i = 0; i < 520; i++) {
+      ws = addDays(ws, -7);
+      if (count(ws) >= n) streak++; else break;
+    }
+    return streak;
+  }
+  const rest = new Set(goal.restDates || []);
+  const sched = type === 'days' ? new Set(goal.freq.days || []) : null;
+  // If today is done start from today; otherwise today is still pending, so start from yesterday
+  let cursor = done(fmt(t0)) ? new Date(t0) : addDays(t0, -1);
+  let streak = 0;
+  for (let i = 0; i < 4000; i++) {
+    const dk = fmt(cursor);
+    if (done(dk)) streak++;
+    else if (rest.has(dk) || (sched && !sched.has(cursor.getDay()))) { /* neutral day */ }
+    else break;
+    cursor = addDays(cursor, -1);
+  }
+  return streak;
+}
+// "2/3" style progress for × per week habits (null for other kinds)
+function habitWeekProgress(goal, completions, todayDate) {
+  if (!goal.freq || goal.freq.type !== 'perWeek') return null;
+  const ws = getWeekStart(todayDate);
+  let c = 0;
+  for (let i = 0; i < 7; i++) if (((completions || {})[fmt(addDays(ws, i))] || []).includes(goal.id)) c++;
+  return { done: c, n: Math.max(1, parseInt(goal.freq.n, 10) || 1) };
+}
+function habitFreqSummary(goal) {
+  const f = goal.freq;
+  if (!f) return 'Every day';
+  if (f.type === 'perWeek') return `${f.n || 1}× a week`;
+  if (f.type === 'days') return (f.days || []).map(i => ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][i]).join(', ') || 'No days chosen';
+  return 'Every day';
+}
+
+// ── REPEAT RULES (v4.6.0) ──
+// task.repeat = { freq:'daily'|'weekly'|'monthly'|'yearly', interval:1+, days:[0-6] (weekly),
+//   monthMode:'date'|'nth'|'last' (monthly), endType:'never'|'date'|'count', endDate, count,
+//   anchor:'YYYY-MM-DD' (series start), genThrough:'YYYY-MM-DD' (how far copies were written) }
+// Tasks saved before v4.6.0 only have {days, endDate}; normalizeRepeat reads those as
+// "weekly, every week, until endDate". Copies are still written into weekData (so checking off,
+// colours, dragging etc. all work as before); "never ends" series are topped up as time passes.
+const REPEAT_HORIZON_DAYS = { daily: 60, weekly: 182, monthly: 400, yearly: 800 };
+const REPEAT_DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function normalizeRepeat(r) {
+  if (!r) return null;
+  return {
+    freq: r.freq || 'weekly',
+    interval: Math.max(1, parseInt(r.interval, 10) || 1),
+    days: Array.isArray(r.days) ? r.days : [],
+    monthMode: r.monthMode || 'date',
+    endType: r.endType || 'date',
+    endDate: r.endDate || '',
+    count: Math.max(2, parseInt(r.count, 10) || 10),
+    anchor: r.anchor || '',
+    genThrough: r.genThrough || '',
+  };
+}
+// Is there enough information to generate copies?
+function repeatIsComplete(r) {
+  const n = normalizeRepeat(r);
+  if (!n) return false;
+  if (n.freq === 'weekly' && !n.days.length) return false;
+  if (n.endType === 'date' && !n.endDate) return false;
+  return true;
+}
+function repeatDaysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
+// Does day d (a local Date) fall on the rule, counting from anchor date a? (a itself is never a match)
+function repeatMatches(n, a, d) {
+  if (Math.round((d - a) / 86400000) <= 0) return false;
+  if (n.freq === 'daily') return Math.round((d - a) / 86400000) % n.interval === 0;
+  if (n.freq === 'weekly') {
+    if (!n.days.includes(d.getDay())) return false;
+    const w = Math.round((getWeekStart(d) - getWeekStart(a)) / (7 * 86400000));
+    return w % n.interval === 0;
+  }
+  if (n.freq === 'monthly') {
+    const mo = (d.getFullYear() - a.getFullYear()) * 12 + d.getMonth() - a.getMonth();
+    if (mo < 0 || mo % n.interval !== 0) return false;
+    const dim = repeatDaysInMonth(d.getFullYear(), d.getMonth());
+    if (n.monthMode === 'last') return d.getDate() === dim;
+    if (n.monthMode === 'nth') {
+      if (d.getDay() !== a.getDay()) return false;
+      const k = Math.ceil(a.getDate() / 7);                       // 1st, 2nd, … Monday of the month
+      return k >= 5 ? d.getDate() + 7 > dim : Math.ceil(d.getDate() / 7) === k;   // 5th = the last one
+    }
+    return d.getDate() === Math.min(a.getDate(), dim);             // "day 31" falls back to month end
+  }
+  if (n.freq === 'yearly') {
+    const y = d.getFullYear() - a.getFullYear();
+    return y > 0 && y % n.interval === 0 && d.getMonth() === a.getMonth() && d.getDate() === a.getDate();
+  }
+  return false;
+}
+// Dates (YYYY-MM-DD) strictly after afterKey, up to throughKey, that fall on the rule.
+// "After N times" counts the anchor task as time #1.
+function repeatDates(rule, anchorKey, afterKey, throughKey, max) {
+  const n = normalizeRepeat(rule);
+  const a = parseLocal(anchorKey);
+  const out = [];
+  if (!n || !a) return out;
+  const through = parseLocal(throughKey);
+  const end = n.endType === 'date' && n.endDate ? parseLocal(n.endDate) : null;
+  const cap = n.endType === 'count' ? n.count - 1 : (max || 800);
+  let cursor = addDays(parseLocal(afterKey) || a, 1);
+  for (let i = 0; i < 6000 && out.length < cap; i++) {
+    if (through && cursor > through) break;
+    if (end && cursor > end) break;
+    if (repeatMatches(n, a, cursor)) out.push(fmtLocal(cursor));
+    cursor = addDays(cursor, 1);
+  }
+  return out;
+}
+function repeatOrdinal(k) { return ['', 'first', 'second', 'third', 'fourth', 'last'][Math.min(k, 5)]; }
+// Plain-English summary, e.g. "Every 2 weeks on Mon, Wed · never ends"
+function repeatSummary(rule, fallbackAnchorKey) {
+  const n = normalizeRepeat(rule);
+  if (!n) return '';
+  const a = parseLocal(n.anchor || fallbackAnchorKey || '');
+  let s;
+  if (n.freq === 'daily') s = n.interval === 1 ? 'Every day' : `Every ${n.interval} days`;
+  else if (n.freq === 'weekly') {
+    const names = n.days.map(i => REPEAT_DAY_NAMES[i]).join(', ') || 'no days chosen';
+    s = (n.interval === 1 ? 'Every week' : `Every ${n.interval} weeks`) + ` on ${names}`;
+  } else if (n.freq === 'monthly') {
+    const every = n.interval === 1 ? 'Monthly' : `Every ${n.interval} months`;
+    if (n.monthMode === 'last') s = `${every} on the last day`;
+    else if (n.monthMode === 'nth' && a) s = `${every} on the ${repeatOrdinal(Math.ceil(a.getDate() / 7))} ${DAYS[a.getDay()]}`;
+    else s = `${every} on day ${a ? a.getDate() : '?'}`;
+  } else {
+    s = (n.interval === 1 ? 'Every year' : `Every ${n.interval} years`) + (a ? ` on ${MONTHS[a.getMonth()].slice(0,3)} ${a.getDate()}` : '');
+  }
+  const end = n.endType === 'never' ? 'never ends' : n.endType === 'count' ? `${n.count} times` : (n.endDate ? `until ${n.endDate}` : 'pick an end date');
+  return `${s} · ${end}`;
+}
+// Copy-on-write edit of one day's task list inside a weekData object being built (`out`)
+function wdEditDay(out, dk, fn) {
+  const wk = fmtLocal(getWeekStart(parseLocal(dk)));
+  const week = out[wk] || { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
+  const tasks = week.tasks || {};
+  out[wk] = { ...week, tasks: { ...tasks, [dk]: fn(tasks[dk] || []) } };
+}
+// Is this task part of a repeat series (new rules, or the old weekday-copy style)?
+function taskIsRepeating(t) {
+  return !!(t && (t.repeatId || (t.repeat && ((t.repeat.days || []).length || (t.repeat.freq && t.repeat.freq !== 'weekly')))));
+}
+function defaultRepeat(dayKey) {
+  const d = parseLocal(dayKey);
+  return { freq: 'weekly', interval: 1, days: [d ? d.getDay() : 1], monthMode: 'date', endType: 'never', endDate: '', count: 10 };
+}
+function repeatCopy(tpl, repeatId, dk, stored) {
+  return { ...tpl, id: `${repeatId}_${dk}`, repeatId, repeat: stored, done: false, expanded: false, gcalId: null };
+}
+// Apply a rule to the task `src` sitting on srcDk.
+//  • Unfinished copies of the old series after srcDk are dropped and rewritten from the rule.
+//  • split=true gives this task and the following ones a NEW series id (earlier ones keep their old rule).
+// Returns { wd, repeatId, count } — wd is a new object; untouched weeks are shared, not copied.
+function repeatApply(wd, src, srcDk, rule, split, todayKey) {
+  const n = normalizeRepeat(rule);
+  const oldId = src.repeatId || null;
+  const newId = !oldId ? src.id : (split ? 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5) : oldId);
+  let horizon = '';
+  if (n.endType === 'never') {
+    const base = parseLocal(todayKey) > parseLocal(srcDk) ? parseLocal(todayKey) : parseLocal(srcDk);
+    horizon = fmtLocal(addDays(base, REPEAT_HORIZON_DAYS[n.freq] || 182));
+  }
+  const stored = { ...n, anchor: srcDk, genThrough: horizon };
+  const out = { ...wd };
+  if (oldId) {
+    Object.keys(wd).forEach(wk => {
+      Object.keys((wd[wk] && wd[wk].tasks) || {}).forEach(dk => {
+        if (dk <= srcDk) return;
+        if ((wd[wk].tasks[dk] || []).some(t => t.repeatId === oldId && !t.done)) {
+          wdEditDay(out, dk, ts => ts.filter(t => !(t.repeatId === oldId && !t.done)));
+        }
+      });
+    });
+  }
+  wdEditDay(out, srcDk, ts => ts.map(t => t.id === src.id ? { ...t, repeatId: newId, repeat: stored } : t));
+  const dates = repeatDates(stored, srcDk, srcDk, horizon, 800);
+  dates.forEach(dk => wdEditDay(out, dk, ts => ts.some(t => t.repeatId === newId) ? ts : [...ts, repeatCopy(src, newId, dk, stored)]));
+  return { wd: out, repeatId: newId, count: dates.length };
+}
+// Top up "never ends" series so copies always run well ahead of today. Returns the SAME object when
+// nothing needed adding (so React doesn't re-render).
+function repeatExtend(wd, todayKey) {
+  const series = {};
+  Object.keys(wd).forEach(wk => {
+    const tasks = (wd[wk] && wd[wk].tasks) || {};
+    Object.keys(tasks).forEach(dk => (tasks[dk] || []).forEach(t => {
+      if (!t.repeatId || !t.repeat || t.repeat.endType !== 'never') return;
+      const s = series[t.repeatId] || (series[t.repeatId] = { latestDk: '', latest: null, gen: '' });
+      if (dk >= s.latestDk) { s.latestDk = dk; s.latest = t; }
+      if ((t.repeat.genThrough || '') > s.gen) s.gen = t.repeat.genThrough;
+    }));
+  });
+  const today = parseLocal(todayKey);
+  let out = null;
+  Object.keys(series).forEach(id => {
+    const s = series[id];
+    const rule = normalizeRepeat(s.latest.repeat);
+    const H = REPEAT_HORIZON_DAYS[rule.freq] || 182;
+    const horizon = fmtLocal(addDays(today, H));
+    if (s.gen && s.gen >= fmtLocal(addDays(today, Math.floor(H * 0.6)))) return;   // still plenty ahead
+    const after = s.gen && s.gen > s.latestDk ? s.gen : s.latestDk;               // never re-add skipped days
+    const dates = repeatDates(rule, rule.anchor || s.latestDk, after, horizon, 800);
+    if (!dates.length) return;
+    if (!out) out = { ...wd };
+    const stored = { ...rule, genThrough: horizon };
+    dates.forEach(dk => wdEditDay(out, dk, ts => ts.some(t => t.repeatId === id) ? ts : [...ts, repeatCopy(s.latest, id, dk, stored)]));
+  });
+  return out || wd;
+}
+
 // ─────────────────────────────────────────────
 // CONFIG — the only values that differ between the TEST app and the live app
 // ─────────────────────────────────────────────
@@ -2123,6 +2410,40 @@ let _lastCalSyncMs = 0; // timestamp of last auto calendar sync — throttles to
 // Pages body flush: PagesView registers a synchronous flush fn here so pending editor text
 // is written to local storage before a sync (tab hidden, page closing, sign-out).
 const _bodyFlushRef = { fn: null };
+// ── UNDO (v4.6.0) ──
+// Deleting something calls Undo.push(label, restoreFn). restoreFn must re-insert ONLY what was
+// removed, using functional state updates, so it never overwrites edits made since the delete.
+// Entries expire after 10s; the toast always offers the most recent one.
+const Undo = {
+  items: [], subs: new Set(),
+  push(label, restore) {
+    const item = { id: Date.now() + Math.random(), label, restore };
+    this.items = [...this.items, item].slice(-5);
+    setTimeout(() => { this.items = this.items.filter(x => x.id !== item.id); this.emit(); }, 10000);
+    this.emit();
+  },
+  run() {
+    const item = this.items[this.items.length - 1];
+    if (!item) return;
+    this.items = this.items.slice(0, -1);
+    this.emit();
+    try { item.restore(); } catch (e) { console.error('Undo failed', e); }
+  },
+  emit() { this.subs.forEach(f => f(this.items)); },
+};
+function UndoToast({ lift }) {
+  const [items, setItems] = useState(Undo.items);
+  useEffect(() => { Undo.subs.add(setItems); return () => { Undo.subs.delete(setItems); }; }, []);
+  if (!items.length) return null;
+  const top = items[items.length - 1];
+  return (
+    <div className={`undo-toast${lift ? ' lift' : ''}`} role="status" aria-live="polite">
+      <span className="undo-toast-label">{top.label}</span>
+      {items.length > 1 && <span className="undo-toast-more">+{items.length - 1} earlier</span>}
+      <button type="button" className="undo-toast-btn" onClick={() => Undo.run()}>Undo</button>
+    </div>
+  );
+}
 // Debounce timers for calendar sync — keyed by task id
 const _calSyncTimers = {};
 function debouncedCalSync(id, fn, delay = 2500) {
@@ -3261,6 +3582,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const [sheetOpen, setSheetOpen] = useState(false);
   const [showPeoplePicker, setShowPeoplePicker] = useState(false);
   const [showRepeatCleanup, setShowRepeatCleanup] = useState(false);
+  const [repeatScope, setRepeatScope] = useState(null); // {kind:'delete'|'apply', task, dayKey, rule?}
   const pendingTaskFocus = useRef(null); // {id, dayKey} — task to focus after render
   const taskTitleRefs = useRef({}); // id -> input ref (desktop)
   const taskTitleRefsMobile = useRef({}); // id -> input ref (mobile)
@@ -3296,51 +3618,28 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     });
   }
 
-  // Propagate a repeat task across future days up to endDate
-  function propagateRepeat(sourceTask, sourceDayKey, repeatDays, endDate) {
-    if (!repeatDays || repeatDays.length === 0 || !endDate) return;
-    const end = new Date(endDate + 'T00:00:00');
-    const start = new Date(sourceDayKey + 'T00:00:00');
-    start.setDate(start.getDate() + 1); // start from day after source
-    const repeatId = sourceTask.repeatId || sourceTask.id;
-    // Stamp the source task with repeatId if not already set
-    if (!sourceTask.repeatId) {
-      setTasks(sourceDayKey, ts => ts.map(t => t.id === sourceTask.id ? {...t, repeatId} : t));
+  // Apply a repeat rule to a task (see repeatApply). split=true starts a new series from this task.
+  function applyRepeatRule(task, dayKey, rule, split) {
+    const todayKey = fmtLocal(new Date());
+    setWeekData(wd => repeatApply(wd, task, dayKey, rule, split, todayKey).wd);
+  }
+  // Changing the rule of a task that already has other copies asks which ones to change
+  function requestApplyRepeat(task, dayKey, rule) {
+    if (task.repeatId && collectInstances(t => t.repeatId === task.repeatId).length > 1) {
+      setRepeatScope({ kind: 'apply', task, dayKey, rule });
+    } else {
+      applyRepeatRule(task, dayKey, rule, false);
     }
-    // Build all target dates
-    const cursor = new Date(start);
-    const targets = [];
-    while (cursor <= end) {
-      if (repeatDays.includes(cursor.getDay())) {
-        targets.push(fmt(new Date(cursor)));
-      }
-      cursor.setDate(cursor.getDate() + 1);
+  }
+  function runRepeatScope(sc, choice) {
+    const { task, dayKey } = sc;
+    if (sc.kind === 'delete') {
+      if (choice === 'one') deleteTask(dayKey, task.id);
+      else if (choice === 'following') deleteTaskAndFuture(dayKey, task.id);
+      else deleteRepeatGroup(null, task.repeatId, task.title, task.repeat && task.repeat.days);
+    } else {
+      applyRepeatRule(task, dayKey, sc.rule, choice === 'following');
     }
-    if (targets.length === 0) return;
-    // Write copies into weekData — accumulate into a single draft object
-    // so targets that share a week don't clobber each other
-    setWeekData(wd => {
-      const draft = JSON.parse(JSON.stringify(wd)); // deep clone
-      targets.forEach(dk => {
-        const dateObj = new Date(dk + 'T00:00:00');
-        const wk = fmt(getWeekStart(dateObj));
-        if (!draft[wk]) draft[wk] = { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
-        if (!draft[wk].tasks) draft[wk].tasks = {};
-        const dayTasks = draft[wk].tasks[dk] || [];
-        // Skip if a repeat copy already exists for this repeatId on this day
-        if (dayTasks.some(t => t.repeatId === repeatId)) return;
-        draft[wk].tasks[dk] = [...dayTasks, {
-          ...sourceTask,
-          id: `${repeatId}_${dk}`,
-          repeatId,
-          repeat: { days: repeatDays, endDate },
-          done: false,
-          expanded: false,
-          gcalId: null,
-        }];
-      });
-      return draft;
-    });
   }
 
   // Scan all weekData and group repeat task instances.
@@ -3359,6 +3658,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
               key, title: t.title||'(untitled)',
               days: t.repeat?.days || [],
               endDate: t.repeat?.endDate || '',
+              rule: t.repeat || null,
               repeatId: t.repeatId || null,
               instances: [],
             };
@@ -3373,6 +3673,15 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
 
   // Delete ALL instances of a repeat group (regardless of date — used by cleanup tool)
   function deleteRepeatGroup(groupKey, repeatId, title, days) {
+    {
+      const sig = JSON.stringify((days||[]).slice().sort());
+      const removed = collectInstances(t => repeatId
+        ? t.repeatId === repeatId
+        : (t.title === title && JSON.stringify((t.repeat?.days||[]).slice().sort()) === sig));
+      if (removed.length) Undo.push(`Deleted ${removed.length} repeating task${removed.length===1?'':'s'}`, () => {
+        removed.forEach(r => insertTaskBack(r.wk, r.dk, r.task, r.idx));
+      });
+    }
     setWeekData(wd => {
       const draft = JSON.parse(JSON.stringify(wd));
       Object.keys(draft).forEach(wk => {
@@ -3452,8 +3761,36 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       setTasks(dayKey, ts => ts.map(x => x.id===id ? {...x, gcalId: null} : x));
     }
   }
+  // Put a deleted task back (used by Undo). Only inserts if it isn't already there.
+  function insertTaskBack(wk, dayKey, task, idx) {
+    setWeekData(wd => {
+      const week = wd[wk] || { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
+      const list = (week.tasks||{})[dayKey] || [];
+      if (list.some(t => t.id === task.id)) return wd;
+      const next = [...list];
+      next.splice(Math.min(idx, next.length), 0, task);
+      return { ...wd, [wk]: { ...week, tasks: { ...(week.tasks||{}), [dayKey]: next } } };
+    });
+  }
+  // Every instance (from fromDayKey on, if given) that matches, with where it lives
+  function collectInstances(matcher, fromDayKey) {
+    const out = [];
+    Object.entries(weekDataRef.current).forEach(([wk, w]) => {
+      Object.entries((w && w.tasks) || {}).forEach(([dk, ts]) => {
+        if (fromDayKey && dk < fromDayKey) return;
+        (ts||[]).forEach((t, i) => { if (matcher(t)) out.push({ wk, dk, idx: i, task: t }); });
+      });
+    });
+    return out;
+  }
   function deleteTask(dayKey, id) {
-    const task = getTasks(dayKey).find(t => t.id===id);
+    const dayTasks = getTasks(dayKey);
+    const idx = dayTasks.findIndex(t => t.id===id);
+    const task = dayTasks[idx];
+    const wk = weekKey;
+    const prevSched = task?.isProjectTask
+      ? (((pagesData||[]).find(d => d.id === task.projectDocId)?.tasks||[]).find(t => t.id===id)?.scheduledDate || dayKey)
+      : null;
     if (task && task.gcalId && getToken()) deleteEventFromCalendar(task.gcalId).catch(()=>{});
     // If this is a project task, clear its scheduledDate in pagesData (removes from planner but keeps in doc)
     if (task?.isProjectTask && task?.projectDocId && setPagesData) {
@@ -3462,6 +3799,27 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       }));
     }
     setTasks(dayKey, t => t.filter(x=>x.id!==id));
+    // Offer Undo unless it was an empty, just-created card
+    if (task && ((task.title||'').trim() || (task.details||'').trim())) {
+      Undo.push(`Deleted "${(task.title||'task').trim().slice(0,40) || 'task'}"`, () => {
+        insertTaskBack(wk, dayKey, { ...task, gcalId: null }, idx);
+        if (task.isProjectTask && task.projectDocId && setPagesData) {
+          setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : {
+            ...doc, tasks: (doc.tasks||[]).map(t => t.id===id ? {...t, scheduledDate: prevSched} : t)
+          }));
+        }
+        // The calendar event was removed with the task — put it back
+        if (task.gcalId && task.isEvent && getToken()) {
+          pushEventToCalendar(task, dayKey).then(gcalId => {
+            if (!gcalId) return;
+            setWeekData(wd => {
+              const week = wd[wk]; if (!week) return wd;
+              return { ...wd, [wk]: { ...week, tasks: { ...(week.tasks||{}), [dayKey]: ((week.tasks||{})[dayKey]||[]).map(x => x.id===id ? {...x, gcalId} : x) } } };
+            });
+          }).catch(e => console.error('Calendar re-push failed:', e));
+        }
+      });
+    }
   }
 
   // Delete this instance and all future instances of a repeat task (same repeatId, on or after dayKey)
@@ -3471,13 +3829,29 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     const repeatId = task.repeatId;
     const legacyTitle = task.title;
     const legacyDays = (task.repeat?.days||[]).slice().sort();
+    {
+      const removed = collectInstances(t => repeatId
+        ? t.repeatId === repeatId
+        : (t.title === legacyTitle && JSON.stringify((t.repeat?.days||[]).slice().sort()) === JSON.stringify(legacyDays)), dayKey);
+      if (removed.length) Undo.push(`Deleted ${removed.length} repeating task${removed.length===1?'':'s'}`, () => {
+        removed.forEach(r => insertTaskBack(r.wk, r.dk, r.task, r.idx));
+      });
+    }
     setWeekData(wd => {
       const draft = JSON.parse(JSON.stringify(wd));
       Object.keys(draft).forEach(wk => {
         const tasks = draft[wk]?.tasks;
         if (!tasks) return;
         Object.keys(tasks).forEach(dk => {
-          if (dk < dayKey) return; // keep past instances
+          if (dk < dayKey) {
+            // Keep earlier copies — but a "never ends" series must now end the day before, or it would be topped up again
+            if (repeatId && tasks[dk].some(t => t.repeatId === repeatId && t.repeat && t.repeat.endType === 'never')) {
+              const prevDay = fmtLocal(addDays(parseLocal(dayKey), -1));
+              tasks[dk] = tasks[dk].map(t => (t.repeatId === repeatId && t.repeat && t.repeat.endType === 'never')
+                ? { ...t, repeat: { ...t.repeat, endType: 'date', endDate: prevDay } } : t);
+            }
+            return;
+          }
           tasks[dk] = tasks[dk].filter(t => {
             if (repeatId) return t.repeatId !== repeatId;
             // Legacy: match by title + days
@@ -3509,7 +3883,32 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     setShowPeoplePicker(false);
   }
   function updatePerson(id,patch) { setWD(w=>({...w, people:(w.people||[]).map(p=>p.id===id?{...p,...patch}:p)})); }
-  function deletePerson(id) { setWD(w=>({...w, people:(w.people||[]).filter(p=>p.id!==id)})); }
+  // Remove an item from one of this week's lists (people / toCreate / goals) with Undo
+  function removeFromWeekList(key, id, labelFor) {
+    const list = Array.isArray(getWD()[key]) ? getWD()[key] : [];
+    const idx = list.findIndex(x => x.id === id);
+    const item = list[idx];
+    const wk = weekKey;
+    setWD(w => ({...w, [key]: (Array.isArray(w[key]) ? w[key] : []).filter(x => x.id !== id)}));
+    const label = item ? labelFor(item) : null;
+    if (!label) return;
+    Undo.push(label, () => {
+      setWeekData(wd => {
+        const week = wd[wk] || { proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} };
+        const cur = Array.isArray(week[key]) ? week[key] : [];
+        if (cur.some(x => x.id === id)) return wd;
+        const next = [...cur];
+        next.splice(Math.min(idx, next.length), 0, item);
+        return { ...wd, [wk]: { ...week, [key]: next } };
+      });
+    });
+  }
+  function deletePerson(id) {
+    removeFromWeekList('people', id, p => {
+      const nm = (peopleDirectory||[]).find(d => d.id === p.personId)?.name || p.name || 'person';
+      return `Removed ${nm}`;
+    });
+  }
   function reorderPeople(fromId, toId) {
     setWD(w=>{
       const list = [...(w.people||[])];
@@ -3524,7 +3923,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
 
   function addCreate() { setWD(w=>({...w, toCreate:[...(Array.isArray(w.toCreate)?w.toCreate:[]),{id:Date.now().toString(),name:'',done:false}]})); }
   function updateCreate(id,patch) { setWD(w=>({...w, toCreate:(Array.isArray(w.toCreate)?w.toCreate:[]).map(c=>c.id===id?{...c,...patch}:c)})); }
-  function deleteCreate(id) { setWD(w=>({...w, toCreate:(Array.isArray(w.toCreate)?w.toCreate:[]).filter(c=>c.id!==id)})); }
+  function deleteCreate(id) { removeFromWeekList('toCreate', id, c => (c.name||'').trim() ? `Removed "${c.name.trim().slice(0,40)}"` : null); }
 
   function addGoal(afterId, newId) {
     const newItem = {id: newId || Date.now().toString(), name:'', done:false};
@@ -3538,7 +3937,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     });
   }
   function updateGoal(id,patch) { setWD(w=>({...w, goals:(w.goals||[]).map(g=>g.id===id?{...g,...patch}:g)})); }
-  function deleteGoal(id) { setWD(w=>({...w, goals:(w.goals||[]).filter(g=>g.id!==id)})); }
+  function deleteGoal(id) { removeFromWeekList('goals', id, g => (g.name||'').trim() ? `Removed "${g.name.trim().slice(0,40)}"` : null); }
   function reorderGoals(fromId, toId) {
     setWD(w=>{
       const list = [...(w.goals||[])];
@@ -3811,7 +4210,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                         onUpdate={p=>updateTask(dk,task.id,p)}
                         onBlurSync={()=>syncTaskToCalendar(dk,task.id)}
                         onDelete={()=>deleteTask(dk,task.id)}
-                        onDeleteFuture={(task.repeatId || task.repeat?.days?.length) ? ()=>deleteTaskAndFuture(dk,task.id) : null}
+                        onDeleteFuture={taskIsRepeating(task) ? ()=>deleteTaskAndFuture(dk,task.id) : null}
+                        onAskScope={taskIsRepeating(task) ? ()=>setRepeatScope({kind:'delete',task,dayKey:dk}) : null}
+                        dayKey={dk}
                         onEnterKey={()=>addTask(dk,task.id)}
                         titleRef={el=>taskTitleRefs.current[task.id]=el}
                         deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(dk,task.id);}}
@@ -3829,7 +4230,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                           });
                         }}
                         onShowCtxMenu={(x,y,cp,pp,hp)=>setCtxMenu({x,y,onCopy:cp,onPaste:pp,hasCopied:hp})}
-                        onApplyRepeat={(days,endDate)=>propagateRepeat(task,dk,days,endDate)}
+                        onApplyRepeat={(rule)=>requestApplyRepeat(task,dk,rule)}
                         isDragOver={dragOver?.dayKey===dk && dragOver?.id===task.id}
                         onDragStart={()=>setDragging({dayKey:dk, id:task.id})}
                         onDragOver={()=>setDragOver({dayKey:dk, id:task.id})}
@@ -3927,11 +4328,13 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                     onUpdate={p=>updateTask(mobileDayKey,task.id,p)}
                     onBlurSync={()=>syncTaskToCalendar(mobileDayKey,task.id)}
                     onDelete={()=>deleteTask(mobileDayKey,task.id)}
-                    onDeleteFuture={(task.repeatId || task.repeat?.days?.length) ? ()=>deleteTaskAndFuture(mobileDayKey,task.id) : null}
+                    onDeleteFuture={taskIsRepeating(task) ? ()=>deleteTaskAndFuture(mobileDayKey,task.id) : null}
+                    onAskScope={taskIsRepeating(task) ? ()=>setRepeatScope({kind:'delete',task,dayKey:mobileDayKey}) : null}
+                    dayKey={mobileDayKey}
                     onEnterKey={()=>addTask(mobileDayKey,task.id)}
                     titleRef={el=>taskTitleRefsMobile.current[task.id]=el}
                     deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(mobileDayKey,task.id);}}
-                    onApplyRepeat={(days,endDate)=>propagateRepeat(task,mobileDayKey,days,endDate)}
+                    onApplyRepeat={(rule)=>requestApplyRepeat(task,mobileDayKey,rule)}
                     onReschedule={(toDayKey)=>{
                 moveTaskBetweenDays(mobileDayKey,toDayKey,task.id,null);
                 if(task.expanded) updateTask(toDayKey,task.id,{expanded:false});
@@ -4035,6 +4438,11 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         />
       )}
 
+      {repeatScope && (
+        <RepeatScopeModal scope={repeatScope}
+          onClose={()=>setRepeatScope(null)}
+          onPick={(choice)=>{ const sc = repeatScope; setRepeatScope(null); runRepeatScope(sc, choice); }} />
+      )}
       {showRepeatCleanup && (
         <RepeatCleanupModal
           groups={getRepeatGroups()}
@@ -4052,6 +4460,52 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
 // Lists all repeat task groups across all weeks; lets user delete entire groups at once.
 // ─────────────────────────────────────────────
 const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+// "Change which tasks?" — asked before deleting a repeating task, or before changing its repeat rule
+function RepeatScopeModal({ scope, onPick, onClose }) {
+  const isDelete = scope.kind === 'delete';
+  const opts = isDelete
+    ? [['one', 'Only this task', 'Just this one. The rest stay as they are.'],
+       ['following', 'This and following', 'This one and every later one. Earlier ones stay.'],
+       ['all', 'All tasks in the series', 'Every past and future one.']]
+    : [['following', 'This and following', 'Starts a new series from here. Earlier ones keep their old settings.'],
+       ['all', 'All tasks in the series', 'Keeps one series; unfinished later tasks are rewritten to match.']];
+  const [choice, setChoice] = useState(isDelete ? 'one' : 'following');
+  const title = (scope.task.title || 'This task').trim() || 'This task';
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" role="dialog" aria-label="Change which tasks?" style={{maxWidth:420,gap:12}} onClick={e=>e.stopPropagation()}>
+        <div>
+          <div style={{fontFamily:"'Playfair Display',serif",fontSize:17,fontWeight:700,color:'var(--ink)'}}>
+            {isDelete ? 'Delete which tasks?' : 'Change which tasks?'}
+          </div>
+          <div style={{fontSize:12,color:'var(--ink-light)',marginTop:4,lineHeight:1.5}}>
+            “{title}” — {repeatSummary(scope.task.repeat, scope.dayKey) || 'repeats'}. You're on {scope.dayKey}.
+          </div>
+        </div>
+        <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          {opts.map(([val, label, desc]) => (
+            <label key={val} className={`rp-scope-opt ${choice===val?'on':''}`}>
+              <input type="radio" name="repeat-scope" checked={choice===val} onChange={()=>setChoice(val)} />
+              <span style={{display:'flex',flexDirection:'column',gap:2}}>
+                <span style={{fontSize:14,fontWeight:600,color:'var(--ink)'}}>{label}</span>
+                <span style={{fontSize:12,color:'var(--ink-light)',lineHeight:1.4}}>{desc}</span>
+              </span>
+            </label>
+          ))}
+        </div>
+        <div style={{display:'flex',gap:10,justifyContent:'flex-end'}}>
+          <button onClick={onClose} style={{minHeight:44,padding:'0 18px',borderRadius:10,border:'1px solid var(--border)',background:'none',cursor:'pointer',fontSize:14,color:'var(--ink)'}}>Cancel</button>
+          <button onClick={()=>onPick(choice)}
+            style={{minHeight:44,padding:'0 22px',borderRadius:10,border:'none',cursor:'pointer',fontSize:14,fontWeight:700,color:'#fff',
+                    background: isDelete ? 'var(--red)' : 'var(--accent)'}}>
+            {isDelete ? 'Delete' : 'Apply'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RepeatCleanupModal({ groups, onDeleteGroup, onClose }) {
   const [deletedKeys, setDeletedKeys] = useState(new Set());
   const [confirmKey, setConfirmKey] = useState(null);
@@ -4091,7 +4545,7 @@ function RepeatCleanupModal({ groups, onDeleteGroup, onClose }) {
                     {g.title||'(untitled)'}
                   </div>
                   <div style={{fontSize:10,color:'var(--ink-light)',marginTop:2}}>
-                    {dayStr || 'unknown days'}{g.endDate ? ` · until ${g.endDate}` : ''}
+                    {g.rule ? repeatSummary(g.rule) : (dayStr || 'unknown days')}
                     {' · '}<span style={{color:'var(--ink-faint)'}}>{g.instances.length} instance{g.instances.length!==1?'s':''}</span>
                   </div>
                 </div>
@@ -4592,13 +5046,14 @@ function pickTaskColorIndex(existingTasks) {
   }
   return Math.floor(Math.random() * TASK_COLORS.length);
 }
-function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onReschedule, weekDays, currentDayKey }) {
+function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onAskScope, dayKey, onReschedule, weekDays, currentDayKey }) {
   const textareaRef = useRef();
   const titleTextareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
   const [mobileConfirming, setMobileConfirming] = useState(false);
   const [showColors, setShowColors] = useState(false);
   const [repeatOpen, setRepeatOpen] = useState(false);
+  const [repeatDraft, setRepeatDraft] = useState(null); // rule being edited in the Repeat panel (not saved until Apply)
   const [rescheduleWeekOffset, setRescheduleWeekOffset] = useState(0);
   const longPressTimer = useRef(null);
 
@@ -4628,6 +5083,8 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
 
   function handleDeleteClick(e) {
     e.stopPropagation();
+    // Repeating task: ask which tasks to delete (this / this and following / all)
+    if (onDeleteFuture && onAskScope) { onAskScope(); return; }
     if (!onDeleteFuture) {
       // Non-repeat task: standard two-click confirm
       if (confirming) { onDelete(); } else { setConfirming(true); }
@@ -4750,7 +5207,12 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
         {mobileConfirming && onReschedule ? (
           <>
             {onDeleteFuture ? (
-              // Repeat task: two options
+              onAskScope ? (
+                <button className="task-mobile-delete-btn"
+                  onClick={e=>{e.stopPropagation();setMobileConfirming(false);onAskScope();}}>
+                  Delete…
+                </button>
+              ) : (
               <>
                 <button className="task-mobile-delete-btn"
                   onClick={e=>{e.stopPropagation();setMobileConfirming(false);onDelete();}}>
@@ -4762,6 +5224,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
                   All future
                 </button>
               </>
+              )
             ) : (
               <button className="task-mobile-delete-btn"
                 onClick={e=>{e.stopPropagation();onDelete();}}>
@@ -4938,80 +5401,106 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
           })()}
 
           {/* ── Repeat ── */}
-          {!task.isProjectTask && (
+          {!task.isProjectTask && (() => {
+            const hasRule = taskIsRepeating(task);
+            const dk = dayKey || '';
+            const dd = repeatDraft;
+            const open = repeatOpen && !!dd;
+            const set = patch => setRepeatDraft(d => ({ ...d, ...patch }));
+            const complete = open && repeatIsComplete(dd);
+            const anchorDate = parseLocal(dk);
+            const upcoming = complete && dk ? repeatDates(dd, dk, dk, '', 4).slice(0, 4) : [];
+            const unitWord = { daily: 'day', weekly: 'week', monthly: 'month', yearly: 'year' }[dd && dd.freq] || 'week';
+            const ordinalLabel = anchorDate ? `The ${repeatOrdinal(Math.ceil(anchorDate.getDate() / 7))} ${DAYS[anchorDate.getDay()]}` : 'The same weekday';
+            return (
             <div style={{paddingTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',marginTop:6}} onClick={e=>e.stopPropagation()}>
-              <div style={{display:'flex',alignItems:'center',gap:6}}>
+              <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                 <button
-                  className={`task-repeat-toggle ${task.repeat?.days?.length ? 'active' : ''}`}
+                  className={`task-repeat-toggle ${hasRule ? 'active' : ''}`}
                   onClick={e=>{
                     e.stopPropagation();
-                    if (task.repeat === null || task.repeat === undefined) {
-                      // Turn on repeat + open panel
-                      onUpdate({repeat:{days:[], endDate:''}});
+                    if (open) { setRepeatOpen(false); }
+                    else {
+                      const saved = normalizeRepeat(task.repeat);
+                      setRepeatDraft(saved && hasRule ? { ...saved } : defaultRepeat(dk));
                       setRepeatOpen(true);
-                    } else {
-                      // Toggle panel open/closed (repeat stays saved)
-                      setRepeatOpen(o => !o);
                     }
                   }}>
-                  🔁 Repeat {(task.repeat !== null && task.repeat !== undefined) ? (repeatOpen ? '▲' : '▼') : '▼'}
+                  🔁 Repeat {open ? '▲' : '▼'}
                 </button>
-                {task.repeat?.days?.length > 0 && (
-                  <span className="task-repeat-badge">
-                    {['S','M','T','W','T','F','S'].filter((_,i)=>task.repeat.days.includes(i)).join('')}
-                    {task.repeat.endDate ? ` until ${task.repeat.endDate}` : ''}
-                  </span>
+                {hasRule && task.repeat && (
+                  <span className="task-repeat-badge">{repeatSummary(task.repeat, dk)}</span>
                 )}
-                {/* Clear repeat entirely */}
-                {task.repeat !== null && task.repeat !== undefined && (
+                {/* Clear the rule from this one task only */}
+                {task.repeat && (
                   <button onClick={e=>{e.stopPropagation();onUpdate({repeat:null});setRepeatOpen(false);}}
                     style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',marginLeft:'auto'}}>
                     ✕ clear
                   </button>
                 )}
               </div>
-              {(task.repeat !== null && task.repeat !== undefined) && repeatOpen && (
-                <div>
-                  <div className="task-repeat-days">
-                    {['S','M','T','W','T','F','S'].map((d,i)=>(
-                      <button key={i}
-                        className={`task-repeat-day-btn ${(task.repeat?.days||[]).includes(i)?'active':''}`}
-                        onClick={e=>{
-                          e.stopPropagation();
-                          const cur = task.repeat?.days||[];
-                          const next = cur.includes(i) ? cur.filter(x=>x!==i) : [...cur,i].sort((a,b)=>a-b);
-                          const updated = {...(task.repeat||{}), days:next};
-                          onUpdate({repeat:updated});
-                          if (updated.endDate && next.length > 0 && onApplyRepeat) {
-                            onApplyRepeat(next, updated.endDate);
-                          }
-                        }}>
-                        {d}
-                      </button>
+              {open && (
+                <div className="rp-panel">
+                  <div className="rp-seg" role="group" aria-label="Repeat frequency">
+                    {[['daily','Daily'],['weekly','Weekly'],['monthly','Monthly'],['yearly','Yearly']].map(([v,l]) => (
+                      <button key={v} className={dd.freq===v?'active':''}
+                        onClick={e=>{e.stopPropagation(); set({ freq: v, days: v==='weekly' && !dd.days.length ? [anchorDate ? anchorDate.getDay() : 1] : dd.days }); }}>{l}</button>
                     ))}
                   </div>
-                  <div className="task-repeat-end">
-                    <span className="task-repeat-end-label" style={{color: !task.repeat?.endDate && (task.repeat?.days||[]).length > 0 ? '#ef4444' : undefined}}>
-                      Until{!task.repeat?.endDate && (task.repeat?.days||[]).length > 0 ? '*' : ''}:
-                    </span>
-                    <input type="date" className="task-repeat-end-input"
-                      value={task.repeat?.endDate||''}
-                      style={{borderColor: !task.repeat?.endDate && (task.repeat?.days||[]).length > 0 ? '#ef4444' : undefined}}
-                      onChange={e=>{
+                  <div className="rp-row">
+                    <label htmlFor={`rp-int-${task.id}`}>Every</label>
+                    <input id={`rp-int-${task.id}`} className="rp-num" type="number" inputMode="numeric" min="1" max="99" value={dd.interval}
+                      onChange={e=>set({ interval: Math.max(1, Math.min(99, parseInt(e.target.value, 10) || 1)) })} />
+                    <span>{unitWord}{dd.interval === 1 ? '' : 's'}</span>
+                  </div>
+                  {dd.freq === 'weekly' && (
+                    <div className="rp-days" role="group" aria-label="Days of the week">
+                      {['S','M','T','W','T','F','S'].map((d,i)=>(
+                        <button key={i} aria-label={DAYS[i]} aria-pressed={dd.days.includes(i)}
+                          className={`task-repeat-day-btn ${dd.days.includes(i)?'active':''}`}
+                          onClick={e=>{
+                            e.stopPropagation();
+                            set({ days: dd.days.includes(i) ? dd.days.filter(x=>x!==i) : [...dd.days,i].sort((x,y)=>x-y) });
+                          }}>{d}</button>
+                      ))}
+                    </div>
+                  )}
+                  {dd.freq === 'monthly' && (
+                    <div style={{display:'flex',flexDirection:'column'}}>
+                      {[['date', `Day ${anchorDate ? anchorDate.getDate() : ''} of the month`],['nth', ordinalLabel],['last','The last day of the month']].map(([v,l]) => (
+                        <label key={v} className="rp-radio"><input type="radio" name={`rp-mm-${task.id}`} checked={dd.monthMode===v} onChange={()=>set({ monthMode: v })} />{l}</label>
+                      ))}
+                    </div>
+                  )}
+                  <div style={{display:'flex',flexDirection:'column'}}>
+                    <div className="rp-label">Ends</div>
+                    <label className="rp-radio"><input type="radio" name={`rp-end-${task.id}`} checked={dd.endType==='never'} onChange={()=>set({ endType: 'never' })} />Never</label>
+                    <label className="rp-radio"><input type="radio" name={`rp-end-${task.id}`} checked={dd.endType==='date'} onChange={()=>set({ endType: 'date' })} />On
+                      <input type="date" className="rp-date" aria-label="End date" value={dd.endDate} onClick={e=>e.stopPropagation()}
+                        onChange={e=>set({ endType: 'date', endDate: e.target.value })} /></label>
+                    <label className="rp-radio"><input type="radio" name={`rp-end-${task.id}`} checked={dd.endType==='count'} onChange={()=>set({ endType: 'count' })} />After
+                      <input type="number" inputMode="numeric" className="rp-num" aria-label="Number of times" min="2" max="400" value={dd.count}
+                        onClick={e=>e.stopPropagation()}
+                        onChange={e=>set({ endType: 'count', count: Math.max(2, Math.min(400, parseInt(e.target.value, 10) || 2)) })} />times</label>
+                  </div>
+                  <div className="rp-summary">{repeatSummary({ ...dd, anchor: dk }, dk)}</div>
+                  {upcoming.length > 0 && (
+                    <div className="rp-next"><b>Next:</b> {upcoming.map(u => { const d = parseLocal(u); return `${DAYS[d.getDay()].slice(0,3)}, ${fmtDisplay(d)}`; }).join(' · ')}</div>
+                  )}
+                  <div className="rp-actions">
+                    <button className="rp-apply" disabled={!complete}
+                      onClick={e=>{
                         e.stopPropagation();
-                        const updated = {...(task.repeat||{}), endDate:e.target.value};
-                        onUpdate({repeat:updated});
-                        if (e.target.value && (updated.days||[]).length > 0 && onApplyRepeat) {
-                          onApplyRepeat(updated.days, e.target.value);
-                        }
-                      }}
-                      onClick={e=>e.stopPropagation()}
-                    />
+                        onApplyRepeat && onApplyRepeat({ ...dd });
+                        setRepeatOpen(false);
+                      }}>{task.repeatId ? 'Apply…' : 'Apply'}</button>
+                    {!complete && <span className="rp-next">{dd.freq==='weekly' && !dd.days.length ? 'Pick at least one day' : 'Pick an end date'}</span>}
                   </div>
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
           {/* Mobile delete — only in expanded section, only in mobile context */}
           {onReschedule && (
             <div style={{paddingTop:8,marginTop:6,borderTop:'1px solid rgba(0,0,0,0.07)',display:'flex',justifyContent:'flex-end'}}
@@ -5019,8 +5508,8 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
               {mobileConfirming ? (
                 <div style={{display:'flex',gap:6,alignItems:'center'}}>
                   <button className="task-mobile-delete-btn"
-                    onClick={e=>{e.stopPropagation();onDelete();}}>
-                    Delete?
+                    onClick={e=>{e.stopPropagation();if (onDeleteFuture && onAskScope) { setMobileConfirming(false); onAskScope(); } else onDelete();}}>
+                    {onDeleteFuture && onAskScope ? 'Delete…' : 'Delete?'}
                   </button>
                   <button onClick={e=>{e.stopPropagation();setMobileConfirming(false);}}
                     style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 4px'}}>✕</button>
@@ -5034,6 +5523,80 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
               )}
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Streak badge: 🔥N (days) or 🔥Nw plus "2/3" this-week progress for × per week habits
+function HabitStreakChip({ goal, streak, completions }) {
+  const wp = habitWeekProgress(goal, completions, new Date());
+  const weekly = !!(goal.freq && goal.freq.type === 'perWeek');
+  return (
+    <>
+      {wp && <span title="Done this week" style={{marginRight:4}}>{wp.done}/{wp.n}</span>}
+      <span title={weekly ? 'Current streak (weeks)' : 'Current streak'} style={{color:'var(--gold)'}}>🔥{streak}{weekly ? 'w' : ''}</span>
+    </>
+  );
+}
+
+// "How often" editor shown in a habit's expanded section: every day / certain days / × per week,
+// plus a rest-day toggle for the selected day (rest days never break a streak).
+function HabitFreqEditor({ goal, onChange, dayKey }) {
+  const type = (goal.freq && goal.freq.type) || 'daily';
+  const days = (goal.freq && goal.freq.days) || [];
+  const n = (goal.freq && goal.freq.n) || 3;
+  const restDates = goal.restDates || [];
+  const isRest = restDates.includes(dayKey);
+  const dayDate = parseLocal(dayKey);
+  const dayLabel = dayDate ? `${DAYS[dayDate.getDay()].slice(0,3)} ${fmtDisplay(dayDate)}` : dayKey;
+  function pick(t) {
+    if (t === 'daily') onChange({ freq: undefined });
+    else if (t === 'days') onChange({ freq: { type: 'days', days: days.length ? days : [1,3,5] } });
+    else onChange({ freq: { type: 'perWeek', n } });
+  }
+  const label = { fontSize:10, color:'var(--ink-faint)', fontFamily:"'DM Mono',monospace", flexShrink:0 };
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:6}} onClick={e=>e.stopPropagation()}>
+      <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+        <span style={label}>How often:</span>
+        <div className="habit-schedule-selector">
+          {[['daily','Every day'],['days','Certain days'],['perWeek','× a week']].map(([val,lab]) => (
+            <button key={val} className={`habit-schedule-btn ${type===val?'active':''}`}
+              onClick={e=>{e.stopPropagation();pick(val);}}>{lab}</button>
+          ))}
+        </div>
+      </div>
+      {type === 'days' && (
+        <div className="task-repeat-days">
+          {['S','M','T','W','T','F','S'].map((d,i)=>(
+            <button key={i} aria-label={DAYS[i]} className={`task-repeat-day-btn ${days.includes(i)?'active':''}`}
+              onClick={e=>{
+                e.stopPropagation();
+                const next = days.includes(i) ? days.filter(x=>x!==i) : [...days,i].sort((a,b)=>a-b);
+                onChange({ freq: { type: 'days', days: next } });
+              }}>{d}</button>
+          ))}
+        </div>
+      )}
+      {type === 'perWeek' && (
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <button className="habit-schedule-btn" aria-label="Fewer times a week"
+            onClick={e=>{e.stopPropagation();onChange({ freq: { type:'perWeek', n: Math.max(1, n-1) } });}}>−</button>
+          <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}>{n} time{n===1?'':'s'} a week</span>
+          <button className="habit-schedule-btn" aria-label="More times a week"
+            onClick={e=>{e.stopPropagation();onChange({ freq: { type:'perWeek', n: Math.min(7, n+1) } });}}>+</button>
+        </div>
+      )}
+      {type !== 'perWeek' && (
+        <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+          <span style={label}>Rest day:</span>
+          <button className={`habit-schedule-btn ${isRest?'active':''}`}
+            onClick={e=>{
+              e.stopPropagation();
+              onChange({ restDates: isRest ? restDates.filter(d=>d!==dayKey) : [...restDates, dayKey].sort() });
+            }}>{isRest ? `✓ ${dayLabel} is a rest day` : `Make ${dayLabel} a rest day`}</button>
         </div>
       )}
     </div>
@@ -5076,7 +5639,19 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
     setNewCdTitle(''); setNewCdEnd(''); setNewCdStart(fmt(new Date())); setNewCdColor(COUNTDOWN_COLORS[0]);
     setAddingCountdown(false);
   }
-  function deleteCountdown(id) { setCountdowns(cs => cs.filter(c => c.id !== id)); }
+  function deleteCountdown(id) {
+    const idx = (countdowns||[]).findIndex(c => c.id === id);
+    const cd = (countdowns||[])[idx];
+    setCountdowns(cs => cs.filter(c => c.id !== id));
+    if (cd) Undo.push(`Deleted countdown "${(cd.title||'countdown').slice(0,40)}"`, () => {
+      setCountdowns(cs => {
+        if ((cs||[]).some(c => c.id === id)) return cs;
+        const next = [...(cs||[])];
+        next.splice(Math.min(idx, next.length), 0, cd);
+        return next;
+      });
+    });
+  }
 
   function renderCountdownCards() {
     if (!countdowns || countdowns.length === 0) return null;
@@ -5238,7 +5813,20 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
     setGoals(g=>[...g, {id, name:'New Goal', color: GOAL_COLORS[g.length % GOAL_COLORS.length]}]);
   }
   function updateGoal(id, patch) { setGoals(g=>g.map(x=>x.id===id?{...x,...patch}:x)); }
-  function deleteGoal(id) { setGoals(g=>g.filter(x=>x.id!==id)); }
+  function deleteGoal(id) {
+    const idx = goals.findIndex(x => x.id === id);
+    const habit = goals[idx];
+    setGoals(g=>g.filter(x=>x.id!==id));
+    // Completions are kept in their own data, so restoring the habit brings its history back too
+    if (habit) Undo.push(`Deleted habit "${(habit.name||'habit').slice(0,40)}"`, () => {
+      setGoals(gs => {
+        if (gs.some(x => x.id === id)) return gs;
+        const next = [...gs];
+        next.splice(Math.min(idx, next.length), 0, habit);
+        return next;
+      });
+    });
+  }
 
   // Count completions for a goal in current view window
   function countInView(goalId) {
@@ -5284,23 +5872,9 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
   }
 
   function calcStreak(goalId) {
-    const todayDate = new Date(); todayDate.setHours(0,0,0,0);
-    const todayKey = fmt(todayDate);
-    // If today is completed, start counting from today, else start from yesterday
-    let cursor = isCompleted(goalId, todayKey)
-      ? new Date(todayDate)
-      : addDays(todayDate, -1);
-    let streak = 0;
-    while (true) {
-      const dk = fmt(cursor);
-      if (isCompleted(goalId, dk)) {
-        streak++;
-        cursor = addDays(cursor, -1);
-      } else {
-        break;
-      }
-    }
-    return streak;
+    // Handles every-day, certain-days and × per week habits, plus rest days (see habitStreak)
+    const goal = goals.find(g => g.id === goalId) || { id: goalId };
+    return habitStreak(goal, completions, new Date());
   }
 
   const selectedDayKey = fmt(selectedDate);
@@ -5401,7 +5975,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
               <span className="goal-count" style={{flexShrink:0}}>
                 {countInView(goal.id)}
                 <span style={{margin:'0 3px',opacity:0.6}}>·</span>
-                <span title="Current streak" style={{color:'var(--gold)'}}>🔥{calcStreak(goal.id)}</span>
+                <HabitStreakChip goal={goal} streak={calcStreak(goal.id)} completions={completions} />
               </span>
               <button
                 style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',flexShrink:0}}
@@ -5428,6 +6002,8 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                     ))}
                   </div>
                 </div>
+                {/* How often (every day / certain days / × a week) + rest day */}
+                <HabitFreqEditor goal={goal} dayKey={selectedDayKey} onChange={patch=>updateGoal(goal.id, patch)} />
                 {/* Link to fitness exercise */}
                 {fitnessExercises && fitnessExercises.length > 0 && (
                   <div style={{display:'flex',flexDirection:'column',gap:3}}>
@@ -5930,7 +6506,7 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                   <span style={{fontSize:10,color:'var(--ink-light)',fontFamily:"'DM Mono',monospace",flexShrink:0,whiteSpace:'nowrap'}}>
                     {countInView(g.id)}
                     <span style={{margin:'0 2px',opacity:0.6}}>·</span>
-                    <span style={{color:'var(--gold)'}}>🔥{calcStreak(g.id)}</span>
+                    <HabitStreakChip goal={g} streak={calcStreak(g.id)} completions={completions} />
                   </span>
                 )}
                 {/* Expand toggle */}
@@ -5969,6 +6545,9 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                         ))}
                       </div>
                     </div>
+                  )}
+                  {onRename && (
+                    <HabitFreqEditor goal={g} dayKey={fmt(date)} onChange={patch=>onRename(g.id, patch)} />
                   )}
                   {onRename && fitnessExercises && fitnessExercises.length > 0 && (
                     <div style={{display:'flex',flexDirection:'column',gap:3}}>
@@ -8157,6 +8736,14 @@ function App() {
   const [fitnessGoals, setFitnessGoals] = useSynced('fitnessGoals', []); // [{id, exerciseId, period, target, unit}]
   const [countdowns, setCountdowns] = useSynced('countdowns', []); // [{id, title, startDate, endDate, color}]
   const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
+  // Keep "never ends" repeating tasks topped up as time passes (v4.6.0). Debounced; only writes when something was added.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const next = repeatExtend(weekData, fmtLocal(new Date()));
+      if (next !== weekData) setWeekData(wd => (wd === weekData ? next : repeatExtend(wd, fmtLocal(new Date()))));
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [weekData]);
   const [selectedGoalId, setSelectedGoalIdRaw] = useState(() => sessionStorage.getItem('lp_selectedGoalId') || null);
   const setSelectedGoalId = (id) => { if(id) sessionStorage.setItem('lp_selectedGoalId', id); else sessionStorage.removeItem('lp_selectedGoalId'); setSelectedGoalIdRaw(id); };
   const openGoal = (id) => { setSelectedGoalId(id || null); setPage('goals'); };
@@ -8458,6 +9045,7 @@ function App() {
 
   return (
     <div className="app">
+      <UndoToast lift={isErr || !!authError} />
       {/* ── SAVE ERROR TOAST — bottom, persistent until save actually succeeds ── */}
       {(isErr || authError) && (
         <div className="save-error-toast" style={{
@@ -8579,7 +9167,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.5.5</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v4.6.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -8916,7 +9504,23 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     setDayExs(dk, exs=>[...exs, newEx]);
     if (fitView!=='day') { setSelectedDate(new Date(dk+'T00:00:00')); setFitView('day'); }
   }
-  function deleteExercise(dk, exId) { setDayExs(dk, exs=>exs.filter(e=>e.id!==exId)); }
+  function deleteExercise(dk, exId) {
+    const cur = getDayExercises(dk);
+    const idx = cur.findIndex(e => e.id === exId);
+    const ex = cur[idx];
+    setDayExs(dk, exs=>exs.filter(e=>e.id!==exId));
+    if (ex) {
+      const nm = (fitnessExercises.find(l => l.id === ex.exerciseId) || {}).name || 'exercise';
+      Undo.push(`Removed ${nm}`, () => {
+        setDayExs(dk, exs => {
+          if (exs.some(e => e.id === exId)) return exs;
+          const next = [...exs];
+          next.splice(Math.min(idx, next.length), 0, ex);
+          return next;
+        });
+      });
+    }
+  }
   function reorderExercises(dk, fromExId, toExId) {
     if (fromExId === toExId) return;
     setDayExs(dk, exs => {
@@ -8958,7 +9562,18 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     }
   });
   function deleteSet(dk, exId, setId) {
+    const exNow = getDayExercises(dk).find(e => e.id === exId);
+    const sIdx = exNow ? exNow.sets.findIndex(s => s.id === setId) : -1;
+    const setObj = sIdx >= 0 ? exNow.sets[sIdx] : null;
     setDayExs(dk, exs=>exs.map(e=>e.id!==exId?e:{...e,sets:e.sets.filter(s=>s.id!==setId)}));
+    if (setObj) Undo.push(`Deleted set ${sIdx + 1}`, () => {
+      setDayExs(dk, exs => exs.map(e => {
+        if (e.id !== exId || e.sets.some(s => s.id === setId)) return e;
+        const sets = [...e.sets];
+        sets.splice(Math.min(sIdx, sets.length), 0, setObj);
+        return { ...e, sets };
+      }));
+    });
   }
 
   // ── Library helpers ──────────────────────────────────────────────────────
@@ -8969,7 +9584,19 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     return id;
   }
   function updateExercise(id, patch) { setFitnessExercises(es=>es.map(e=>e.id===id?{...e,...patch}:e)); }
-  function deleteExercise_lib(id) { setFitnessExercises(es=>es.filter(e=>e.id!==id)); }
+  function deleteExercise_lib(id) {
+    const idx = fitnessExercises.findIndex(e => e.id === id);
+    const ex = fitnessExercises[idx];
+    setFitnessExercises(es=>es.filter(e=>e.id!==id));
+    if (ex) Undo.push(`Deleted "${(ex.name||'exercise').slice(0,40)}" from library`, () => {
+      setFitnessExercises(es => {
+        if (es.some(e => e.id === id)) return es;
+        const next = [...es];
+        next.splice(Math.min(idx, next.length), 0, ex);
+        return next;
+      });
+    });
+  }
 
   // ── Progress calculation ─────────────────────────────────────────────────
   function goalProgressFull(goal, refDate) {
