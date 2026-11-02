@@ -6,7 +6,9 @@
 // own Drive, using the Google access they granted at sign-in (drive.file scope).
 //
 // Kept: the last 7 days, plus the 1st of each month for 12 months. Older ones are deleted.
-// The old planner-data.json is never touched.
+// "Back up now" never touches a nightly file: it writes its own lp-planner-backup-DATE-manual-HHMM.json
+// (the newest 5 are kept), so the overnight snapshot can't be replaced by the state you may want to
+// recover from. The old planner-data.json is never touched.
 //
 // The JSON is assembled by joining the stored text — document bodies are never parsed — which
 // keeps CPU time low enough for the free plan.
@@ -16,6 +18,8 @@ import { getGoogleAccess } from './auth.js';
 
 const FOLDER_NAME = 'LP Planner Backups';
 const FILE_RE = /^lp-planner-backup-(\d{4}-\d{2}-\d{2})\.json$/;
+const MANUAL_RE = /^lp-planner-backup-(\d{4}-\d{2}-\d{2})-manual-(\d{4})\.json$/;
+const KEEP_MANUAL = 5;
 const KEEP_DAYS = 7;
 const KEEP_MONTHS = 12;
 const DRIVE = 'https://www.googleapis.com/drive/v3';
@@ -117,6 +121,12 @@ function keepFile(dateStr, today, now) {
   return dateStr.endsWith('-01') && dateStr >= monthCutoff;
 }
 
+// "HHMM" in Pacific time, 24-hour
+function ptHHMM(d = new Date()) {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Los_Angeles', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+    .format(d).replace(':', '');
+}
+
 async function record(env, userId, fields) {
   await env.DB.prepare(
     `UPDATE users SET last_backup_at = ?, last_backup_status = ?, last_backup_error = ?,
@@ -125,7 +135,8 @@ async function record(env, userId, fields) {
 }
 
 // Back up one person. Never throws; returns { status, file?, bytes?, docs?, deleted?, error? }.
-export async function backupUser(env, user, now = Date.now()) {
+export async function backupUser(env, user, now = Date.now(), opts = {}) {
+  const manual = !!opts.manual;
   try {
     const { results: rows } = await env.DB.prepare(
       'SELECT collection, doc_id, data FROM docs WHERE user_id = ? AND deleted = 0 ORDER BY collection, seq'
@@ -149,7 +160,7 @@ export async function backupUser(env, user, now = Date.now()) {
 
     const today = ptDate(new Date(now));
     const text = assembleBackup(rows, new Date(now));
-    const name = `lp-planner-backup-${today}.json`;
+    const name = manual ? `lp-planner-backup-${today}-manual-${ptHHMM(new Date(now))}.json` : `lp-planner-backup-${today}.json`;
     const folder = await ensureFolder(g.token, user.backup_folder_id);
     const listing = await drive(g.token, `${DRIVE}/files?` + qs({
       q: `'${folder}' in parents and trashed=false`, fields: 'files(id,name)', pageSize: '1000',
@@ -179,6 +190,16 @@ export async function backupUser(env, user, now = Date.now()) {
       catch (e) { console.warn('Backup cleanup failed', f.name, e.message); }
     }
 
+    // Manual backups: keep only the newest few (names sort by date, then time)
+    const manualFiles = files.filter((f) => MANUAL_RE.test(f.name) && f.name !== name).map((f) => f.name);
+    manualFiles.push(name);
+    const dropNames = new Set(manualFiles.sort().reverse().slice(KEEP_MANUAL));
+    for (const f of files) {
+      if (!dropNames.has(f.name)) continue;
+      try { await drive(g.token, `${DRIVE}/files/${encodeURIComponent(f.id)}`, { method: 'DELETE' }); deleted++; }
+      catch (e) { console.warn('Manual backup cleanup failed', f.name, e.message); }
+    }
+
     await record(env, user.id, { status: 'ok', file: name, folder });
     return { status: 'ok', file: name, bytes: text.length, docs: rows.length, deleted };
   } catch (e) {
@@ -206,6 +227,6 @@ export async function runNightlyBackups(env, allowed) {
 export async function backupNow(env, user) {
   const row = await env.DB.prepare('SELECT backup_folder_id, last_backup_at FROM users WHERE id = ?').bind(user.id).first();
   if (row && row.last_backup_at && Date.now() - row.last_backup_at < 20000) return json({ error: 'too_soon' }, 429);
-  const r = await backupUser(env, { ...user, backup_folder_id: row && row.backup_folder_id });
+  const r = await backupUser(env, { ...user, backup_folder_id: row && row.backup_folder_id }, Date.now(), { manual: true });
   return json(r, r.status === 'ok' || r.status === 'skipped_empty' ? 200 : 502);
 }

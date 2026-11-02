@@ -224,7 +224,7 @@ function userRow(env, email) { return env.DB.raw.prepare('SELECT id, email, back
 function driveOf(email) { return google.drives.get(email) || new Map(); }
 const backups = (email) => [...driveOf(email).values()].filter((f) => /^lp-planner-backup-/.test(f.name));
 
-test('backup: skipped when empty, written when there is data, same-day reruns update in place', async () => {
+test('backup: skipped when empty, written when there is data; "Back up now" never overwrites the nightly file', async () => {
   google.drives.clear();
   const env = makeEnv();
   const a = (await signIn(env, 'zach@example.com')).session_token;
@@ -242,7 +242,7 @@ test('backup: skipped when empty, written when there is data, same-day reruns up
   assert.equal(r.data.status, 'ok');
   const files = backups('zach@example.com');
   assert.equal(files.length, 1);
-  assert.equal(files[0].name, `lp-planner-backup-${ptDate()}.json`);
+  assert.match(files[0].name, new RegExp(`^lp-planner-backup-${ptDate()}-manual-\\d{4}\\.json$`));
   const folder = [...driveOf('zach@example.com').values()].find((f) => f.folder);
   assert.equal(folder.name, 'LP Planner Backups');
   assert.deepEqual(files[0].parents, [folder.id]);
@@ -250,18 +250,42 @@ test('backup: skipped when empty, written when there is data, same-day reruns up
   assert.equal(body.navColor, '#5c2d52');
   assert.deepEqual(body.weekData, { '2026-10-25': { proverb: 'p', tasks: {} } });
 
-  // Too soon → 429; later same day → updates the same file
+  // Too soon → 429
   assert.equal((await call(env, 'POST', '/api/backup', { token: a })).status, 429);
+
+  // The nightly run writes its own file...
+  const nightly = await backupUser(env, userRow(env, 'zach@example.com'));
+  assert.equal(nightly.file, `lp-planner-backup-${ptDate()}.json`);
+  assert.equal(backups('zach@example.com').length, 2);
+  const nightlyContent = () => backups('zach@example.com').find((f) => f.name === nightly.file).content;
+  const before = nightlyContent();
+  assert.equal(JSON.parse(before).navColor, '#5c2d52');
+  // ...and a later change plus "Back up now" leaves it exactly as it was
   await call(env, 'PUT', '/api/docs', { token: a, body: { docs: [{ c: 'navColor', i: '_', b: 1, j: '"#000000"' }] } });
   env.DB.raw.prepare('UPDATE users SET last_backup_at = 0').run();
   await call(env, 'POST', '/api/backup', { token: a });
-  assert.equal(backups('zach@example.com').length, 1);
-  assert.equal(JSON.parse(backups('zach@example.com')[0].content).navColor, '#000000');
+  assert.equal(nightlyContent(), before, 'nightly snapshot untouched by a manual backup');
+  const man = backups('zach@example.com').filter((f) => /-manual-/.test(f.name));
+  assert.ok(man.some((f) => JSON.parse(f.content).navColor === '#000000'), 'manual backup has the newer data');
 
   // Status shows on /api/me
   const me = await call(env, 'GET', '/api/me', { token: a });
   assert.equal(me.data.backup.status, 'ok');
   assert.equal(me.data.drive_ok, true);
+});
+
+test('backup: only the newest 5 manual backups are kept; nightly files are never counted', async () => {
+  google.drives.clear();
+  const env = makeEnv();
+  const a = (await signIn(env, 'zach@example.com')).session_token;
+  await call(env, 'PUT', '/api/docs', { token: a, body: { docs: [{ c: 'navColor', i: '_', b: 0, j: '"#5c2d52"' }] } });
+  const u = userRow(env, 'zach@example.com');
+  const t0 = Date.now();
+  await backupUser(env, u, t0);                                   // nightly
+  for (let k = 0; k < 8; k++) await backupUser(env, userRow(env, 'zach@example.com'), t0 + k * 120000, { manual: true });
+  const names = backups('zach@example.com').map((f) => f.name);
+  assert.equal(names.filter((n) => /-manual-/.test(n)).length, 5);
+  assert.equal(names.filter((n) => !/-manual-/.test(n)).length, 1);
 });
 
 test('backup: retention keeps 7 days + the 1st of each month for a year; other files untouched', async () => {

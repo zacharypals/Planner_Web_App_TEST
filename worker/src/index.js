@@ -8,7 +8,7 @@ import { authExchange, authLogout, authenticate, googleToken, googleScope } from
 import { backupNow, runNightlyBackups } from './backup.js';
 import { listDocs, listChanges, putDocs } from './docs.js';
 
-const WORKER_VERSION = '0.2.2';
+const WORKER_VERSION = '0.2.3';
 
 export default {
   async fetch(req, env) {

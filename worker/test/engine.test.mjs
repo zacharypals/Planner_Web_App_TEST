@@ -1,5 +1,5 @@
 // Client sync engine tests: pure helpers + two simulated devices against the real Worker.
-// The engine source is read straight out of index.html (between the SYNC ENGINE markers).
+// The engine source is read straight out of index.src.html (between the SYNC ENGINE markers).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -9,9 +9,9 @@ import { makeD1, installFakeGoogle } from './d1shim.mjs';
 import worker from '../src/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const html = readFileSync(join(here, '..', '..', 'index.html'), 'utf8');
+const html = readFileSync(join(here, '..', '..', 'index.src.html'), 'utf8');
 const src = html.slice(html.indexOf('// ═══ SYNC ENGINE START'), html.indexOf('// ═══ SYNC ENGINE END'));
-assert.ok(src.length > 1000, 'engine block found in index.html');
+assert.ok(src.length > 1000, 'engine block found in index.src.html');
 globalThis.__fakeGoogle = installFakeGoogle();
 
 // Build one "device": its own localStorage, Sync instance and React-like state.

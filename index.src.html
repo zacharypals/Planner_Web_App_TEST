@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.3.0 -->
+<!-- LP Planner v5.3.1 -->
+<!-- v5.3.1 — Backups: "Back up now" no longer overwrites the nightly backup. Manual backups are saved as their own files (newest 5 kept) and the restore list labels them "Nightly" or "Manual". Needs Worker 0.2.3. -->
 <!-- v5.3.0 — Faster start: the app is now compiled ahead of time (index.src.html is the editable source, build.js produces index.html), so the browser no longer downloads and runs Babel on every launch; React production builds. No change to features or data. -->
 <!-- v5.2.0 — Cleanup: repeat rules with long gaps (every 20 years…) no longer truncate; "after N times" series now fill in gradually like never-ending ones; repeat-rule changes can be undone; habit "Schedule" row is now one "Show daily" toggle; closing the weekly review past step 1 counts as reviewed; Project Tasks retired from Pages (existing ones remain). -->
 <!-- v5.1.0 — Pages editor: text colour, highlight, font, font size, alignment and inline code (palettes work on light and dark). Stored as inline styles in the same HTML format. -->
@@ -8443,9 +8444,9 @@ async function driveListImportable() {
   const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token } });
   if (!res.ok) throw new Error(res.status === 403 ? 'Google Drive access not granted — tap "Reconnect Google" and allow Drive' : 'Could not list Drive files (' + res.status + ')');
   const d = await res.json();
-  const files = (d.files || []).filter(f => f.name === 'planner-data.json' || /^lp-planner-backup-\d{4}-\d{2}-\d{2}\.json$/.test(f.name));
+  const files = (d.files || []).filter(f => f.name === 'planner-data.json' || /^lp-planner-backup-\d{4}-\d{2}-\d{2}(-manual-\d{4})?\.json$/.test(f.name));
   // The live app's file first, then backups newest first
-  return files.sort((a, b) => (a.name === 'planner-data.json' ? -1 : b.name === 'planner-data.json' ? 1 : (b.name > a.name ? 1 : -1)));
+  return files.sort((a, b) => (a.name === 'planner-data.json' ? -1 : b.name === 'planner-data.json' ? 1 : (b.modifiedTime > a.modifiedTime ? 1 : -1)));
 }
 
 async function driveDownloadJson(id) {
@@ -8490,7 +8491,12 @@ function summarizePlannerData(d) {
 function fileLabel(f) {
   if (f.name === 'planner-data.json') return 'Live app data (planner-data.json)';
   const m = f.name.match(/(\d{4})-(\d{2})-(\d{2})/);
-  return m ? `Backup · ${MONTHS[parseInt(m[2], 10) - 1].slice(0, 3)} ${parseInt(m[3], 10)}, ${m[1]}` : f.name;
+  if (!m) return f.name;
+  const day = `${MONTHS[parseInt(m[2], 10) - 1].slice(0, 3)} ${parseInt(m[3], 10)}, ${m[1]}`;
+  const t = f.name.match(/-manual-(\d{2})(\d{2})\.json$/);
+  if (!t) return `Nightly backup · ${day}`;
+  const h = parseInt(t[1], 10);
+  return `Manual backup · ${day}, ${h % 12 || 12}:${t[2]} ${h < 12 ? 'AM' : 'PM'}`;
 }
 function fmtWhen(ms) {
   if (!ms) return '';
@@ -8572,7 +8578,7 @@ function DataPanel({ me, refreshMe, suggestImport, onClose }) {
         <div style={box}>
           <div style={{ color: backupColor, fontWeight: 600 }}>{backupText}</div>
           <div style={{ ...small, marginTop: 6 }}>
-            Runs every night around 3 AM into the <b>LP Planner Backups</b> folder in your Google Drive.
+            Runs every night around 3 AM into the <b>LP Planner Backups</b> folder in your Google Drive. “Back up now” saves its own separate copy (the newest 5 are kept) and never replaces the nightly one.
             Keeps the last 7 days plus the 1st of each month for a year.
           </div>
           <button className="modal-btn primary" style={{ marginTop: 10 }} disabled={!!busy || !driveOk} onClick={backupNow}>
@@ -10174,7 +10180,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.3.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.3.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
