@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.7.1 -->
+<!-- LP Planner v5.8.0 -->
+<!-- v5.8.0 — Goals timeline: new Day zoom (10 days from two days before today; ‹ › step a week; weekends lightly shaded). Bars still drag/resize by whole days. -->
 <!-- v5.7.1 — Goals: the "Schedule" week picker on a milestone task is no longer cut off at the bottom of the milestone card; it floats above everything and opens upward when there isn't room below. -->
 <!-- v5.7.0 — Goals: milestones can be reordered by dragging the ⋮⋮ grip (works with touch/Pencil); a second "+ Add milestone" button sits under the last milestone; "Complete automatically from my weight" now appears only on goals that link Weight (Links → Measurements) or on a milestone already using it. -->
 <!-- v5.6.1 — Repeat section: the "✕ clear" button (which only blanked one task's repeat info and left the series running) is replaced by "⏹ Stop repeating": this task stays as a one-off, the series ends the day before and later copies are removed (confirm + Undo). -->
@@ -9534,6 +9535,11 @@ function GlNextUp({ goals, weekKeys, onOpenGoal }) {
 // ── Timeline range per zoom level ──
 function glRange(zoom, offset) {
   const now = new Date(); now.setHours(0, 0, 0, 0);
+  if (zoom === 'day') {                                      // v5.8.0: 10 days, starting 2 days before today; ‹ › move a week
+    const start = addDays(now, -2 + offset * 7);
+    const cols = Array.from({ length: 10 }, (_, i) => { const d = addDays(start, i); return { start: d, label: DAYS[d.getDay()].slice(0, 3) + '\n' + MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate() }; });
+    return { start, end: addDays(start, 10), cols, day: true };
+  }
   if (zoom === 'week') {
     const start = addDays(getWeekStart(now), -7 + offset * 28);
     const cols = Array.from({ length: 10 }, (_, i) => { const d = addDays(start, i * 7); return { start: d, label: MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate() }; });
@@ -9653,7 +9659,9 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   });
   const todayPct = pct(today);
   const endCol = range.cols[range.cols.length - 1];
-  const rangeLabel = `${MONTHS[range.start.getMonth()].slice(0, 3)} ${range.start.getFullYear()} – ${MONTHS[endCol.start.getMonth()].slice(0, 3)} ${endCol.start.getFullYear()}`;
+  const rangeLabel = range.day
+    ? `${MONTHS[range.start.getMonth()].slice(0, 3)} ${range.start.getDate()} – ${MONTHS[endCol.start.getMonth()].slice(0, 3)} ${endCol.start.getDate()}, ${endCol.start.getFullYear()}`
+    : `${MONTHS[range.start.getMonth()].slice(0, 3)} ${range.start.getFullYear()} – ${MONTHS[endCol.start.getMonth()].slice(0, 3)} ${endCol.start.getFullYear()}`;
   function setZ(z) { sessionStorage.setItem('lp_glZoom', z); setZoom(z); setOffset(0); }
 
   return (
@@ -9675,7 +9683,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
           <button className="gl-btn" onClick={() => setOffset(0)}>Today</button>
           <button className="gl-btn" aria-label="Later" onClick={() => setOffset(o => o + 1)}>›</button>
           <div className="gl-seg" role="group" aria-label="Zoom">
-            {['week', 'month', 'quarter', 'year'].map(z => (
+            {['day', 'week', 'month', 'quarter', 'year'].map(z => (
               <button key={z} className={zoom === z ? 'on' : ''} aria-pressed={zoom === z} onClick={() => setZ(z)}>{z[0].toUpperCase() + z.slice(1)}</button>
             ))}
           </div>
@@ -9710,12 +9718,15 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
             ))}
           </div>
           <div className="gl-tl-area" ref={areaRef}>
+            {range.day && range.cols.filter(c => c.start.getDay() === 0 || c.start.getDay() === 6).map((c, i) => (
+              <div key={'we' + i} aria-hidden="true" data-testid="tl-weekend" style={{ position: 'absolute', top: 0, bottom: 0, left: ((c.start - range.start) / total * 100) + '%', width: (86400000 / total * 100) + '%', background: 'rgba(0,0,0,0.035)' }} />
+            ))}
             {range.cols.slice(1).map((c, i) => (
               <div key={i} aria-hidden="true" style={{ position: 'absolute', top: 0, bottom: 0, left: ((c.start - range.start) / total * 100) + '%', width: 1, background: 'var(--grid-line)' }} />
             ))}
             <div className="gl-tl-head" style={{ position: 'relative' }}>
               {range.cols.map((c, i) => (
-                <span key={i} className="gl-mono" style={{ position: 'absolute', bottom: 6, left: `calc(${(c.start - range.start) / total * 100}% + 8px)`, fontSize: 11, color: 'var(--ink-light)', whiteSpace: 'nowrap' }}>{c.label}</span>
+                <span key={i} className="gl-mono" style={{ position: 'absolute', bottom: 6, left: `calc(${(c.start - range.start) / total * 100}% + 8px)`, fontSize: 11, color: 'var(--ink-light)', whiteSpace: range.day ? 'pre' : 'nowrap', lineHeight: range.day ? 1.2 : undefined }}>{range.day && fmtLocal(c.start) === today ? c.label.split('\n')[1] : c.label}</span>
               ))}
             </div>
             {rows.map(r => {
@@ -10817,7 +10828,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.7.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.8.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
