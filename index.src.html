@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.7.0 -->
+<!-- LP Planner v5.7.1 -->
+<!-- v5.7.1 — Goals: the "Schedule" week picker on a milestone task is no longer cut off at the bottom of the milestone card; it floats above everything and opens upward when there isn't room below. -->
 <!-- v5.7.0 — Goals: milestones can be reordered by dragging the ⋮⋮ grip (works with touch/Pencil); a second "+ Add milestone" button sits under the last milestone; "Complete automatically from my weight" now appears only on goals that link Weight (Links → Measurements) or on a milestone already using it. -->
 <!-- v5.6.1 — Repeat section: the "✕ clear" button (which only blanked one task's repeat info and left the series running) is replaced by "⏹ Stop repeating": this task stays as a one-off, the series ends the day before and later copies are removed (confirm + Undo). -->
 <!-- v5.6.0 — Repeating tasks, stage 2 (writer): new repeating tasks are now stored ONCE as a rule (series) instead of a copy on every day; changing the rule, deleting this/following/all, and the edit-scope bar (this / following / all) all work on the series. Older repeating tasks stay as they are until you press Convert in the repeat groups list (each group is verified day by day first; Undo for 10 seconds). -->
@@ -9389,11 +9390,33 @@ function GlSchedulePicker({ value, onPick, onClose, extra, anchor }) {
   const [weekStart, setWeekStart] = useState(() => getWeekStart(parseLocal(value) || today));
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const end = days[6];
+  // v5.7.1: when opened from a task row (no anchor given) float the picker at fixed coordinates so the milestone card's
+  // overflow can't clip it; it opens below the row, or above it when there isn't room, and follows scrolling.
+  const popRef = useRef(null);
+  const [pos, setPos] = useState(null);
+  React.useLayoutEffect(() => {
+    if (anchor) return;
+    const place = () => {
+      const el = popRef.current; const row = el && el.parentElement; if (!el || !row) return;
+      if (window.innerWidth <= 767) { setPos(null); return; }           // phones use the bottom-sheet style
+      const r = row.getBoundingClientRect(), h = el.offsetHeight, w = el.offsetWidth || 290;
+      const vw = window.innerWidth, vh = window.innerHeight;
+      let top = r.bottom - 2;
+      if (top + h > vh - 8) top = r.top - h + 2;
+      top = Math.max(8, Math.min(top, vh - h - 8));
+      const left = Math.max(8, Math.min(r.right - 8 - w, vw - w - 8));
+      setPos(p => (p && p.top === top && p.left === left) ? p : { top, left });
+    };
+    place();
+    window.addEventListener('scroll', place, true); window.addEventListener('resize', place);
+    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place); };
+  }, [anchor, weekStart]);
   const label = `${MONTHS[weekStart.getMonth()].slice(0, 3)} ${weekStart.getDate()} – ${weekStart.getMonth() === end.getMonth() ? '' : MONTHS[end.getMonth()].slice(0, 3) + ' '}${end.getDate()}`;
   return (
     <>
       <div style={{ position: 'fixed', inset: 0, zIndex: 299 }} onClick={e => { e.stopPropagation(); onClose(); }} />
-      <div className="gl-pop" style={anchor ? { position: 'fixed', top: anchor.top, left: anchor.left, right: 'auto' } : undefined} onClick={e => e.stopPropagation()}>
+      <div className="gl-pop" ref={popRef} style={anchor ? { position: 'fixed', top: anchor.top, left: anchor.left, right: 'auto' }
+        : pos ? { position: 'fixed', top: pos.top, left: pos.left, right: 'auto' } : undefined} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <button className="gl-btn ghost" aria-label="Previous week" onClick={() => setWeekStart(w => addDays(w, -7))}>‹</button>
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-light)' }}>Week of {label}</span>
@@ -10794,7 +10817,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.7.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.7.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
