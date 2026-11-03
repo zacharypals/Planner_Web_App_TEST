@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.3.1 -->
+<!-- LP Planner v5.4.0 -->
+<!-- v5.4.0 — Repeating tasks: after you edit one copy (title, details, time, colour, priority) a bar offers "This and following" or "All" to copy the change to the rest of the series; ignoring it keeps the edit on that one task. Undo supported. -->
 <!-- v5.3.1 — Backups: "Back up now" no longer overwrites the nightly backup. Manual backups are saved as their own files (newest 5 kept) and the restore list labels them "Nightly" or "Manual". Needs Worker 0.2.3. -->
 <!-- v5.3.0 — Faster start: the app is now compiled ahead of time (index.src.html is the editable source, build.js produces index.html), so the browser no longer downloads and runs Babel on every launch; React production builds. No change to features or data. -->
 <!-- v5.2.0 — Cleanup: repeat rules with long gaps (every 20 years…) no longer truncate; "after N times" series now fill in gradually like never-ending ones; repeat-rule changes can be undone; habit "Schedule" row is now one "Show daily" toggle; closing the weekly review past step 1 counts as reviewed; Project Tasks retired from Pages (existing ones remain). -->
@@ -1367,10 +1368,13 @@
   }
   .undo-toast-btn:hover { background: rgba(255,255,255,0.12); }
   .undo-toast-more { font-size: 11px; opacity: 0.7; flex-shrink: 0; }
+  .series-toast { bottom: 84px; flex-wrap: wrap; row-gap: 0; max-width: min(94vw, 540px); }
+  .series-toast .undo-toast-label { flex: 1 1 100%; padding-top: 6px; white-space: normal; }
 
   /* ── MOBILE (< 768px) ── */
   @media (max-width: 767px) {
     .undo-toast { bottom: 68px; }
+    .series-toast { bottom: 128px; }
     .undo-toast.lift { bottom: 140px; }
     .rp-seg button, .rp-num, .rp-date, .rp-radio { min-height: 40px; }
     .rp-days .task-repeat-day-btn { width: 38px; height: 38px; font-size: 12px; }
@@ -2380,6 +2384,8 @@ function habitFreqSummary(goal) {
 // "weekly, every week, until endDate". Copies are still written into weekData (so checking off,
 // colours, dragging etc. all work as before); "never ends" series are topped up as time passes.
 const REPEAT_HORIZON_DAYS = { daily: 60, weekly: 182, monthly: 400, yearly: 800 };
+// Fields of a repeating task that can be copied to the rest of its series (not done, expanded, gcalId, isEvent or response status)
+const SERIES_EDIT_FIELDS = ['title', 'details', 'eventTime', 'colorIndex', 'customColor', 'priority', 'star', 'invitees'];
 const REPEAT_DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function normalizeRepeat(r) {
   if (!r) return null;
@@ -4210,6 +4216,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const [showPeoplePicker, setShowPeoplePicker] = useState(false);
   const [showRepeatCleanup, setShowRepeatCleanup] = useState(false);
   const [repeatScope, setRepeatScope] = useState(null); // {kind:'delete'|'apply', task, dayKey, rule?}
+  const [seriesPrompt, setSeriesPrompt] = useState(null);  // v5.4.0: offer to copy an edit to the rest of a repeating series
+  const seriesEditRef = useRef(null);                      // edit waiting for blur: {repeatId, dayKey, id, patch}
+  const seriesTimerRef = useRef(null);
   const [reviewWeek, setReviewWeek] = useState(null);   // week-start Date the review is looking at
   const pendingTaskFocus = useRef(null); // {id, dayKey} — task to focus after render
   const taskTitleRefs = useRef({}); // id -> input ref (desktop)
@@ -4406,6 +4415,71 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       syncTaskToCalendar(dayKey, id, patch);
     }
     // title and details are synced on blur via onBlurSync — not here
+
+    // Repeating task: remember what changed so we can offer to copy it to the rest of the series (v5.4.0)
+    if (task && task.repeatId) {
+      const cp = {};
+      Object.keys(patch).forEach(k => { if (SERIES_EDIT_FIELDS.includes(k)) cp[k] = patch[k]; });
+      if (Object.keys(cp).length) {
+        const cur = seriesEditRef.current;
+        const same = cur && cur.repeatId === task.repeatId && cur.id === id;
+        seriesEditRef.current = { repeatId: task.repeatId, dayKey, id, patch: { ...(same ? cur.patch : {}), ...cp } };
+        // Text waits for blur; clicking a colour, priority or time asks right away
+        if (Object.keys(cp).some(k => k !== 'title' && k !== 'details')) {
+          clearTimeout(seriesTimerRef.current);
+          seriesTimerRef.current = setTimeout(flushSeriesPrompt, 350);
+        }
+      }
+    }
+  }
+  // Show the "apply to the rest?" bar for the edit waiting in seriesEditRef
+  function flushSeriesPrompt() {
+    clearTimeout(seriesTimerRef.current);
+    const e = seriesEditRef.current;
+    if (!e) return;
+    seriesEditRef.current = null;
+    if (typeof e.patch.title === 'string' && !e.patch.title.trim()) return;      // emptied title: the card is about to be removed
+    const count = (fromDk) => collectInstances(t => t.repeatId === e.repeatId && t.id !== e.id && !t.done, fromDk)
+      .filter(x => !fromDk || x.dk > e.dayKey).length;
+    const following = count(e.dayKey), all = count(null);
+    if (!all) return;
+    const t = getTasksAnyWeek(e.dayKey).find(x => x.id === e.id);
+    setSeriesPrompt({ ...e, following, all, label: ((t && t.title) || '').trim() || 'this task' });
+  }
+  // Copy the edit onto the other unfinished copies. 'following' = later ones only; 'all' = every unfinished copy.
+  function applySeriesEdit(sp, scope) {
+    const before = weekDataRef.current;
+    const out = { ...before };
+    const touched = [], cal = [];
+    Object.entries(before).forEach(([wk, w]) => {
+      const tasks = (w && w.tasks) || {};
+      let nt = null;
+      Object.entries(tasks).forEach(([dk, ts]) => {
+        if (scope === 'following' && dk <= sp.dayKey) return;
+        let changed = false;
+        const nts = (ts || []).map(t => {
+          if (t.repeatId !== sp.repeatId || t.id === sp.id || t.done) return t;
+          changed = true;
+          const u = { ...t, ...sp.patch };
+          if (u.isEvent && u.gcalId) cal.push({ task: u, dk });
+          return u;
+        });
+        if (changed) { if (!nt) nt = { ...tasks }; nt[dk] = nts; }
+      });
+      if (nt) { out[wk] = { ...w, tasks: nt }; touched.push(wk); }
+    });
+    if (!touched.length) { setSeriesPrompt(null); return; }
+    setWeekData(wd => { const o = { ...wd }; touched.forEach(k => { o[k] = out[k]; }); return o; });
+    Undo.push(scope === 'all' ? 'Updated the whole series' : 'Updated this and following', () => setWeekData(wd => {
+      const o = { ...wd };
+      touched.forEach(k => { o[k] = before[k]; });
+      return o;
+    }));
+    // Copies that are already Google Calendar events get the change too (one after another, best effort)
+    if (cal.length && getToken()) (async () => {
+      for (const c of cal) { try { await updateEventInCalendar(c.task.gcalId, c.task, c.dk); } catch (err) { console.error('Calendar update failed:', err); } }
+    })();
+    setSeriesPrompt(null);
   }
 
   function syncTaskToCalendar(dayKey, id, patch = {}) {
@@ -4903,6 +4977,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                       <TaskCard key={task.id} task={task}
                         onUpdate={p=>updateTask(dk,task.id,p)}
                         onBlurSync={()=>syncTaskToCalendar(dk,task.id)}
+                        onBlurEdit={flushSeriesPrompt}
                         onDelete={()=>deleteTask(dk,task.id)}
                         onDeleteFuture={taskIsRepeating(task) ? ()=>deleteTaskAndFuture(dk,task.id) : null}
                         onAskScope={taskIsRepeating(task) ? ()=>setRepeatScope({kind:'delete',task,dayKey:dk}) : null}
@@ -5021,6 +5096,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                   <TaskCard task={task}
                     onUpdate={p=>updateTask(mobileDayKey,task.id,p)}
                     onBlurSync={()=>syncTaskToCalendar(mobileDayKey,task.id)}
+                    onBlurEdit={flushSeriesPrompt}
                     onDelete={()=>deleteTask(mobileDayKey,task.id)}
                     onDeleteFuture={taskIsRepeating(task) ? ()=>deleteTaskAndFuture(mobileDayKey,task.id) : null}
                     onAskScope={taskIsRepeating(task) ? ()=>setRepeatScope({kind:'delete',task,dayKey:mobileDayKey}) : null}
@@ -5143,6 +5219,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           onGoToWeek={() => { setWeekStart(reviewWeek); setReviewOpen(false); }}
           onOpenGoal={onOpenGoal} onClose={() => setReviewOpen(false)} />
       )}
+      {seriesPrompt && (
+        <SeriesEditToast sp={seriesPrompt} onPick={(scope)=>applySeriesEdit(seriesPrompt, scope)} onClose={()=>setSeriesPrompt(null)} />
+      )}
       {repeatScope && (
         <RepeatScopeModal scope={repeatScope}
           onClose={()=>setRepeatScope(null)}
@@ -5165,6 +5244,20 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
 // Lists all repeat task groups across all weeks; lets user delete entire groups at once.
 // ─────────────────────────────────────────────
 const DAY_LABELS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+// v5.4.0 — after editing one copy of a repeating task: "apply to the rest?" The edit is already on this
+// task; dismissing the bar (or ignoring it) leaves the other copies untouched.
+function SeriesEditToast({ sp, onPick, onClose }) {
+  useEffect(() => { const t = setTimeout(onClose, 15000); return () => clearTimeout(t); }, [sp]);
+  const name = sp.label.length > 28 ? sp.label.slice(0, 27) + '…' : sp.label;
+  return (
+    <div className="undo-toast series-toast" role="status" aria-live="polite">
+      <span className="undo-toast-label">Changed “{name}” on this day only</span>
+      {sp.following > 0 && <button type="button" className="undo-toast-btn" onClick={() => onPick('following')}>This and following ({sp.following})</button>}
+      <button type="button" className="undo-toast-btn" onClick={() => onPick('all')}>All ({sp.all + 1})</button>
+      <button type="button" className="undo-toast-btn" aria-label="Keep only this one" style={{padding:'0 10px'}} onClick={onClose}>✕</button>
+    </div>
+  );
+}
 // "Change which tasks?" — asked before deleting a repeating task, or before changing its repeat rule
 function RepeatScopeModal({ scope, onPick, onClose }) {
   const isDelete = scope.kind === 'delete';
@@ -5751,7 +5844,7 @@ function pickTaskColorIndex(existingTasks) {
   }
   return Math.floor(Math.random() * TASK_COLORS.length);
 }
-function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onAskScope, dayKey, onReschedule, weekDays, currentDayKey }) {
+function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onAskScope, dayKey, onReschedule, weekDays, currentDayKey }) {
   const textareaRef = useRef();
   const titleTextareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
@@ -5884,6 +5977,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
             onChange={e=>{let v=e.target.value.replace(/\n/g,''); if(task.title===''&&v.length===1) v=v.toUpperCase(); onUpdate({title:v});}}
             onBlur={()=>{
               if(onBlurSync && task.isEvent) onBlurSync();
+              if(onBlurEdit) onBlurEdit();
               if(deleteIfEmpty) deleteIfEmpty();
             }}
             onKeyDown={e=>{
@@ -5956,7 +6050,7 @@ function TaskCard({ task, onUpdate, onBlurSync, onDelete, onDeleteFuture, onEnte
         <div className="task-details">
           <textarea ref={textareaRef} className="task-details-input" placeholder="Details…"
             value={task.details||''} onChange={e=>onUpdate({details:e.target.value})}
-            onBlur={()=>onBlurSync && task.isEvent && onBlurSync()}
+            onBlur={()=>{ if(onBlurSync && task.isEvent) onBlurSync(); if(onBlurEdit) onBlurEdit(); }}
             rows={2} />
           {task.isEvent && (
             <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:4}} onClick={e=>e.stopPropagation()}>
@@ -10180,7 +10274,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.3.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.4.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
