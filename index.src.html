@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.6.0 -->
+<!-- LP Planner v5.6.1 -->
+<!-- v5.6.1 — Repeat section: the "✕ clear" button (which only blanked one task's repeat info and left the series running) is replaced by "⏹ Stop repeating": this task stays as a one-off, the series ends the day before and later copies are removed (confirm + Undo). -->
 <!-- v5.6.0 — Repeating tasks, stage 2 (writer): new repeating tasks are now stored ONCE as a rule (series) instead of a copy on every day; changing the rule, deleting this/following/all, and the edit-scope bar (this / following / all) all work on the series. Older repeating tasks stay as they are until you press Convert in the repeat groups list (each group is verified day by day first; Undo for 10 seconds). -->
 <!-- v5.5.0 — Repeating tasks, stage 1 (reader): the app can now show repeating tasks stored once as a rule (new synced repeatSeries collection) with copies generated on screen; changing a copy stores just that copy. Nothing creates these yet, so existing repeating tasks are untouched. -->
 <!-- v5.4.0 — Repeating tasks: after you edit one copy (title, details, time, colour, priority) a bar offers "This and following" or "All" to copy the change to the rest of the series; ignoring it keeps the edit on that one task. Undo supported. -->
@@ -2798,6 +2799,17 @@ function repeatSeriesDelete(stored, series, sid, fromDk) {
   else { outSeries[sid] = { ...s, until: seriesPrev(fromDk) }; seriesDropStored(out, sid, fromDk); }
   return { stored: out, series: outSeries };
 }
+// "Stop repeating" on one copy: it stays as a plain one-off task; the series ends the day before and later copies go.
+function repeatSeriesStop(stored, series, sid, dk, task) {
+  const s = series[sid];
+  if (!s) return { stored, series };
+  const out = { ...stored }, outSeries = { ...series };
+  const { repeat, repeatId, ...plain } = task;
+  if (dk <= s.anchor) { delete outSeries[sid]; seriesDropStored(out, sid, null); }
+  else { outSeries[sid] = { ...s, until: seriesPrev(dk) }; seriesDropStored(out, sid, dk); }
+  wdEditDay(out, dk, ts => ts.some(t => t.id === plain.id) ? ts : [...ts, plain]);
+  return { stored: out, series: outSeries };
+}
 // "All": change the template and every stored, unfinished copy. Generated copies follow the template.
 function repeatSeriesEditAll(stored, series, sid, patch, editedId) {
   const s = series[sid];
@@ -4680,6 +4692,33 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       .sort((a,b) => a.title.localeCompare(b.title));
   }
 
+  // "Stop repeating": keep this task as a one-off, end the series from the next day on
+  function stopRepeating(task, dayKey) {
+    const rid = task.repeatId;
+    if (seriesRun && rid && (repeatSeries || {})[rid]) {
+      seriesRun('Stopped repeating', (st, se) => repeatSeriesStop(st, se, rid, dayKey, task));
+      return;
+    }
+    if (!rid) { setTasks(dayKey, ts => ts.map(t => t.id === task.id ? { ...t, repeat: null } : t)); return; }
+    const removed = collectInstances(t => t.repeatId === rid, dayKey).filter(x => x.dk > dayKey);
+    if (removed.length) Undo.push('Stopped repeating', () => removed.forEach(r => insertTaskBack(r.wk, r.dk, r.task, r.idx)));
+    const prevDay = fmtLocal(addDays(parseLocal(dayKey), -1));
+    setWeekData(wd => {
+      const draft = JSON.parse(JSON.stringify(wd));
+      Object.keys(draft).forEach(wk => {
+        const tasks = draft[wk] && draft[wk].tasks; if (!tasks) return;
+        Object.keys(tasks).forEach(dk => {
+          if (dk > dayKey) { tasks[dk] = tasks[dk].filter(t => t.repeatId !== rid); return; }
+          tasks[dk] = tasks[dk].map(t => {
+            if (t.repeatId !== rid) return t;
+            if (dk === dayKey && t.id === task.id) { const { repeat, repeatId, ...plain } = t; return plain; }
+            return (dk < dayKey && t.repeat && t.repeat.endType === 'never') ? { ...t, repeat: { ...t.repeat, endType: 'date', endDate: prevDay } } : t;
+          });
+        });
+      });
+      return draft;
+    });
+  }
   // v5.6.0: old repeating tasks (a stored copy on every day) -> compact series
   function previewLegacyConvert() { return repeatConvertLegacy(weekData, repeatSeries || {}, fmtLocal(new Date())); }
   function runLegacyConvert() {
@@ -5355,6 +5394,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                         }}
                         onShowCtxMenu={(x,y,cp,pp,hp)=>setCtxMenu({x,y,onCopy:cp,onPaste:pp,hasCopied:hp})}
                         onApplyRepeat={(rule)=>requestApplyRepeat(task,dk,rule)}
+                        onStopRepeat={()=>stopRepeating(task,dk)}
                         isDragOver={dragOver?.dayKey===dk && dragOver?.id===task.id}
                         onDragStart={()=>setDragging({dayKey:dk, id:task.id})}
                         onDragOver={()=>setDragOver({dayKey:dk, id:task.id})}
@@ -5460,6 +5500,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                     titleRef={el=>taskTitleRefsMobile.current[task.id]=el}
                     deleteIfEmpty={()=>{if(!task.title.trim())deleteTask(mobileDayKey,task.id);}}
                     onApplyRepeat={(rule)=>requestApplyRepeat(task,mobileDayKey,rule)}
+                    onStopRepeat={()=>stopRepeating(task,mobileDayKey)}
                     onReschedule={(toDayKey)=>{
                 moveTaskBetweenDays(mobileDayKey,toDayKey,task.id,null);
                 if(task.expanded) updateTask(toDayKey,task.id,{expanded:false});
@@ -6215,13 +6256,14 @@ function pickTaskColorIndex(existingTasks) {
   }
   return Math.floor(Math.random() * TASK_COLORS.length);
 }
-function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onAskScope, dayKey, onReschedule, weekDays, currentDayKey }) {
+function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onStopRepeat, onAskScope, dayKey, onReschedule, weekDays, currentDayKey }) {
   const textareaRef = useRef();
   const titleTextareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
   const [mobileConfirming, setMobileConfirming] = useState(false);
   const [showColors, setShowColors] = useState(false);
   const [repeatOpen, setRepeatOpen] = useState(false);
+  const [stopConfirm, setStopConfirm] = useState(false);
   const [repeatDraft, setRepeatDraft] = useState(null); // rule being edited in the Repeat panel (not saved until Apply)
   const [rescheduleWeekOffset, setRescheduleWeekOffset] = useState(0);
   const longPressTimer = useRef(null);
@@ -6606,13 +6648,21 @@ function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFu
                 {hasRule && task.repeat && (
                   <span className="task-repeat-badge">{repeatSummary(task.repeat, dk)}</span>
                 )}
-                {/* Clear the rule from this one task only */}
-                {task.repeat && (
-                  <button onClick={e=>{e.stopPropagation();onUpdate({repeat:null});setRepeatOpen(false);}}
+                {/* Stop repeating: this task stays, later copies go (v5.6.1) */}
+                {hasRule && onStopRepeat && (stopConfirm ? (
+                  <span style={{marginLeft:'auto',display:'inline-flex',gap:6,alignItems:'center',fontSize:11}}>
+                    <span style={{color:'var(--ink-light)'}}>Remove later copies?</span>
+                    <button data-testid="stop-yes" onClick={e=>{e.stopPropagation();setStopConfirm(false);setRepeatOpen(false);onStopRepeat();}}
+                      style={{background:'none',border:'1px solid #fca5a5',borderRadius:4,cursor:'pointer',fontSize:11,color:'#ef4444',padding:'1px 8px',fontWeight:600}}>Stop</button>
+                    <button onClick={e=>{e.stopPropagation();setStopConfirm(false);}}
+                      style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px'}}>Cancel</button>
+                  </span>
+                ) : (
+                  <button data-testid="stop-repeat" onClick={e=>{e.stopPropagation();setStopConfirm(true);}}
                     style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',marginLeft:'auto'}}>
-                    ✕ clear
+                    ⏹ Stop repeating
                   </button>
-                )}
+                ))}
               </div>
               {open && (
                 <div className="rp-panel">
@@ -10694,7 +10744,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.6.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.6.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
