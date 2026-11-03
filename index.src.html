@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.4.0 -->
+<!-- LP Planner v5.5.0 -->
+<!-- v5.5.0 — Repeating tasks, stage 1 (reader): the app can now show repeating tasks stored once as a rule (new synced repeatSeries collection) with copies generated on screen; changing a copy stores just that copy. Nothing creates these yet, so existing repeating tasks are untouched. -->
 <!-- v5.4.0 — Repeating tasks: after you edit one copy (title, details, time, colour, priority) a bar offers "This and following" or "All" to copy the change to the rest of the series; ignoring it keeps the edit on that one task. Undo supported. -->
 <!-- v5.3.1 — Backups: "Back up now" no longer overwrites the nightly backup. Manual backups are saved as their own files (newest 5 kept) and the restore list labels them "Nightly" or "Manual". Needs Worker 0.2.3. -->
 <!-- v5.3.0 — Faster start: the app is now compiled ahead of time (index.src.html is the editable source, build.js produces index.html), so the browser no longer downloads and runs Babel on every launch; React production builds. No change to features or data. -->
@@ -2561,7 +2562,7 @@ function repeatExtend(wd, todayKey) {
   Object.keys(wd).forEach(wk => {
     const tasks = (wd[wk] && wd[wk].tasks) || {};
     Object.keys(tasks).forEach(dk => (tasks[dk] || []).forEach(t => {
-      if (!t.repeatId || !t.repeat) return;
+      if (!t.repeatId || !t.repeat || t.repeat.series) return;     // generated series are not materialized
       const et = t.repeat.endType, gc = t.repeat.genCount;
       // "never ends" series, and "after N times" series that still have occurrences left to write
       // (series saved before v5.2.0 have no genCount: they were written in full, so they are skipped)
@@ -2590,6 +2591,151 @@ function repeatExtend(wd, todayKey) {
     dates.forEach(dk => wdEditDay(out, dk, ts => ts.some(t => t.repeatId === id) ? ts : [...ts, repeatCopy(s.latest, id, dk, stored)]));
   });
   return out || wd;
+}
+
+// ── REPEAT SERIES (v5.5.0) ──
+// A series stores a repeating task ONCE, in the synced `repeatSeries` collection:
+//   { id, anchor:'YYYY-MM-DD', rule:{freq,interval,days,monthMode,endType,endDate,count},
+//     tpl:{title,details,…}, skip:['YYYY-MM-DD'…], until:'YYYY-MM-DD' | '' }
+// The anchor day's task is a normal stored task; every later copy is generated at read time by
+// repeatExpandAll and is NOT written to weekData until you change it (check it off, move it, edit
+// it…), at which point repeatCollapse stores just that copy as an "exception". Deleting a single
+// copy adds its date to `skip`; ending a series sets `until`. Old materialized series (tasks with a
+// repeatId that is not in repeatSeries) keep working exactly as before.
+const REPEAT_VIEW_DAYS = { daily: 365, weekly: 730, monthly: 730, yearly: 1500 };   // how far ahead copies are generated
+const REPEAT_VIRT = new WeakMap();            // generated task object -> { sid, dk }
+const emptyWeekFields = () => ({ proverb:'', toCreate:[], people:[], beWord:'', proud:'', story:'', tasks:{} });
+function seriesWeekKey(dk) { return fmtLocal(getWeekStart(parseLocal(dk))); }
+function seriesRuleView(s) { return { ...normalizeRepeat(s.rule), anchor: s.anchor, genThrough: '', genCount: null, series: true }; }
+// Dates (after the anchor) on which this series has a generated copy
+function seriesDates(s, todayKey) {
+  const n = normalizeRepeat(s.rule);
+  let through = fmtLocal(addDays(parseLocal(todayKey), REPEAT_VIEW_DAYS[n.freq] || 730));
+  if (s.until && s.until < through) through = s.until;
+  if (!s.anchor || through <= s.anchor) return [];
+  const raw = repeatDates({ ...n, anchor: s.anchor }, s.anchor, s.anchor, through, 5000);
+  const skip = s.skip && s.skip.length ? new Set(s.skip) : null;
+  return skip ? raw.filter(d => !skip.has(d)) : raw;
+}
+function seriesInstanceFor(s, sid, dk, ruleView) {
+  const t = { ...(s.tpl || {}), id: `${sid}_${dk}`, repeatId: sid, repeat: ruleView, done: false, expanded: false, gcalId: null };
+  REPEAT_VIRT.set(t, { sid, dk });
+  return t;
+}
+// stored weekData + series → the weekData the screens see (generated copies merged in).
+// With no series it returns `stored` itself, so nothing changes for anyone who doesn't use them.
+// `cache` keeps object identities stable between calls so React can skip unchanged weeks.
+function repeatExpandAll(stored, series, todayKey, cache) {
+  const sids = Object.keys(series || {}).filter(id => series[id] && series[id].anchor).sort();
+  if (!sids.length) return stored;
+  const c = cache || { ser: new Map(), weeks: new Map(), ver: 0 };
+  if (c.lastStored === stored && c.lastSeries === series && c.lastToday === todayKey && c.lastOut) return c.lastOut;
+  const sidsKey = sids.join('|');
+  let bump = c.sidsKey !== sidsKey;
+  c.sidsKey = sidsKey;
+  const byWeek = new Map();                       // wk -> Map(dk -> [generated tasks])
+  for (const sid of sids) {
+    const s = series[sid];
+    let e = c.ser.get(sid);
+    if (!e || e.s !== s || e.today !== todayKey) {
+      const rv = seriesRuleView(s);
+      const days = new Map();
+      for (const dk of seriesDates(s, todayKey)) days.set(dk, seriesInstanceFor(s, sid, dk, rv));
+      e = { s, today: todayKey, days }; c.ser.set(sid, e); bump = true;
+    }
+    e.days.forEach((t, dk) => {
+      const wk = seriesWeekKey(dk);
+      let m = byWeek.get(wk); if (!m) byWeek.set(wk, m = new Map());
+      const l = m.get(dk); if (l) l.push(t); else m.set(dk, [t]);
+    });
+  }
+  for (const k of [...c.ser.keys()]) if (!series[k]) c.ser.delete(k);
+  if (bump) c.ver++;
+  const out = { ...stored };
+  const keepWeeks = new Set();
+  byWeek.forEach((dayMap, wk) => {
+    keepWeeks.add(wk);
+    const base = stored[wk];
+    const hit = c.weeks.get(wk);
+    if (hit && hit.base === base && hit.ver === c.ver) { out[wk] = hit.out; return; }
+    const baseTasks = (base && base.tasks) || {};
+    const tasks = { ...baseTasks };
+    dayMap.forEach((list, dk) => {
+      const have = baseTasks[dk] || [];
+      const add = list.filter(t => !have.some(x => x.id === t.id));
+      if (add.length) tasks[dk] = [...have, ...add];
+    });
+    const merged = { ...(base || emptyWeekFields()), tasks };
+    c.weeks.set(wk, { base, ver: c.ver, out: merged });
+    out[wk] = merged;
+  });
+  for (const k of [...c.weeks.keys()]) if (!keepWeeks.has(k)) c.weeks.delete(k);
+  c.lastStored = stored; c.lastSeries = series; c.lastToday = todayKey; c.lastOut = out;
+  return out;
+}
+// The reverse: `next` is what the screens produced from `view`. Returns the stored weekData and
+// series to keep. Untouched generated copies are dropped; changed ones become stored exceptions;
+// generated copies that disappeared (deleted, or moved to another day) are added to the series' skip list.
+function repeatCollapse(next, view, stored, series) {
+  if (next === view) return { stored, series };
+  const outStored = { ...stored };
+  const skipAdds = new Map();
+  const addSkip = (sid, dk) => { let st = skipAdds.get(sid); if (!st) skipAdds.set(sid, st = new Set()); st.add(dk); };
+  let touched = false;
+  const keys = new Set([...Object.keys(next), ...Object.keys(view)]);
+  keys.forEach(wk => {
+    const nw = next[wk], ow = view[wk];
+    if (nw === ow) return;
+    const oldVirt = [];       // generated copies that were on screen
+    const oldExc = [];        // stored exceptions of a series (a copy you changed earlier)
+    if (ow && ow.tasks) Object.keys(ow.tasks).forEach(dk => (ow.tasks[dk] || []).forEach(t => {
+      const m = REPEAT_VIRT.get(t);
+      if (m && m.dk === dk) oldVirt.push({ sid: m.sid, dk, t });
+      else if (t.repeatId && series[t.repeatId] && t.id === `${t.repeatId}_${dk}`) oldExc.push({ sid: t.repeatId, dk, t });
+    }));
+    if (!nw) {                                           // the whole week was removed
+      oldVirt.concat(oldExc).forEach(v => addSkip(v.sid, v.dk));
+      if (stored[wk] !== undefined) { delete outStored[wk]; touched = true; }
+      return;
+    }
+    const oldByDay = {};
+    oldVirt.forEach(v => { (oldByDay[v.dk] || (oldByDay[v.dk] = [])).push(v.t); });
+    const tasksOut = {};
+    Object.keys(nw.tasks || {}).forEach(dk => {
+      const list = nw.tasks[dk] || [];
+      const oldV = oldByDay[dk] || [];
+      const isPure = t => {
+        const m = REPEAT_VIRT.get(t);
+        if (m && m.dk === dk) return true;
+        const o = oldV.find(v => v.id === t.id);
+        return !!o && JSON.stringify(o) === JSON.stringify(t);       // an untouched copy that was cloned on the way through
+      };
+      const pure = list.map(isPure);
+      const firstPure = pure.indexOf(true);
+      let canonical = firstPure === -1 || pure.lastIndexOf(false) < firstPure;     // generated copies sit after stored tasks
+      if (canonical && firstPure !== -1) {
+        const ids = list.filter((t, i) => pure[i]).map(t => t.id);
+        canonical = JSON.stringify(ids) === JSON.stringify(oldV.map(v => v.id).filter(id => ids.includes(id)));
+      }
+      const keep = list.map((t, i) => (canonical && pure[i]) ? null : (REPEAT_VIRT.has(t) ? { ...t } : t)).filter(Boolean);
+      if (keep.length || (stored[wk] && stored[wk].tasks && stored[wk].tasks[dk])) tasksOut[dk] = keep;
+    });
+    oldVirt.concat(oldExc).forEach(v => { if (!((nw.tasks || {})[v.dk] || []).some(t => t.id === v.t.id)) addSkip(v.sid, v.dk); });
+    const out = { ...nw, tasks: tasksOut };
+    const hasTasks = Object.keys(tasksOut).some(dk => tasksOut[dk].length);
+    if (stored[wk] === undefined && !hasTasks && JSON.stringify({ ...out, tasks: {} }) === JSON.stringify(emptyWeekFields())) return;
+    if (stored[wk] !== undefined && JSON.stringify(stored[wk]) === JSON.stringify(out)) return;
+    outStored[wk] = out; touched = true;
+  });
+  let outSeries = series;
+  if (skipAdds.size) {
+    outSeries = { ...series };
+    skipAdds.forEach((set, sid) => {
+      const s = series[sid]; if (!s) return;
+      outSeries[sid] = { ...s, skip: [...new Set([...(s.skip || []), ...set])].sort() };
+    });
+  }
+  return { stored: touched ? outStored : stored, series: outSeries };
 }
 
 // ── GOAL ↔ HABIT / FITNESS LINKS (v4.7.0) ──
@@ -9798,7 +9944,34 @@ function App() {
   const setPage = (p) => { sessionStorage.setItem('lp_page', p); setPageRaw(p); };
   const [navColor, setNavColor] = useSynced('navColor', '#3a2960');
   const [calHeaderColor, setCalHeaderColor] = useSynced('calHeaderColor', '#523e82');
-  const [weekData, setWeekData] = useSynced('weekData', {});
+  // weekData as STORED (weeks + any copies you changed) and repeatSeries (repeating tasks stored once, v5.5.0).
+  // Screens never see these two directly: they get `weekData` (the generated copies merged in) and a
+  // setWeekData that folds their edits back into the stored form. With no series this is a pass-through.
+  const [weekDataStored, setWeekDataStored] = useSynced('weekData', {});
+  const [repeatSeries, setRepeatSeries] = useSynced('repeatSeries', {});
+  const storedRef = useRef(weekDataStored), seriesRef = useRef(repeatSeries);
+  useEffect(() => { storedRef.current = weekDataStored; }, [weekDataStored]);
+  useEffect(() => { seriesRef.current = repeatSeries; }, [repeatSeries]);
+  const viewCacheRef = useRef(null);
+  if (!viewCacheRef.current) viewCacheRef.current = { ser: new Map(), weeks: new Map(), ver: 0 };
+  const viewTodayKey = fmtLocal(new Date());
+  const weekData = React.useMemo(
+    () => repeatExpandAll(weekDataStored, repeatSeries, viewTodayKey, viewCacheRef.current),
+    [weekDataStored, repeatSeries, viewTodayKey]);
+  const setWeekData = useCallback((fn) => {
+    const st = storedRef.current, se = seriesRef.current;
+    if (!Object.keys(se || {}).length) {                        // no series: exactly the old behaviour
+      const nx = typeof fn === 'function' ? fn(st) : fn;
+      if (nx !== st) { storedRef.current = nx; setWeekDataStored(nx); }
+      return;
+    }
+    const view = repeatExpandAll(st, se, fmtLocal(new Date()), viewCacheRef.current);
+    const next = typeof fn === 'function' ? fn(view) : fn;
+    if (next === view) return;
+    const r = repeatCollapse(next, view, st, se);
+    if (r.series !== se) { seriesRef.current = r.series; setRepeatSeries(r.series); }
+    if (r.stored !== st) { storedRef.current = r.stored; setWeekDataStored(r.stored); }
+  }, []);
   const [pagesData, setPagesData] = useSynced('pagesData', []); // [{id,title,body,createdAt,lastModified,folderId,order,tasks:[]}]
   const [foldersData, setFoldersData] = useSynced('foldersData', []); // [{id,name,expanded,order}]
   const [selectedPagesId, setSelectedPagesIdRaw] = useState(() => sessionStorage.getItem('lp_selectedPagesId') || null);
@@ -10010,7 +10183,8 @@ function App() {
       setAuthUser(profile);
       setSignInError('');
       setAuthError(false);
-      if (r && r.values) ensureGoogleToken().then(() => autoSyncCalendar(r.values.weekData || {}));
+      if (r && r.values) ensureGoogleToken().then(() => autoSyncCalendar(
+        repeatExpandAll(r.values.weekData || {}, r.values.repeatSeries || {}, fmtLocal(new Date()), null)));
       refreshMe();
       if (r && r.empty) { setSuggestImport(true); setShowData(true); }   // brand-new account: offer the Drive import
     } catch (e) {
@@ -10274,7 +10448,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.4.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.5.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
