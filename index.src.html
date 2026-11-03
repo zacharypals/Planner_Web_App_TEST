@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.6.1 -->
+<!-- LP Planner v5.7.0 -->
+<!-- v5.7.0 — Goals: milestones can be reordered by dragging the ⋮⋮ grip (works with touch/Pencil); a second "+ Add milestone" button sits under the last milestone; "Complete automatically from my weight" now appears only on goals that link Weight (Links → Measurements) or on a milestone already using it. -->
 <!-- v5.6.1 — Repeat section: the "✕ clear" button (which only blanked one task's repeat info and left the series running) is replaced by "⏹ Stop repeating": this task stays as a one-off, the series ends the day before and later copies are removed (confirm + Undo). -->
 <!-- v5.6.0 — Repeating tasks, stage 2 (writer): new repeating tasks are now stored ONCE as a rule (series) instead of a copy on every day; changing the rule, deleting this/following/all, and the edit-scope bar (this / following / all) all work on the series. Older repeating tasks stay as they are until you press Convert in the repeat groups list (each group is verified day by day first; Undo for 10 seconds). -->
 <!-- v5.5.0 — Repeating tasks, stage 1 (reader): the app can now show repeating tasks stored once as a rule (new synced repeatSeries collection) with copies generated on screen; changing a copy stores just that copy. Nothing creates these yet, so existing repeating tasks are untouched. -->
@@ -2121,6 +2122,10 @@
   .gl-check.on { background: var(--accent); border-color: var(--accent); }
   .gl-ms { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); overflow: hidden; }
   .gl-ms-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; flex-wrap: wrap; }
+  .gl-grip { border: none; background: none; cursor: grab; color: var(--ink-faint); font-size: 14px; letter-spacing: -2px; width: 20px; height: 28px; padding: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
+  .gl-grip:hover { color: var(--ink-light); }
+  .gl-ms.dragging { opacity: 0.45; }
+  .gl-ms-drop { height: 3px; border-radius: 2px; background: var(--accent); margin: -2px 0; }
   .gl-caret { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 11px; width: 22px; height: 28px; padding: 0; }
   .gl-task { display: flex; align-items: center; gap: 8px; min-height: 38px; border-top: 1px solid var(--neutral-line); padding: 2px 10px 2px 40px; position: relative; }
   .gl-x { border: none; background: none; cursor: pointer; color: var(--ink-faint); font-size: 13px; padding: 4px 6px; opacity: 0; }
@@ -9344,6 +9349,7 @@ function GlLinkPicker({ goal, onChange, habitGoals, fitnessExercises }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Measurements</span>
+        {!metricIds.includes('weight') && <span style={{ fontSize: 11, color: 'var(--ink-light)' }}>Link Weight to also let a milestone complete itself from your weight.</span>}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
           {Object.entries(GL_METRICS).map(([id, mm]) => (
             <button key={id} className={`gl-chip ${metricIds.includes(id) ? 'on' : ''}`}
@@ -9766,7 +9772,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
 }
 
 // One milestone in the goal editor: header row plus (when open) its tasks.
-function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete }) {
+function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete, onGripDown, dragging }) {
   const today = glToday();
   const [newTask, setNewTask] = useState('');
   const [focusId, setFocusId] = useState(null);
@@ -9788,8 +9794,9 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
     return t.id;
   }
   return (
-    <div className="gl-ms" style={{ borderColor: open ? color : late ? '#f0c9c3' : undefined, borderWidth: open ? 2 : 1 }}>
+    <div className={`gl-ms${dragging ? ' dragging' : ''}`} style={{ borderColor: open ? color : late ? '#f0c9c3' : undefined, borderWidth: open ? 2 : 1 }}>
       <div className="gl-ms-head" style={{ background: open ? glTint(color, 0.06) : late ? '#fdf3f1' : undefined }}>
+        {onGripDown && <button className="gl-grip" aria-label="Drag to reorder milestone" title="Drag to reorder" onPointerDown={onGripDown}>⋮⋮</button>}
         <button className="gl-caret" aria-label={open ? 'Collapse milestone' : 'Expand milestone'} onClick={onToggleOpen}>{open ? '▾' : '▸'}</button>
         <button className={`gl-check ${m.done ? 'on' : ''}`} aria-label={m.done ? 'Mark milestone not done' : 'Mark milestone done'}
           onClick={() => onChange(mm => ({ ...mm, done: !mm.done, completedAt: !mm.done ? Date.now() : null,
@@ -9813,8 +9820,9 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
       </div>
       {open && (
         <div>
-          {/* v4.8.0 — complete this milestone from my weight */}
-          {(() => {
+          {/* v4.8.0 — complete this milestone from my weight. v5.7.0: only offered when the goal links Weight
+              (Links → Measurements) or this milestone already uses it */}
+          {((goal && (goal.linkedMetrics || []).includes('weight')) || m.metric) && (() => {
             const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
             const c = m.metric;
             const cur = mctx ? smoothWeight(mctx.metrics, asOf, goal && goal.startDate) : { n: 0, avg: null };
@@ -9897,6 +9905,37 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, hab
   const ms = goal.milestones || [];
   const pages = (pagesData || []).filter(p => p && p.id);
   function setMs(mid, fn) { onChange(g => glPatchMs(g, mid, fn)); }
+  // Drag a milestone by its grip to reorder (pointer events, so it works with a finger or Pencil on the iPad)
+  const msListRef = useRef(null);
+  const [msDrag, setMsDrag] = useState(null);          // { id, idx } idx = insertion slot among the current list
+  function beginMsDrag(e, id) {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const slotAt = y => {
+      const els = [...(msListRef.current ? msListRef.current.querySelectorAll('[data-msid]') : [])];
+      for (let i = 0; i < els.length; i++) { const r = els[i].getBoundingClientRect(); if (y < r.top + r.height / 2) return i; }
+      return els.length;
+    };
+    let idx = slotAt(e.clientY);
+    setMsDrag({ id, idx });
+    const move = ev => { idx = slotAt(ev.clientY); setMsDrag({ id, idx }); };
+    const end = (ev, cancel) => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cn);
+      setMsDrag(null);
+      if (cancel) return;
+      onChange(g => {
+        const list = [...(g.milestones || [])];
+        const from = list.findIndex(x => x.id === id);
+        if (from < 0) return g;
+        const to = idx > from ? idx - 1 : idx;
+        if (to === from) return g;
+        const [it] = list.splice(from, 1); list.splice(Math.max(0, Math.min(list.length, to)), 0, it);
+        return { ...g, milestones: list };
+      });
+    };
+    const up = ev => end(ev, false), cn = ev => end(ev, true);
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cn);
+  }
   function addMs() {
     const m = glNewMilestone(goal);
     onChange(g => ({ ...g, milestones: [...(g.milestones || []), m] }));
@@ -9934,12 +9973,23 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, hab
               <button className="gl-btn" onClick={addMs}>+ Add milestone</button>
             </div>
             {!ms.length && <div style={{ fontSize: 13, color: 'var(--ink-light)', padding: '6px 2px' }}>Break the goal into milestones — checkpoints with dates — then add tasks under each one and schedule them into your weeks.</div>}
-            {ms.map(m => (
-              <GlMilestoneEditor key={m.id} m={m} goal={goal} mctx={mctx} color={c} open={!!openMs[m.id]}
-                onToggleOpen={() => setOpenMs(o => ({ ...o, [m.id]: !o[m.id] }))}
-                onChange={fn => setMs(m.id, fn)}
-                onDelete={() => onChange(g => ({ ...g, milestones: (g.milestones || []).filter(x => x.id !== m.id) }))} />
-            ))}
+            <div ref={msListRef} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {ms.map((m, i) => (
+                <React.Fragment key={m.id}>
+                  {msDrag && msDrag.idx === i && <div className="gl-ms-drop" data-testid="ms-drop" />}
+                  <div data-msid={m.id}>
+                    <GlMilestoneEditor m={m} goal={goal} mctx={mctx} color={c} open={!!openMs[m.id]}
+                      dragging={!!msDrag && msDrag.id === m.id}
+                      onGripDown={ms.length > 1 ? (e => beginMsDrag(e, m.id)) : null}
+                      onToggleOpen={() => setOpenMs(o => ({ ...o, [m.id]: !o[m.id] }))}
+                      onChange={fn => setMs(m.id, fn)}
+                      onDelete={() => onChange(g => ({ ...g, milestones: (g.milestones || []).filter(x => x.id !== m.id) }))} />
+                  </div>
+                </React.Fragment>
+              ))}
+              {msDrag && msDrag.idx === ms.length && <div className="gl-ms-drop" data-testid="ms-drop" />}
+            </div>
+            {ms.length > 0 && <button className="gl-btn" data-testid="add-ms-bottom" style={{ alignSelf: 'flex-start' }} onClick={addMs}>+ Add milestone</button>}
           </div>
         </div>
 
@@ -10744,7 +10794,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.6.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.7.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
