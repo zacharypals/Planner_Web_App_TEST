@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.5.0 -->
+<!-- LP Planner v5.6.0 -->
+<!-- v5.6.0 — Repeating tasks, stage 2 (writer): new repeating tasks are now stored ONCE as a rule (series) instead of a copy on every day; changing the rule, deleting this/following/all, and the edit-scope bar (this / following / all) all work on the series. Older repeating tasks stay as they are until you press Convert in the repeat groups list (each group is verified day by day first; Undo for 10 seconds). -->
 <!-- v5.5.0 — Repeating tasks, stage 1 (reader): the app can now show repeating tasks stored once as a rule (new synced repeatSeries collection) with copies generated on screen; changing a copy stores just that copy. Nothing creates these yet, so existing repeating tasks are untouched. -->
 <!-- v5.4.0 — Repeating tasks: after you edit one copy (title, details, time, colour, priority) a bar offers "This and following" or "All" to copy the change to the rest of the series; ignoring it keeps the edit on that one task. Undo supported. -->
 <!-- v5.3.1 — Backups: "Back up now" no longer overwrites the nightly backup. Manual backups are saved as their own files (newest 5 kept) and the restore list labels them "Nightly" or "Manual". Needs Worker 0.2.3. -->
@@ -2613,7 +2614,8 @@ function seriesDates(s, todayKey) {
   let through = fmtLocal(addDays(parseLocal(todayKey), REPEAT_VIEW_DAYS[n.freq] || 730));
   if (s.until && s.until < through) through = s.until;
   if (!s.anchor || through <= s.anchor) return [];
-  const raw = repeatDates({ ...n, anchor: s.anchor }, s.anchor, s.anchor, through, 5000);
+  // `base` is where the pattern is counted from (an every-2-weeks series keeps its rhythm after a split)
+  const raw = repeatDates({ ...n, anchor: s.anchor }, s.base || s.anchor, s.anchor, through, 5000);
   const skip = s.skip && s.skip.length ? new Set(s.skip) : null;
   return skip ? raw.filter(d => !skip.has(d)) : raw;
 }
@@ -2736,6 +2738,177 @@ function repeatCollapse(next, view, stored, series) {
     });
   }
   return { stored: touched ? outStored : stored, series: outSeries };
+}
+
+// ── Series operations (v5.6.0). Each takes the STORED weekData + series and returns new ones. ──
+function seriesPrev(dk) { return fmtLocal(addDays(parseLocal(dk), -1)); }
+// What a copy of this task looks like (everything except per-copy state)
+function seriesContent(t) {
+  const { id, done, expanded, gcalId, repeat, repeatId, isProjectTask, projectDocId, projectTitle, responseStatus, ...rest } = t;
+  return rest;
+}
+function seriesRuleFields(n) {
+  return { freq: n.freq, interval: n.interval, days: n.days, monthMode: n.monthMode, endType: n.endType, endDate: n.endDate, count: n.count };
+}
+// Remove stored tasks of a series (or an old materialized series) that match, from fromDk on (exclusive when `after`).
+function seriesDropStored(out, id, fromDk, opts) {
+  const o = opts || {};
+  Object.keys(out).forEach(wk => Object.keys((out[wk] && out[wk].tasks) || {}).forEach(dk => {
+    if (fromDk && (o.after ? dk <= fromDk : dk < fromDk)) return;
+    if ((out[wk].tasks[dk] || []).some(t => t.repeatId === id && (!o.unfinishedOnly || !t.done))) {
+      wdEditDay(out, dk, ts => ts.filter(t => !(t.repeatId === id && (!o.unfinishedOnly || !t.done))));
+    }
+  }));
+}
+// Give a task a repeat rule. `src` may be a generated copy. Returns { stored, series, repeatId }.
+function repeatApplySeries(stored, series, src, srcDk, rule) {
+  const n = normalizeRepeat(rule);
+  const ruleF = seriesRuleFields(n);
+  const oldId = src.repeatId || null;
+  const oldS = oldId ? series[oldId] : null;
+  const out = { ...stored }, outSeries = { ...series };
+  let sid;
+  if (oldS && srcDk === oldS.anchor) {                       // changing the rule from the first task: same series
+    sid = oldId;
+    seriesDropStored(out, oldId, srcDk, { after: true, unfinishedOnly: true });
+    outSeries[sid] = { ...oldS, rule: ruleF, skip: [], until: '' };
+  } else {
+    if (oldS) {                                              // from a later copy: end the old series the day before, start a new one
+      sid = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+      seriesDropStored(out, oldId, srcDk, { after: true, unfinishedOnly: true });
+      outSeries[oldId] = { ...oldS, until: seriesPrev(srcDk) };
+    } else {                                                 // a plain task, or an old materialized series (its finished copies stay)
+      sid = oldId || src.id;
+      if (oldId) seriesDropStored(out, oldId, srcDk, { after: true, unfinishedOnly: true });
+    }
+    outSeries[sid] = { id: sid, anchor: srcDk, base: srcDk, rule: ruleF, tpl: seriesContent(src), skip: [], until: '' };
+  }
+  const rv = seriesRuleView(outSeries[sid]);
+  wdEditDay(out, srcDk, ts => ts.some(t => t.id === src.id)
+    ? ts.map(t => t.id === src.id ? { ...t, repeatId: sid, repeat: rv } : t)
+    : [...ts, { ...src, repeatId: sid, repeat: rv }]);
+  return { stored: out, series: outSeries, repeatId: sid };
+}
+// Delete a series from a day on (fromDk null = all of it). Returns { stored, series }.
+function repeatSeriesDelete(stored, series, sid, fromDk) {
+  const s = series[sid];
+  const out = { ...stored }, outSeries = { ...series };
+  if (!s) return { stored, series };
+  if (!fromDk || fromDk <= s.anchor) { delete outSeries[sid]; seriesDropStored(out, sid, null); }
+  else { outSeries[sid] = { ...s, until: seriesPrev(fromDk) }; seriesDropStored(out, sid, fromDk); }
+  return { stored: out, series: outSeries };
+}
+// "All": change the template and every stored, unfinished copy. Generated copies follow the template.
+function repeatSeriesEditAll(stored, series, sid, patch, editedId) {
+  const s = series[sid];
+  if (!s) return { stored, series };
+  const out = { ...stored };
+  Object.keys(out).forEach(wk => Object.keys((out[wk] && out[wk].tasks) || {}).forEach(dk => {
+    if ((out[wk].tasks[dk] || []).some(t => t.repeatId === sid && !t.done && t.id !== editedId)) {
+      wdEditDay(out, dk, ts => ts.map(t => (t.repeatId === sid && !t.done && t.id !== editedId) ? { ...t, ...patch } : t));
+    }
+  }));
+  return { stored: out, series: { ...series, [sid]: { ...s, tpl: { ...(s.tpl || {}), ...patch } } } };
+}
+// "This and following": end the series the day before and continue it as a new series with the edit.
+// The edited copy (editedId, on dk) becomes the new series' first task; later stored copies move over to it.
+function repeatSeriesEditFollowing(stored, series, sid, dk, patch, editedTask) {
+  const s = series[sid];
+  if (!s) return { stored, series };
+  if (dk <= s.anchor) return repeatSeriesEditAll(stored, series, sid, patch, editedTask && editedTask.id);
+  const nid = 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const n = normalizeRepeat(s.rule);
+  let rule = seriesRuleFields(n), until = s.until || '';
+  if (n.endType === 'count') {                               // count what is left after the copies before dk
+    const before = 1 + repeatDates({ ...n, anchor: s.anchor }, s.base || s.anchor, s.anchor, seriesPrev(dk), 5000).length;
+    const left = n.count - before;                           // occurrences from dk on, dk included
+    if (left >= 2) rule = { ...rule, count: left };
+    else { rule = { ...rule, endType: 'never' }; until = dk; }
+  }
+  const out = { ...stored };
+  const moved = [];
+  Object.keys(out).forEach(wk => Object.keys((out[wk] && out[wk].tasks) || {}).forEach(d => {
+    if (d < dk) return;
+    if ((out[wk].tasks[d] || []).some(t => t.repeatId === sid)) moved.push(d);
+  }));
+  const nSeries = { id: nid, anchor: dk, base: s.base || s.anchor, rule, tpl: { ...(s.tpl || {}), ...patch },
+                    skip: (s.skip || []).filter(d => d > dk), until };
+  const rv = seriesRuleView(nSeries);
+  moved.forEach(d => wdEditDay(out, d, ts => ts.map(t => {
+    if (t.repeatId !== sid) return t;
+    const nt = { ...t, repeatId: nid, repeat: rv, ...(t.done ? {} : patch) };
+    if (!(editedTask && t.id === editedTask.id) && t.id === `${sid}_${d}`) nt.id = `${nid}_${d}`;   // keeps ids = series_date
+    return nt;
+  })));
+  // the edited copy may have been a generated one (not stored yet): store it as the new series' first task
+  if (editedTask && !((out[seriesWeekKey(dk)] || {}).tasks || {})[dk]?.some(t => t.repeatId === nid)) {
+    wdEditDay(out, dk, ts => [...ts, { ...editedTask, ...patch, id: `${nid}_${dk}`, repeatId: nid, repeat: rv }]);
+  }
+  return { stored: out, series: { ...series, [sid]: { ...s, until: seriesPrev(dk) }, [nid]: nSeries }, repeatId: nid };
+}
+
+// ── Convert old materialized repeating tasks (a stored copy on every day) into compact series (v5.6.0) ──
+// Per group: the most common copy content becomes the template, copies identical to what the series would
+// generate are dropped, changed or moved copies stay (as exceptions), days the user deleted become `skip`.
+// Each group is verified by expanding it again and comparing, day by day, with what it was before; a group
+// that does not match exactly is left untouched. Returns { stored, series, converted, failed }.
+function repeatConvertLegacy(stored, series, todayKey) {
+  const groups = new Map();
+  Object.keys(stored || {}).forEach(wk => Object.keys((stored[wk] && stored[wk].tasks) || {}).forEach(dk =>
+    (stored[wk].tasks[dk] || []).forEach(t => {
+      if (!t.repeatId || !t.repeat || t.repeat.series || (series || {})[t.repeatId] || !repeatIsComplete(t.repeat)) return;
+      if (!groups.has(t.repeatId)) groups.set(t.repeatId, []);
+      groups.get(t.repeatId).push({ dk, t });
+    })));
+  const key = o => JSON.stringify(Object.keys(o).sort().reduce((a, k) => (o[k] === undefined ? a : (a[k] = o[k], a)), {}));
+  const out = { ...stored }, outSeries = { ...(series || {}) };
+  const converted = [], failed = [];
+  groups.forEach((list, sid) => {
+    list.sort((a, b) => a.dk < b.dk ? -1 : a.dk > b.dk ? 1 : 0);
+    const title = (list[list.length - 1].t.title) || '(untitled)';
+    const anchorDk = list[0].dk, maxDk = list[list.length - 1].dk;
+    const latest = list[list.length - 1].t;
+    const n = normalizeRepeat(latest.repeat);
+    const base = (latest.repeat && latest.repeat.anchor) || anchorDk;
+    // template = the most common content among unfinished copies (latest wins ties)
+    const tally = new Map();
+    list.forEach(({ t }) => { if (t.done) return; const k = key(seriesContent(t)); const e = tally.get(k) || { c: 0, t }; e.c++; e.t = t; tally.set(k, e); });
+    let tplT = latest; let best = -1;
+    tally.forEach(e => { if (e.c >= best) { best = e.c; tplT = e.t; } });
+    const s = { id: sid, anchor: anchorDk, base, rule: seriesRuleFields(n), tpl: seriesContent(tplT), skip: [], until: '' };
+    const rv = seriesRuleView(s);
+    const dates = new Set(repeatDates({ ...n, anchor: anchorDk }, base, anchorDk, maxDk, 5000));
+    const at = new Map(); list.forEach(x => { if (!at.has(x.dk)) at.set(x.dk, []); at.get(x.dk).push(x.t); });
+    dates.forEach(d => { if (!at.has(d)) s.skip.push(d); });
+    const tplKey = key(s.tpl);
+    const pure = (t, dk) => dk !== anchorDk && dates.has(dk) && (at.get(dk) || []).length === 1 && !t.done && !t.expanded && !t.gcalId
+      && !t.isProjectTask && t.id === `${sid}_${dk}` && key(seriesContent(t)) === tplKey;
+    // build the converted form of this group only, then verify it on its own
+    const mini = {};
+    const drop = [];                               // [dk, id]
+    list.forEach(({ dk, t }) => {
+      if (pure(t, dk)) { drop.push([dk, t.id]); return; }
+      wdEditDay(mini, dk, ts => [...ts, { ...t, repeat: rv }]);
+    });
+    const view = repeatExpandAll(mini, { [sid]: s }, todayKey, { ser: new Map(), weeks: new Map(), ver: 0 });
+    const got = new Map();
+    Object.keys(view).forEach(wk => Object.keys(view[wk].tasks || {}).forEach(dk => {
+      if (dk > maxDk) return;
+      (view[wk].tasks[dk] || []).forEach(t => { if (t.repeatId === sid) got.set(dk + '|' + t.id, key({ ...t, repeat: undefined })); });
+    }));
+    const want = new Map(); list.forEach(({ dk, t }) => want.set(dk + '|' + t.id, key({ ...t, repeat: undefined })));
+    let why = '';
+    if (got.size !== want.size) why = 'copy count differs';
+    else want.forEach((v, k) => { if (!why && got.get(k) !== v) why = 'a copy differs'; });
+    if (why) { failed.push({ id: sid, title, why }); return; }
+    // commit this group
+    drop.forEach(([dk, id]) => wdEditDay(out, dk, ts => ts.filter(t => !(t.id === id && t.repeatId === sid))));
+    wdEditDay(out, anchorDk, ts => ts.map(t => (t.repeatId === sid && t.id === at.get(anchorDk)[0].id) ? { ...t, repeat: rv } : t));
+    list.forEach(({ dk, t }) => { if (!pure(t, dk) && dk !== anchorDk) wdEditDay(out, dk, ts => ts.map(x => x.id === t.id ? { ...x, repeat: rv } : x)); });
+    outSeries[sid] = s;
+    converted.push({ id: sid, title, copies: list.length, kept: list.length - drop.length, skipped: s.skip.length });
+  });
+  return { stored: out, series: outSeries, converted, failed };
 }
 
 // ── GOAL ↔ HABIT / FITNESS LINKS (v4.7.0) ──
@@ -4300,7 +4473,7 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
   );
 }
 
-function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen }) {
+function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen, repeatSeries, seriesRun }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
@@ -4436,6 +4609,17 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
 
   // Apply a repeat rule to a task (see repeatApply). split=true starts a new series from this task.
   function applyRepeatRule(task, dayKey, rule, split) {
+    // v5.6.0: new and generated repeating tasks are stored once as a series; old materialized series keep the legacy path
+    const ser = task.repeatId && (repeatSeries || {})[task.repeatId];
+    if (seriesRun && (!task.repeatId || ser)) {
+      let src = task, dk = dayKey;
+      if (ser && !split) {                                   // "all": the rule belongs to the series, so change it at its first task
+        const a = getTasksAnyWeek(ser.anchor).find(t => t.repeatId === task.repeatId);
+        if (a) { src = a; dk = ser.anchor; }
+      }
+      seriesRun('Repeat rule changed', (st, se) => repeatApplySeries(st, se, src, dk, rule));
+      return;
+    }
     const todayKey = fmtLocal(new Date());
     const before = weekData;
     const res = repeatApply(before, task, dayKey, rule, split, todayKey);
@@ -4496,8 +4680,20 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       .sort((a,b) => a.title.localeCompare(b.title));
   }
 
+  // v5.6.0: old repeating tasks (a stored copy on every day) -> compact series
+  function previewLegacyConvert() { return repeatConvertLegacy(weekData, repeatSeries || {}, fmtLocal(new Date())); }
+  function runLegacyConvert() {
+    let res = null;
+    if (seriesRun) seriesRun('Converted repeating tasks', (st, se) => { res = repeatConvertLegacy(st, se, fmtLocal(new Date())); return res.converted.length ? res : null; });
+    return res;
+  }
+
   // Delete ALL instances of a repeat group (regardless of date — used by cleanup tool)
   function deleteRepeatGroup(groupKey, repeatId, title, days) {
+    if (seriesRun && repeatId && (repeatSeries || {})[repeatId]) {
+      seriesRun('Deleted repeating task', (st, se) => repeatSeriesDelete(st, se, repeatId, null));
+      return;
+    }
     {
       const sig = JSON.stringify((days||[]).slice().sort());
       const removed = collectInstances(t => repeatId
@@ -4594,6 +4790,15 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   }
   // Copy the edit onto the other unfinished copies. 'following' = later ones only; 'all' = every unfinished copy.
   function applySeriesEdit(sp, scope) {
+    const ser = (repeatSeries || {})[sp.repeatId];
+    if (seriesRun && ser) {
+      const edited = getTasksAnyWeek(sp.dayKey).find(t => t.id === sp.id) || null;
+      seriesRun(scope === 'all' ? 'Updated the whole series' : 'Updated this and following', (st, se) =>
+        scope === 'all' ? repeatSeriesEditAll(st, se, sp.repeatId, sp.patch, sp.id)
+                        : repeatSeriesEditFollowing(st, se, sp.repeatId, sp.dayKey, sp.patch, edited));
+      setSeriesPrompt(null);
+      return;
+    }
     const before = weekDataRef.current;
     const out = { ...before };
     const touched = [], cal = [];
@@ -4719,6 +4924,10 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     const task = getTasks(dayKey).find(t => t.id===id);
     if (!task) return;
     const repeatId = task.repeatId;
+    if (seriesRun && repeatId && (repeatSeries || {})[repeatId]) {
+      seriesRun('Deleted this and following', (st, se) => repeatSeriesDelete(st, se, repeatId, dayKey));
+      return;
+    }
     const legacyTitle = task.title;
     const legacyDays = (task.repeat?.days||[]).slice().sort();
     {
@@ -5376,6 +5585,8 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       {showRepeatCleanup && (
         <RepeatCleanupModal
           groups={getRepeatGroups()}
+          previewConvert={seriesRun ? previewLegacyConvert : null}
+          onConvert={runLegacyConvert}
           onDeleteGroup={(g)=>deleteRepeatGroup(g.key, g.repeatId, g.title, g.days)}
           onClose={()=>setShowRepeatCleanup(false)}
         />
@@ -5450,7 +5661,10 @@ function RepeatScopeModal({ scope, onPick, onClose }) {
   );
 }
 
-function RepeatCleanupModal({ groups, onDeleteGroup, onClose }) {
+function RepeatCleanupModal({ groups, onDeleteGroup, onClose, previewConvert, onConvert }) {
+  const [convMsg, setConvMsg] = useState('');
+  const [convTick, setConvTick] = useState(0);
+  const conv = React.useMemo(() => (previewConvert ? previewConvert() : null), [groups, convTick]);
   const [deletedKeys, setDeletedKeys] = useState(new Set());
   const [confirmKey, setConfirmKey] = useState(null);
   const visible = groups.filter(g => !deletedKeys.has(g.key));
@@ -5469,6 +5683,17 @@ function RepeatCleanupModal({ groups, onDeleteGroup, onClose }) {
           Each row is a group of repeat task instances across all weeks.
           Deleting a group removes every instance — past and future.
         </div>
+        {conv && (conv.converted.length > 0 || convMsg) && (
+          <div data-testid="convert-box" style={{fontSize:12,background:'var(--gold-light)',border:'1px solid var(--gold)',borderRadius:'var(--radius-sm)',padding:'8px 10px',marginBottom:12}}>
+            {conv.converted.length > 0 && <>
+              <div style={{marginBottom:6}}><b>{conv.converted.length}</b> older repeating task{conv.converted.length!==1?'s are':' is'} stored as a copy on every day
+                ({conv.converted.reduce((a,c)=>a+c.copies,0)} copies). They can be switched to the compact form, which keeps your edits and deleted days
+                and is checked day by day before anything changes. Undo is available for 10 seconds.</div>
+              <button data-testid="convert-btn" style={{padding:'5px 12px',fontSize:12,fontWeight:600,border:'none',borderRadius:'var(--radius-sm)',background:'var(--accent)',color:'#fff',cursor:'pointer'}} onClick={()=>{ const r = onConvert && onConvert(); setConvMsg(r ? `Converted ${r.converted.length}${r.failed.length?`, left ${r.failed.length} as they were`:''}.` : ''); setConvTick(t=>t+1); }}>Convert now</button>
+            </>}
+            {convMsg && <div style={{marginTop:6,color:'var(--accent)'}}>{convMsg}</div>}
+          </div>
+        )}
         <div style={{flex:1,overflowY:'auto'}}>
           {visible.length === 0 && (
             <div style={{textAlign:'center',color:'var(--ink-faint)',fontSize:13,padding:'24px 0'}}>
@@ -9972,6 +10197,27 @@ function App() {
     if (r.series !== se) { seriesRef.current = r.series; setRepeatSeries(r.series); }
     if (r.stored !== st) { storedRef.current = r.stored; setWeekDataStored(r.stored); }
   }, []);
+  // Run a repeating-task operation on the STORED data (fn(stored, series) -> {stored, series} | null) and
+  // register an Undo that puts back only the weeks and series it touched. Returns the result (or null).
+  const commitSeries = (ns, nse) => {
+    if (nse !== seriesRef.current) { seriesRef.current = nse; setRepeatSeries(nse); }
+    if (ns !== storedRef.current) { storedRef.current = ns; setWeekDataStored(ns); }
+  };
+  const seriesRun = useCallback((label, fn) => {
+    const st = storedRef.current, se = seriesRef.current;
+    const r = fn(st, se);
+    if (!r || (r.stored === st && r.series === se)) return null;
+    commitSeries(r.stored, r.series);
+    const wk = Object.keys({ ...st, ...r.stored }).filter(k => st[k] !== r.stored[k]);
+    const sk = Object.keys({ ...se, ...r.series }).filter(k => se[k] !== r.series[k]);
+    Undo.push(label, () => {
+      const ns = { ...storedRef.current }, nse = { ...seriesRef.current };
+      wk.forEach(k => { if (st[k] === undefined) delete ns[k]; else ns[k] = st[k]; });
+      sk.forEach(k => { if (se[k] === undefined) delete nse[k]; else nse[k] = se[k]; });
+      commitSeries(ns, nse);
+    });
+    return r;
+  }, []);
   const [pagesData, setPagesData] = useSynced('pagesData', []); // [{id,title,body,createdAt,lastModified,folderId,order,tasks:[]}]
   const [foldersData, setFoldersData] = useSynced('foldersData', []); // [{id,name,expanded,order}]
   const [selectedPagesId, setSelectedPagesIdRaw] = useState(() => sessionStorage.getItem('lp_selectedPagesId') || null);
@@ -10448,7 +10694,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.5.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.6.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -10526,7 +10772,7 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
