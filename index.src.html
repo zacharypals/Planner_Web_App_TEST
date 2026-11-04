@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.11.0 -->
+<!-- LP Planner v5.11.1 -->
+<!-- v5.11.1 — Exercise Library: editing an exercise no longer snaps shut when you tap the Sub field or category menu (the row now closes only when focus leaves it); Cardio exercises without a subcategory show a dashed "+ sub" chip, and any subcategory chip opens the editor. -->
 <!-- v5.11.0 — Goals: tasks and milestones can check themselves off from the Fitness log. A rule counts chosen exercises or a subcategory (new optional "Sub" on library exercises, e.g. Run / Bike): total or longest single set of miles, minutes, reps, heaviest weight, or days with a workout logged. Tasks look at their scheduled day; milestones look since they started, or at any single Sun–Sat week. Done items show "completed on" the day it was reached; unchecking an auto-completed item pauses it. Also: the linked-exercise roll-up now reads flat fitness-log days. -->
 <!-- v5.10.0 — Week view: the Habits and Goals sections remember being expanded per day, on this device only (localStorage, not synced). Still collapsed by default; entries older than 90 days are pruned. -->
 <!-- v5.9.1 — Expanded task: the Repeat / + List row now sits above the "Move to" day picker. -->
@@ -11327,7 +11328,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.11.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.11.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -12832,12 +12833,12 @@ function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose 
               {items.map(ex => (
                 <div key={ex.id} style={{display:'flex',alignItems:'center',gap:6,padding:'5px 4px',borderRadius:6}}
                   onMouseEnter={e=>e.currentTarget.style.background='var(--cream)'}
-                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+                  onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+                  onBlur={e=>{ if(editId===ex.id && !e.currentTarget.contains(e.relatedTarget)) setEditId(null); }}>
                   {editId === ex.id ? (
                     <>
                       <input autoFocus value={ex.name}
                         onChange={e=>onUpdate(ex.id,{name:e.target.value})}
-                        onBlur={()=>setEditId(null)}
                         onKeyDown={e=>{ if(e.key==='Enter'||e.key==='Escape') setEditId(null); }}
                         style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--accent)',
                           borderRadius:4,padding:'3px 6px',outline:'none',background:'var(--surface)',color:'var(--ink)'}}
@@ -12855,7 +12856,9 @@ function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose 
                   ) : (
                     <>
                       <span style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}>{ex.name}
-                        {ex.subcategory&&<span style={{marginLeft:6,fontSize:10,color:'var(--ink-light)',background:'var(--neutral-bg)',borderRadius:999,padding:'1px 6px'}}>{ex.subcategory}</span>}</span>
+                        {ex.subcategory
+                          ? <span onClick={()=>setEditId(ex.id)} title="Edit subcategory" style={{marginLeft:6,fontSize:10,color:'var(--ink-light)',background:'var(--neutral-bg)',borderRadius:999,padding:'1px 6px',cursor:'pointer'}}>{ex.subcategory}</span>
+                          : cat==='Cardio' && <span onClick={()=>setEditId(ex.id)} title="Add a subcategory, e.g. Run or Bike" style={{marginLeft:6,fontSize:10,color:'var(--ink-faint)',border:'1px dashed var(--border)',borderRadius:999,padding:'0 6px',cursor:'pointer'}}>+ sub</span>}</span>
                       <button onClick={()=>setEditId(ex.id)}
                         style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:'var(--ink-faint)',padding:'0 3px'}}>✏️</button>
                       <button onClick={()=>{ if(confirmId===ex.id){onDelete(ex.id);setConfirmId(null);}else setConfirmId(ex.id); }}
