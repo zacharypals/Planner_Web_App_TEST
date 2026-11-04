@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.11.1 -->
+<!-- LP Planner v5.12.0 -->
+<!-- v5.12.0 — Goals: the ↻ auto-check buttons (tasks) and the "Complete automatically from my training" row (milestones) now show only on goals that have Habits & training → Edit → Auto-check → ↻ Fitness log switched on. Anything that already has a rule stays visible. -->
 <!-- v5.11.1 — Exercise Library: editing an exercise no longer snaps shut when you tap the Sub field or category menu (the row now closes only when focus leaves it); Cardio exercises without a subcategory show a dashed "+ sub" chip, and any subcategory chip opens the editor. -->
 <!-- v5.11.0 — Goals: tasks and milestones can check themselves off from the Fitness log. A rule counts chosen exercises or a subcategory (new optional "Sub" on library exercises, e.g. Run / Bike): total or longest single set of miles, minutes, reps, heaviest weight, or days with a workout logged. Tasks look at their scheduled day; milestones look since they started, or at any single Sun–Sat week. Done items show "completed on" the day it was reached; unchecking an auto-completed item pauses it. Also: the linked-exercise roll-up now reads flat fitness-log days. -->
 <!-- v5.10.0 — Week view: the Habits and Goals sections remember being expanded per day, on this device only (localStorage, not synced). Still collapsed by default; entries older than 90 days are pruned. -->
@@ -9722,6 +9723,15 @@ function GlLinkPicker({ goal, onChange, habitGoals, fitnessExercises }) {
   });
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* v5.12.0 — per-goal switch for the ↻ auto-check buttons on this goal's tasks and milestones */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Auto-check</span>
+        <span style={{ fontSize: 11, color: 'var(--ink-light)' }}>Adds a ↻ button to this goal's tasks and milestones so they can check themselves off from your Fitness log. Anything that already has a rule stays visible.</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+          <button className={`gl-chip ${goal.autoTraining ? 'on' : ''}`} aria-pressed={!!goal.autoTraining}
+            onClick={() => onChange(g => ({ ...g, autoTraining: !g.autoTraining }))}>↻ Fitness log</button>
+        </div>
+      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Measurements</span>
         {!metricIds.includes('weight') && <span style={{ fontSize: 11, color: 'var(--ink-light)' }}>Link Weight to also let a milestone complete itself from your weight.</span>}
@@ -10368,8 +10378,9 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
               </div>
             );
           })()}
-          {/* v5.11.0 — complete this milestone from my training (Fitness log). Offered once there are exercises, or when already set */}
-          {(((fctx.fitnessExercises || []).length > 0) || m.rule) && (
+          {/* v5.11.0 — complete this milestone from my training (Fitness log). v5.12.0: offered when the goal has the
+              "Auto-check → Fitness log" switch on (Habits & training → Edit), or when this milestone already has a rule */}
+          {((goal && goal.autoTraining) || m.rule) && (
             <div className="gl-task" style={{ flexWrap: 'wrap', rowGap: 6 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink)', minHeight: 32, cursor: 'pointer' }}>
                 <input type="checkbox" checked={!!m.rule} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }}
@@ -10398,7 +10409,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
                 onClick={() => setPicker(p => p === t.id ? null : t.id)}>
                 {t.scheduledDate ? glShortDay(t.scheduledDate) : '+ Schedule'}
               </button>
-              {(((fctx.fitnessExercises || []).length > 0) || t.rule) && (
+              {((goal && goal.autoTraining) || t.rule) && (
                 <button className={`gl-sched ${t.rule ? 'set' : ''}`} aria-expanded={ruleOpen === t.id} aria-label="Check off automatically from my Fitness log"
                   title="Check this off automatically from my Fitness log"
                   style={t.rule ? { background: glTint(color, 0.14), color: glInk(color) } : undefined}
@@ -10589,14 +10600,21 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, hab
             </div>
             {linksOpen ? (
               <GlLinkPicker goal={goal} onChange={onChange} habitGoals={habitGoals} fitnessExercises={fitnessExercises} />
-            ) : glHasLinks(goal) ? (
-              <>
-                <GlLinksRow goal={goal} habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
-                  habitCompletions={habitCompletions} fitnessLog={fitnessLog} weekStart={linkWeekStart} />
-                <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>This week. Shown alongside the milestones — it doesn't change the goal's progress.</span>
-              </>
             ) : (
-              <span style={{ fontSize: 13, color: 'var(--ink-light)' }}>Link the habits and exercises this goal rests on, and their weekly progress shows here.</span>
+              <>
+                {glHasLinks(goal) ? (
+                  <>
+                    <GlLinksRow goal={goal} habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
+                      habitCompletions={habitCompletions} fitnessLog={fitnessLog} weekStart={linkWeekStart} />
+                    <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>This week. Shown alongside the milestones — it doesn't change the goal's progress.</span>
+                  </>
+                ) : !goal.autoTraining && (
+                  <span style={{ fontSize: 13, color: 'var(--ink-light)' }}>Link the habits and exercises this goal rests on, and their weekly progress shows here.</span>
+                )}
+                {goal.autoTraining && (
+                  <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>↻ Tasks and milestones can check themselves off from your Fitness log.</span>
+                )}
+              </>
             )}
           </div>
 
@@ -11328,7 +11346,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.11.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.12.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
