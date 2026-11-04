@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.9.1 -->
+<!-- LP Planner v5.10.0 -->
+<!-- v5.10.0 — Week view: the Habits and Goals sections remember being expanded per day, on this device only (localStorage, not synced). Still collapsed by default; entries older than 90 days are pruned. -->
 <!-- v5.9.1 — Expanded task: the Repeat / + List row now sits above the "Move to" day picker. -->
 <!-- v5.9.0 — Week view: tasks can hold a checklist (+ List beside Repeat). Items check off, Enter adds the next, Backspace on an empty one removes it, the grip reorders (touch too). A collapsed card shows a 3/8 pill; "Remove Checked Items" asks before deleting. Repeating tasks: each copy keeps its own list, and new copies start with the items unchecked. Not on events or project tasks. -->
 <!-- v5.8.1 — Week view: removed the per-task Color picker from the expanded task (auto-colors only; old custom colors still show). Task palette grows from 18 to 22 colors (butter, pistachio, clay, aqua) for busy days. -->
@@ -5173,7 +5174,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     const list = goalTasksByDay[localKey] || [];
     if (!list.length) return null;
     return (
-      <GlDaySection key={'gls-'+localKey} done={list.filter(x => x.task.done).length} total={list.length}>
+      <GlDaySection key={'gls-'+localKey} dayKey={localKey} done={list.filter(x => x.task.done).length} total={list.length}>
         {renderGoalTaskCards(list, desktop)}
       </GlDaySection>
     );
@@ -6174,12 +6175,40 @@ function DayNote({ dayKey, note, onChange }) {
   );
 }
 
+// v5.10.0: per-day expanded state for the week view's Habits / Goals sections.
+// Device-local UI pref (localStorage via lsGet/lsSet, never synced). Only open days are stored: { 'YYYY-MM-DD': { habits: 1, goals: 1 } }.
+const DAY_OPEN_LS = 'dayOpen';
+function readDayOpen() { try { const m = JSON.parse(lsGet(DAY_OPEN_LS) || '{}'); return (m && typeof m === 'object') ? m : {}; } catch { return {}; } }
+function useDayOpen(section, dayKey) {
+  const [, bump] = React.useReducer(x => x + 1, 0);
+  React.useEffect(() => {
+    const h = () => bump();
+    window.addEventListener('lp-dayopen', h);
+    return () => window.removeEventListener('lp-dayopen', h);
+  }, []);
+  const open = !!(dayKey && (readDayOpen()[dayKey] || {})[section]);
+  function toggle() {
+    if (!dayKey) return;
+    const m = readDayOpen();
+    const d = { ...(m[dayKey] || {}) };
+    if (d[section]) delete d[section]; else d[section] = 1;
+    if (Object.keys(d).length) m[dayKey] = d; else delete m[dayKey];
+    const c = new Date(); c.setDate(c.getDate() - 90);
+    const cutoff = fmtLocal(c);
+    Object.keys(m).forEach(k => { if (k < cutoff) delete m[k]; });
+    lsSet(DAY_OPEN_LS, JSON.stringify(m));
+    window.dispatchEvent(new Event('lp-dayopen'));
+  }
+  return [open, toggle];
+}
+
 // ─────────────────────────────────────────────
 // DAILY HABITS SECTION (shown in WeeklyPlanner day columns)
 // ─────────────────────────────────────────────
 function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes }) {
   const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily');
-  const [collapsed, setCollapsed] = React.useState(true);
+  const [habitsOpen, toggleHabitsOpen] = useDayOpen('habits', dayKey);
+  const collapsed = !habitsOpen;
   const [expandedIds, setExpandedIds] = React.useState({});
 
   if (dailyHabits.length === 0) return null;
@@ -6213,7 +6242,7 @@ function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitComp
 
   return (
     <div className="habit-task-section">
-      <div className="habit-task-label" onClick={() => setCollapsed(c => !c)}>
+      <div className="habit-task-label" onClick={toggleHabitsOpen}>
         <span style={{fontSize:8}}>{collapsed ? '▸' : '▾'}</span>
         <span>Habits</span>
         <span style={{marginLeft:'auto', fontSize:9, fontWeight:700, opacity:0.8}}>
@@ -9619,11 +9648,12 @@ function GlSchedulePicker({ value, onPick, onClose, extra, anchor }) {
 
 // ── Goal task as it appears inside the Weekly Planner (desktop column + mobile day view) ──
 // v4.5.0: collapsible "Goals" section under Habits in the week grid / mobile day view (collapsed by default, like Habits)
-function GlDaySection({ done, total, children }) {
-  const [collapsed, setCollapsed] = useState(true);
+function GlDaySection({ dayKey, done, total, children }) {
+  const [goalsOpen, toggleGoalsOpen] = useDayOpen('goals', dayKey);
+  const collapsed = !goalsOpen;
   return (
     <div className="habit-task-section gl-day-section">
-      <div className="habit-task-label" onClick={() => setCollapsed(c => !c)}>
+      <div className="habit-task-label" onClick={toggleGoalsOpen}>
         <span style={{fontSize:8}}>{collapsed ? '▸' : '▾'}</span>
         <span>Goals</span>
         <span style={{marginLeft:'auto', fontSize:9, fontWeight:700, opacity:0.8}}>{done}/{total}</span>
@@ -11000,7 +11030,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.9.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.10.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
