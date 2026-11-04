@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.10.0 -->
+<!-- LP Planner v5.11.0 -->
+<!-- v5.11.0 — Goals: tasks and milestones can check themselves off from the Fitness log. A rule counts chosen exercises or a subcategory (new optional "Sub" on library exercises, e.g. Run / Bike): total or longest single set of miles, minutes, reps, heaviest weight, or days with a workout logged. Tasks look at their scheduled day; milestones look since they started, or at any single Sun–Sat week. Done items show "completed on" the day it was reached; unchecking an auto-completed item pauses it. Also: the linked-exercise roll-up now reads flat fitness-log days. -->
 <!-- v5.10.0 — Week view: the Habits and Goals sections remember being expanded per day, on this device only (localStorage, not synced). Still collapsed by default; entries older than 90 days are pruned. -->
 <!-- v5.9.1 — Expanded task: the Repeat / + List row now sits above the "Move to" day picker. -->
 <!-- v5.9.0 — Week view: tasks can hold a checklist (+ List beside Repeat). Items check off, Enter adds the next, Backspace on an empty one removes it, the grip reorders (touch too). A collapsed card shows a 3/8 pill; "Remove Checked Items" asks before deleting. Repeating tasks: each copy keeps its own list, and new copies start with the items unchecked. Not on events or project tasks. -->
@@ -2236,6 +2237,11 @@
   .gl-wtask .gl-wtask-row { display: flex; align-items: flex-start; gap: 6px; }
   .gl-wtask .gl-wtask-title { flex: 1; min-width: 0; font-weight: 500; font-size: 11px; line-height: 1.3; word-break: break-word; }
   .gl-wtask.done .gl-wtask-title { text-decoration: line-through; opacity: 0.55; }
+  .gl-wtask-rule { display: block; margin: 4px 0 0 20px; font-size: 10.5px; font-weight: 600; line-height: 1.3; }
+  .gl-wtask-rule .gl-bar { height: 4px; margin-top: 3px; }
+  .gl-rule { flex-basis: 100%; display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; margin: 2px 0 6px; background: var(--tint); border: 1px solid var(--neutral-line); border-radius: 8px; }
+  .gl-rule-label { font-size: 11px; color: var(--ink-faint); font-family: 'DM Mono', monospace; }
+  .gl-rule-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
   .gl-wtask-pill { display: inline-block; margin: 4px 0 0 20px; font-size: 10px; font-weight: 600; padding: 1px 7px; border-radius: 999px; max-width: calc(100% - 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: top; }
   .gl-wtask-more { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 13px; padding: 0 2px; line-height: 1; opacity: 0; }
   .gl-wtask:hover .gl-wtask-more { opacity: 1; }
@@ -3022,12 +3028,11 @@ function fitWeekStats(exerciseId, fitnessLog, weekStart) {
   let sessions = 0, sets = 0;
   for (let i = 0; i < 7; i++) {
     let hit = false;
-    ((fitnessLog || {})[fmt(addDays(weekStart, i))] || []).forEach(w =>
-      (w.exercises || []).forEach(ex => {
-        if (ex.exerciseId !== exerciseId) return;
-        hit = true;
-        sets += (ex.sets || []).filter(s => s.done).length;
-      }));
+    flDayExs((fitnessLog || {})[fmt(addDays(weekStart, i))]).forEach(ex => {
+      if (ex.exerciseId !== exerciseId) return;
+      hit = true;
+      sets += (ex.sets || []).filter(s => s.done).length;
+    });
     if (hit) sessions++;
   }
   return { sessions, sets };
@@ -3134,20 +3139,179 @@ function glMetricMet(m, goal, mctx, asOf) {
   if (cur.avg === null) return false;
   return c.op === '>=' ? cur.avg >= v : cur.avg <= v;
 }
-// Complete any open weight milestones whose condition is met. Returns the SAME goals array when
+// ── GOAL RULES OVER THE FITNESS LOG (v5.11.0) ──
+// A goal task or milestone can check itself off from what is logged in Fitness:
+//   task.rule / milestone.rule = { src:{ exerciseIds:[exerciseId], subs:['Run'] }, measure, target:'3', window:'since'|'week' }
+// src is a union: an exercise counts if its id is listed OR its library `subcategory` is listed (matched
+// ignoring case/spaces). Exercises are linked by id; a subcategory is a tag, so renaming one in the library
+// means re-picking it in the rule. Only DONE sets count, like Fitness goals. Dates: goal dates are local
+// 'YYYY-MM-DD'; the fitness log is keyed with fmt() (see the note above), so lookups use fmt(parseLocal(..)).
+// Tasks always look at their scheduled day. Milestones look from their start date (or the goal's) through today,
+// either cumulatively ('since') or at any single Sun–Sat week ('week'). Weeks are clipped to the start date so
+// older logs never count. Completion is stamped with the day the log reached the target, not the day it was noticed.
+const GL_RULE_MEASURES = {
+  'dist-sum':   { label: 'Total distance',              unit: 'mi',   day: 'dist',      agg: 'sum' },
+  'dist-max':   { label: 'Longest single set (distance)', unit: 'mi',  day: 'distMax',   agg: 'max' },
+  'mins-sum':   { label: 'Total time',                  unit: 'min',  day: 'mins',      agg: 'sum' },
+  'reps-sum':   { label: 'Total reps',                  unit: 'reps', day: 'reps',      agg: 'sum' },
+  'weight-max': { label: 'Heaviest weight',             unit: 'lb',   day: 'weightMax', agg: 'max' },
+  'days':       { label: 'Days with a workout logged',  unit: 'days', day: null,        agg: 'days' },
+};
+// A day of the fitness log as a flat list of exercise entries (handles the older workout-shaped days too)
+function flDayExs(raw) {
+  const r = raw || [];
+  return (r[0] && Array.isArray(r[0].exercises)) ? r.flatMap(w => w.exercises || []) : r;
+}
+function flMins(v) {
+  if (!v && v !== 0) return 0;
+  const s = String(v).trim();
+  if (s.includes(':')) { const p = s.split(':'); return (parseFloat(p[0]) || 0) + (parseFloat(p[1]) || 0) / 60; }
+  return parseFloat(s) || 0;
+}
+function ruleSubKey(s) { return String(s || '').trim().toLowerCase(); }
+// Distinct subcategories in the library, for the pickers (first spelling wins)
+function ruleSubs(fitnessExercises) {
+  const seen = {};
+  (fitnessExercises || []).forEach(e => { const k = ruleSubKey(e.subcategory); if (k && !seen[k]) seen[k] = String(e.subcategory).trim(); });
+  return Object.values(seen).sort((a, b) => a.localeCompare(b));
+}
+function glNewRule() { return { src: { exerciseIds: [], subs: [] }, measure: 'dist-sum', target: '', window: 'since' }; }
+// Library exercises a rule counts
+function ruleMatchSet(rule, fitnessExercises) {
+  const src = (rule && rule.src) || {};
+  const ids = new Set(src.exerciseIds || []);
+  const subs = new Set((src.subs || []).map(ruleSubKey));
+  const out = new Set();
+  (fitnessExercises || []).forEach(e => { if (ids.has(e.id) || (e.subcategory && subs.has(ruleSubKey(e.subcategory)))) out.add(e.id); });
+  return out;
+}
+// Days (local keys, oldest first) between two local dates inclusive on which a matching exercise has a done set,
+// with that day's numbers. Days with nothing matching are left out.
+function ruleDays(match, fitnessLog, fromKey, toKey) {
+  const out = [];
+  const end = parseLocal(toKey);
+  for (let d = parseLocal(fromKey), i = 0; d && end && d <= end && i < 800; d = addDays(d, 1), i++) {
+    const day = { dk: fmtLocal(d), dist: 0, distMax: 0, mins: 0, reps: 0, weightMax: 0 };
+    let hit = false;
+    flDayExs((fitnessLog || {})[fmt(d)]).forEach(ex => {
+      if (!match.has(ex.exerciseId)) return;
+      (ex.sets || []).forEach(s => {
+        if (!s.done) return;
+        hit = true;
+        const dist = parseFloat(s.dist) || 0;
+        day.dist += dist;
+        if (dist > day.distMax) day.distMax = dist;
+        day.mins += flMins(s.time);
+        day.reps += parseFloat(s.reps) || 0;
+        const w = parseFloat(s.weight) || 0;
+        if (w > day.weightMax) day.weightMax = w;
+      });
+    });
+    if (hit) out.push(day);
+  }
+  return out;
+}
+function ruleAgg(measure, days) {
+  const spec = GL_RULE_MEASURES[measure];
+  if (!spec) return 0;
+  let v;
+  if (spec.agg === 'days') v = days.length;
+  else if (spec.agg === 'max') v = days.reduce((mx, d) => Math.max(mx, d[spec.day]), 0);
+  else v = days.reduce((s, d) => s + d[spec.day], 0);
+  return Math.round(v * 100) / 100;
+}
+function ruleTarget(rule) { const t = mNum(rule && rule.target); return t !== null && t > 0 ? t : null; }
+// The day (local key) the running total first reached the target, or null
+function ruleReachedOn(measure, days, target) {
+  for (let i = 0; i < days.length; i++) if (ruleAgg(measure, days.slice(0, i + 1)) >= target) return days[i].dk;
+  return null;
+}
+function glNoon(key) { const d = parseLocal(key); return d ? d.getTime() + 12 * 3600 * 1000 : Date.now(); }
+// Shared start of a status: what is wrong with the rule, if anything
+function ruleBase(rule, fctx) {
+  const spec = GL_RULE_MEASURES[rule.measure];
+  const target = ruleTarget(rule);
+  const base = { spec, target, unit: spec ? spec.unit : '', value: 0, met: false, pct: 0, ready: false, metOn: null };
+  if (!spec || target === null) return { ...base, why: 'Set a target' };
+  const match = ruleMatchSet(rule, fctx && fctx.fitnessExercises);
+  if (!match.size) return { ...base, why: 'Pick what counts' };
+  return { ...base, match, why: '' };
+}
+// Where a task's rule stands (its scheduled day only). null when the task has no rule.
+function glTaskRule(task, fctx) {
+  const rule = task && task.rule;
+  if (!rule) return null;
+  const b = ruleBase(rule, fctx);
+  if (!b.match) return b;
+  if (!task.scheduledDate) return { ...b, why: 'Schedule it to use this' };
+  const days = ruleDays(b.match, fctx.fitnessLog, task.scheduledDate, task.scheduledDate);
+  const value = ruleAgg(rule.measure, days);
+  const met = value >= b.target;
+  return { ...b, ready: true, value, met, pct: Math.min(1, value / b.target), metOn: met ? task.scheduledDate : null };
+}
+// Where a milestone's rule stands. 'week' windows also report this week's number and the best week so far.
+function glMsRule(m, goal, fctx, todayKey) {
+  const rule = m && m.rule;
+  if (!rule) return null;
+  const b = ruleBase(rule, fctx);
+  if (!b.match) return b;
+  const from = m.startDate || (goal && goal.startDate) || todayKey;
+  if (from > todayKey) return { ...b, ready: true, notStarted: true, from };
+  const days = ruleDays(b.match, fctx.fitnessLog, from, todayKey);
+  if (rule.window === 'week') {
+    const byWeek = {};
+    days.forEach(d => { const ws = fmtLocal(getWeekStart(parseLocal(d.dk))); (byWeek[ws] = byWeek[ws] || []).push(d); });
+    const curKey = fmtLocal(getWeekStart(parseLocal(todayKey)));
+    let best = 0, metOn = null;
+    Object.keys(byWeek).sort().forEach(ws => {
+      best = Math.max(best, ruleAgg(rule.measure, byWeek[ws]));
+      if (metOn === null) metOn = ruleReachedOn(rule.measure, byWeek[ws], b.target);
+    });
+    const cur = byWeek[curKey] ? ruleAgg(rule.measure, byWeek[curKey]) : 0;
+    const met = metOn !== null;
+    return { ...b, ready: true, weekly: true, from, value: cur, best, met, pct: Math.min(1, (met ? best : cur) / b.target), metOn };
+  }
+  const value = ruleAgg(rule.measure, days);
+  const metOn = value >= b.target ? ruleReachedOn(rule.measure, days, b.target) : null;
+  return { ...b, ready: true, from, value, met: metOn !== null, pct: Math.min(1, value / b.target), metOn };
+}
+// Complete any open task or milestone whose rule (training or weight) is met. Returns the SAME goals array when
 // nothing changed (so React does no work) plus what was reached, for the Undo toast.
-// Only active goals; a milestone you reopened by hand (metricHold) is left alone.
+// Only active goals; something you unchecked by hand after it auto-completed (metricHold / ruleHold) is left alone.
+// mctx carries {metrics, fitnessLog, fitnessExercises}.
 function glAutoComplete(goals, mctx, asOf) {
   const reached = [];
   let changed = false;
+  const todayKey = fmtLocal(asOf);
+  const fctx = { fitnessLog: mctx.fitnessLog, fitnessExercises: mctx.fitnessExercises };
   const out = (goals || []).map(g => {
     if (g.status === 'done' || g.status === 'parked') return g;
     let touched = false;
     const ms = (g.milestones || []).map(m => {
-      if (m.done || m.metricHold || !m.metric || !glMetricMet(m, g, mctx, asOf)) return m;
-      touched = true;
-      reached.push({ gid: g.id, mid: m.id, title: m.title, goal: g.title });
-      return { ...m, done: true, completedAt: Date.now(), autoDone: true };
+      let mm = m;
+      if ((m.tasks || []).some(t => t.rule && !t.done && !t.ruleHold)) {
+        let anyTask = false;
+        const tasks = m.tasks.map(t => {
+          if (!t.rule || t.done || t.ruleHold) return t;
+          const s = glTaskRule(t, fctx);
+          if (!s || !s.met) return t;
+          anyTask = true;
+          reached.push({ kind: 'task', gid: g.id, mid: m.id, tid: t.id, title: t.title, goal: g.title });
+          return { ...t, done: true, completedAt: glNoon(t.scheduledDate), autoDone: true };
+        });
+        if (anyTask) mm = { ...mm, tasks };
+      }
+      if (!mm.done) {
+        const weightMet = !mm.metricHold && mm.metric && glMetricMet(mm, g, mctx, asOf);
+        const rs = (!mm.ruleHold && mm.rule) ? glMsRule(mm, g, fctx, todayKey) : null;
+        const ruleMet = !!(rs && rs.met);
+        if (weightMet || ruleMet) {
+          reached.push({ kind: 'ms', gid: g.id, mid: m.id, title: m.title, goal: g.title });
+          mm = { ...mm, done: true, completedAt: (!weightMet && rs && rs.metOn) ? glNoon(rs.metOn) : Date.now(), autoDone: true };
+        }
+      }
+      if (mm !== m) touched = true;
+      return mm;
     });
     if (!touched) return g;
     changed = true;
@@ -5184,6 +5348,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       const ref = {goalId: goal.id, msId: ms.id, taskId: task.id};
       return (
         <GlWeekTask key={'gt-'+task.id} item={{goal, ms, task}}
+          rule={task.rule ? glTaskRule(task, {fitnessLog, fitnessExercises}) : null}
           onToggle={()=>setGoalTask(ref, {done: !task.done})}
           onMove={d=>setGoalTask(ref, {scheduledDate: d})}
           onOpen={()=>onOpenGoal && onOpenGoal(goal.id)}
@@ -9445,10 +9610,16 @@ function glHealth(g, today) {
 }
 function glPatchGoal(gs, gid, fn) { return gs.map(g => g.id === gid ? fn(g) : g); }
 function glPatchMs(g, mid, fn) { return { ...g, milestones: (g.milestones || []).map(m => m.id === mid ? fn(m) : m) }; }
+// v5.11.0: the stamp for checking or unchecking a task by hand. Unchecking something the log checked for you
+// pauses its rule (ruleHold) so the rule can't simply re-check it; editing the rule clears the pause.
+function glDoneExtra(item, done) {
+  const e = { completedAt: done ? Date.now() : null, autoDone: false };
+  if (!done && item && item.rule && item.autoDone) e.ruleHold = true;
+  return e;
+}
 function glPatchTask(gs, gid, mid, tid, patch) {
-  const extra = ('done' in patch) ? { completedAt: patch.done ? Date.now() : null } : {};
   return glPatchGoal(gs, gid, g => glPatchMs(g, mid, m => ({
-    ...m, tasks: (m.tasks || []).map(t => t.id === tid ? { ...t, ...patch, ...extra } : t),
+    ...m, tasks: (m.tasks || []).map(t => t.id === tid ? { ...t, ...patch, ...(('done' in patch) ? glDoneExtra(t, patch.done) : {}) } : t),
   })));
 }
 function glTasksByDay(goals) {   // 'YYYY-MM-DD' → [{ goal, ms, task }]
@@ -9663,7 +9834,7 @@ function GlDaySection({ dayKey, done, total, children }) {
   );
 }
 
-function GlWeekTask({ item, onToggle, onMove, onOpen, onDragStart, onDragEnd }) {
+function GlWeekTask({ item, rule, onToggle, onMove, onOpen, onDragStart, onDragEnd }) {
   const { goal, ms, task } = item;
   const [menu, setMenu] = useState(false);   // false | { anchor }
   function openMenu(e) {
@@ -9690,6 +9861,17 @@ function GlWeekTask({ item, onToggle, onMove, onOpen, onDragStart, onDragEnd }) 
         <button className="gl-wtask-more" aria-label="Goal task options" onClick={openMenu}>⋯</button>
       </div>
       <span className="gl-wtask-pill" style={{ color: glInk(c), background: glTint(c, 0.18) }}>◆ {goal.title || 'Goal'}</span>
+      {rule && (
+        <span className="gl-wtask-rule" style={{ color: rule.ready ? glInk(c) : 'var(--ink-light)' }}
+          title={task.ruleHold ? 'Auto-check is paused because you unchecked this' : 'Checks itself off from your Fitness log'}>
+          {rule.ready
+            ? <>↻ {mRound(rule.value)} / {mRound(rule.target)} {rule.unit}{task.done && task.autoDone ? ' · auto' : ''}{task.ruleHold ? ' · paused' : ''}</>
+            : <>↻ {rule.why}</>}
+          {rule.ready && !task.done && rule.value > 0 && (
+            <div className="gl-bar" style={{ background: glTint(c, 0.15) }}><div style={{ width: Math.round(rule.pct * 100) + '%', background: c }} /></div>
+          )}
+        </span>
+      )}
       {menu && (
         <GlSchedulePicker value={task.scheduledDate} onPick={onMove} onClose={() => setMenu(false)} anchor={menu.anchor}
           extra={<button className="gl-btn" style={{ fontSize: 12 }} onClick={() => { setMenu(false); onOpen(); }}>Open goal ›</button>} />
@@ -10007,18 +10189,100 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   );
 }
 
+// Editor for a task or milestone rule (v5.11.0): what counts, how it is measured, the target, and (milestones) the window.
+// `status` comes from glTaskRule / glMsRule; `onPatch` merges into the rule and clears any pause.
+function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, onRemove }) {
+  const exs = (fctx && fctx.fitnessExercises) || [];
+  const subs = ruleSubs(exs);
+  const src = rule.src || { exerciseIds: [], subs: [] };
+  const subOn = name => (src.subs || []).some(x => ruleSubKey(x) === ruleSubKey(name));
+  const toggleSub = name => onPatch({ src: { ...src, subs: subOn(name) ? (src.subs || []).filter(x => ruleSubKey(x) !== ruleSubKey(name)) : [...(src.subs || []), name] } });
+  const toggleEx = id => { const cur = src.exerciseIds || []; onPatch({ src: { ...src, exerciseIds: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] } }); };
+  const spec = GL_RULE_MEASURES[rule.measure] || GL_RULE_MEASURES['dist-sum'];
+  const match = ruleMatchSet(rule, exs);
+  const matched = exs.filter(e => match.has(e.id));
+  const cardioOnly = matched.length > 0 && matched.every(e => e.category === 'Cardio');
+  const noCardio = matched.length > 0 && !matched.some(e => e.category === 'Cardio');
+  const distLike = spec.day === 'dist' || spec.day === 'distMax' || spec.day === 'mins';
+  const strengthLike = spec.day === 'reps' || spec.day === 'weightMax';
+  let warn = '';
+  if (distLike && noCardio) warn = "None of these are Cardio exercises, so they don't log miles or minutes.";
+  else if (strengthLike && cardioOnly) warn = "Cardio exercises don't log reps or weight.";
+  let note = '';
+  if (held) note = 'Auto-check is paused because you unchecked it. Change the rule to turn it back on.';
+  else if (done && auto) note = `Completed automatically${status && status.metOn ? ' · ' + glShortDay(status.metOn) : ''}.`;
+  else if (status) {
+    if (!status.ready) note = status.why + '.';
+    else if (status.notStarted) note = `Starts counting ${glShort(status.from)}.`;
+    else if (status.weekly) note = `This week ${mRound(status.value)} of ${mRound(status.target)} ${status.unit}. Best week so far ${mRound(status.best)}.`;
+    else note = `Now ${mRound(status.value)} of ${mRound(status.target)} ${status.unit}.`;
+  }
+  return (
+    <div className="gl-rule">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <span className="gl-rule-label">What counts</span>
+        <div className="gl-rule-row">
+          <span className="gl-rule-label" style={{ minWidth: 62 }}>Subcategory</span>
+          {subs.map(s => <button key={s} className={`gl-chip ${subOn(s) ? 'on' : ''}`} aria-pressed={subOn(s)} onClick={() => toggleSub(s)}>{s}</button>)}
+          {!subs.length && <span style={{ fontSize: 11, color: 'var(--ink-light)' }}>None yet. Tag exercises with one (Fitness → ⚙ library) to count them together, or pick exercises below.</span>}
+        </div>
+        {exs.length > 0 && (
+          <div className="gl-rule-row" style={{ maxHeight: 96, overflowY: 'auto' }}>
+            <span className="gl-rule-label" style={{ minWidth: 62 }}>Exercise</span>
+            {exs.map(ex => <button key={ex.id} className={`gl-chip ${(src.exerciseIds || []).includes(ex.id) ? 'on' : ''}`}
+              aria-pressed={(src.exerciseIds || []).includes(ex.id)} onClick={() => toggleEx(ex.id)}>{ex.name || 'Exercise'}</button>)}
+          </div>
+        )}
+      </div>
+      <div className="gl-rule-row">
+        <select className="gl-input" style={{ padding: '4px 6px', fontSize: 12 }} aria-label="What to measure" value={rule.measure}
+          onChange={e => onPatch({ measure: e.target.value })}>
+          {Object.entries(GL_RULE_MEASURES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>at least</span>
+        <input type="number" min="0" step="0.1" inputMode="decimal" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, width: 70 }}
+          aria-label="Target" placeholder="target" value={rule.target} onChange={e => onPatch({ target: e.target.value })} />
+        <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>{spec.unit}</span>
+        {scope === 'ms'
+          ? <select className="gl-input" style={{ padding: '4px 6px', fontSize: 12 }} aria-label="Time window" value={rule.window === 'week' ? 'week' : 'since'}
+              onChange={e => onPatch({ window: e.target.value })}>
+              <option value="since">since this milestone started</option>
+              <option value="week">in a single Sun–Sat week</option>
+            </select>
+          : <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>on this task's day</span>}
+      </div>
+      {note && <span style={{ fontSize: 11.5, color: 'var(--ink-light)' }}>{note}</span>}
+      {warn && <span style={{ fontSize: 11.5, color: '#b03a2e' }}>{warn}</span>}
+      <div className="gl-rule-row" style={{ justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>Counts completed sets only. Checking or unchecking by hand always wins.</span>
+        <button className="gl-btn ghost" style={{ fontSize: 12 }} onClick={onRemove}>Remove auto-check</button>
+      </div>
+    </div>
+  );
+}
+
 // One milestone in the goal editor: header row plus (when open) its tasks.
 function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete, onGripDown, dragging }) {
   const today = glToday();
   const [newTask, setNewTask] = useState('');
   const [focusId, setFocusId] = useState(null);
   const [picker, setPicker] = useState(null);   // task id whose schedule picker is open
+  const [ruleOpen, setRuleOpen] = useState(null);   // task id whose auto-check rule editor is open (v5.11.0)
   const tasks = m.tasks || [];
   const late = glMsOverdue(m, today);
+  const fctx = { fitnessLog: mctx && mctx.fitnessLog, fitnessExercises: mctx && mctx.fitnessExercises };
   function setTask(tid, patch) {
-    const extra = ('done' in patch) ? { completedAt: patch.done ? Date.now() : null } : {};
-    onChange(mm => ({ ...mm, tasks: (mm.tasks || []).map(t => t.id === tid ? { ...t, ...patch, ...extra } : t) }));
+    onChange(mm => ({ ...mm, tasks: (mm.tasks || []).map(t => t.id === tid ? { ...t, ...patch, ...(('done' in patch) ? glDoneExtra(t, patch.done) : {}) } : t) }));
   }
+  function setTaskRule(tid, patch) {
+    onChange(mm => ({ ...mm, tasks: (mm.tasks || []).map(t => t.id === tid ? { ...t, rule: { ...(t.rule || glNewRule()), ...patch }, ruleHold: false } : t) }));
+  }
+  function removeTaskRule(tid) {
+    setRuleOpen(null);
+    onChange(mm => ({ ...mm, tasks: (mm.tasks || []).map(t => { if (t.id !== tid) return t; const { rule, ruleHold, ...rest } = t; return rest; }) }));
+  }
+  const msRule = m.rule ? glMsRule(m, goal, fctx, today) : null;
+  const setMsRule = patch => onChange(mm => ({ ...mm, rule: { ...(mm.rule || glNewRule()), ...patch }, ruleHold: false }));
   function addTask(title, afterId) {
     const t = { id: glId('gt'), title: title || '', scheduledDate: null, done: false, completedAt: null };
     onChange(mm => {
@@ -10037,7 +10301,10 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
         <button className={`gl-check ${m.done ? 'on' : ''}`} aria-label={m.done ? 'Mark milestone not done' : 'Mark milestone done'}
           onClick={() => onChange(mm => ({ ...mm, done: !mm.done, completedAt: !mm.done ? Date.now() : null,
             // Reopening a weight milestone by hand must stick, or the next check would just re-complete it
-            ...(mm.done && mm.metric ? { metricHold: true, autoDone: false } : {}) }))}>{m.done ? '✓' : ''}</button>
+            ...(mm.done && mm.metric ? { metricHold: true, autoDone: false } : {}),
+            // Same for a training rule that completed it (v5.11.0); checking by hand clears the auto flag
+            ...(mm.done && mm.rule && mm.autoDone ? { ruleHold: true, autoDone: false } : {}),
+            ...(!mm.done ? { autoDone: false } : {}) }))}>{m.done ? '✓' : ''}</button>
         <input className="gl-inline" style={{ flex: '1 1 160px', fontSize: 14, fontWeight: open ? 600 : 500, textDecoration: m.done ? 'line-through' : 'none', color: m.done ? 'var(--ink-light)' : late ? '#b03a2e' : 'var(--ink)' }}
           placeholder="Milestone name" value={m.title} autoFocus={!m.title}
           onChange={e => onChange(mm => ({ ...mm, title: e.target.value }))} />
@@ -10100,8 +10367,24 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
               </div>
             );
           })()}
-          {tasks.map(t => (
-            <div key={t.id} className="gl-task">
+          {/* v5.11.0 — complete this milestone from my training (Fitness log). Offered once there are exercises, or when already set */}
+          {(((fctx.fitnessExercises || []).length > 0) || m.rule) && (
+            <div className="gl-task" style={{ flexWrap: 'wrap', rowGap: 6 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink)', minHeight: 32, cursor: 'pointer' }}>
+                <input type="checkbox" checked={!!m.rule} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }}
+                  onChange={e => {
+                    if (e.target.checked) onChange(mm => ({ ...mm, rule: glNewRule(), ruleHold: false }));
+                    else onChange(mm => { const { rule, ruleHold, ...rest } = mm; return rest; });
+                  }} />
+                ↻ Complete automatically from my training
+              </label>
+              {m.rule && <GlRuleEditor rule={m.rule} scope="ms" status={msRule} held={!!m.ruleHold} done={!!m.done} auto={!!m.autoDone}
+                fctx={fctx} onPatch={setMsRule}
+                onRemove={() => onChange(mm => { const { rule, ruleHold, ...rest } = mm; return rest; })} />}
+            </div>
+          )}
+          {tasks.map(t => { const tst = t.rule ? glTaskRule(t, fctx) : null; return (
+            <div key={t.id} className="gl-task" style={ruleOpen === t.id ? { flexWrap: 'wrap', rowGap: 6 } : undefined}>
               <button className={`gl-check ${t.done ? 'on' : ''}`} aria-label={t.done ? 'Mark task not done' : 'Mark task done'}
                 onClick={() => setTask(t.id, { done: !t.done })}>{t.done ? '✓' : ''}</button>
               <input className="gl-inline" style={{ flex: 1, fontSize: 14, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? 'var(--ink-light)' : 'var(--ink)' }}
@@ -10114,10 +10397,20 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
                 onClick={() => setPicker(p => p === t.id ? null : t.id)}>
                 {t.scheduledDate ? glShortDay(t.scheduledDate) : '+ Schedule'}
               </button>
+              {(((fctx.fitnessExercises || []).length > 0) || t.rule) && (
+                <button className={`gl-sched ${t.rule ? 'set' : ''}`} aria-expanded={ruleOpen === t.id} aria-label="Check off automatically from my Fitness log"
+                  title="Check this off automatically from my Fitness log"
+                  style={t.rule ? { background: glTint(color, 0.14), color: glInk(color) } : undefined}
+                  onClick={() => { if (!t.rule) setTask(t.id, { rule: glNewRule() }); setRuleOpen(p => p === t.id ? null : t.id); }}>
+                  {t.rule ? `↻ ${tst && tst.ready ? mRound(tst.value) + '/' + mRound(tst.target) : 'auto'}` : '↻'}
+                </button>
+              )}
               <button className="gl-x" aria-label="Delete task" onClick={() => onChange(mm => ({ ...mm, tasks: (mm.tasks || []).filter(x => x.id !== t.id) }))}>✕</button>
               {picker === t.id && <GlSchedulePicker value={t.scheduledDate} onPick={d => setTask(t.id, { scheduledDate: d })} onClose={() => setPicker(null)} />}
+              {ruleOpen === t.id && t.rule && <GlRuleEditor rule={t.rule} scope="task" status={tst} held={!!t.ruleHold} done={!!t.done} auto={!!t.autoDone}
+                fctx={fctx} onPatch={p => setTaskRule(t.id, p)} onRemove={() => removeTaskRule(t.id)} />}
             </div>
-          ))}
+          ); })}
           <div className="gl-task">
             <span style={{ width: 18, textAlign: 'center', color: 'var(--ink-faint)' }}>+</span>
             <input className="gl-inline" style={{ flex: 1, fontSize: 14 }} placeholder="Add a task — press Enter" value={newTask}
@@ -10575,21 +10868,25 @@ function App() {
   const [countdowns, setCountdowns] = useSynced('countdowns', []); // [{id, title, startDate, endDate, color}]
   const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
   // Weight / calorie readings and their targets, bundled for the goal views (v4.8.0)
-  const mctx = { metrics: habitMetrics, weightTarget, calsTarget };
-  // Complete weight milestones whose condition is met (7-day average, 3+ readings since the goal began).
+  // v5.11.0: the fitness log and exercise library ride along so goal rules can read them
+  const mctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises };
+  // Complete weight milestones whose condition is met (7-day average, 3+ readings since the goal began) and
+  // tasks / milestones whose training rule is met by the Fitness log (v5.11.0).
   // Debounced; writes only when something changed. The Undo toast reopens it and holds auto-complete.
   useEffect(() => {
     const t = setTimeout(() => {
       const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
-      const ctx = { metrics: habitMetrics, weightTarget, calsTarget };
+      const ctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises };
       const r = glAutoComplete(goals, ctx, asOf);
       if (r.goals === goals) return;
       setGoals(gs => glAutoComplete(gs, ctx, asOf).goals);
-      r.reached.forEach(x => Undo.push(`Reached: ${x.title || 'milestone'}`, () => setGoals(gs => glPatchGoal(gs, x.gid, g =>
-        glPatchMs(g, x.mid, m => ({ ...m, done: false, completedAt: null, autoDone: false, metricHold: true }))))));
+      r.reached.forEach(x => Undo.push(`Reached: ${x.title || (x.kind === 'task' ? 'task' : 'milestone')}`, () => x.kind === 'task'
+        ? setGoals(gs => glPatchTask(gs, x.gid, x.mid, x.tid, { done: false }))
+        : setGoals(gs => glPatchGoal(gs, x.gid, g =>
+            glPatchMs(g, x.mid, m => ({ ...m, done: false, completedAt: null, autoDone: false, metricHold: true, ruleHold: true }))))));
     }, 2500);
     return () => clearTimeout(t);
-  }, [goals, habitMetrics, weightTarget]);
+  }, [goals, habitMetrics, weightTarget, fitnessLog, fitnessExercises]);
   // Keep "never ends" repeating tasks topped up as time passes (v4.6.0). Debounced; only writes when something was added.
   useEffect(() => {
     const t = setTimeout(() => {
@@ -11030,7 +11327,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.10.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.11.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -11447,10 +11744,11 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   }
 
   // ── Library helpers ──────────────────────────────────────────────────────
-  function addExercise(name, category) {
+  function addExercise(name, category, subcategory) {
     if (!name.trim()) return;
     const id='e'+Date.now();
-    setFitnessExercises(es=>[...es,{id,name:name.trim(),category:category||UNCATEGORIZED}]);
+    const sub=(subcategory||'').trim();   // v5.11.0: optional tag such as Run / Bike, used by goal rules
+    setFitnessExercises(es=>[...es,{id,name:name.trim(),category:category||UNCATEGORIZED,...(sub?{subcategory:sub}:{})}]);
     return id;
   }
   function updateExercise(id, patch) { setFitnessExercises(es=>es.map(e=>e.id===id?{...e,...patch}:e)); }
@@ -12502,8 +12800,12 @@ function ExercisePicker({ exercises, onAdd, onAddNew, onClose }) {
 function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose }) {
   const [newName, setNewName] = useState('');
   const [newCat, setNewCat] = useState('Strength');
+  const [newSub, setNewSub] = useState('');
   const [editId, setEditId] = useState(null);
   const [confirmId, setConfirmId] = useState(null);
+  const existingSubs = ruleSubs(exercises);   // v5.11.0: subcategory suggestions
+  const subInputStyle = {width:60,minWidth:0,flexShrink:1,fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',
+    background:'var(--surface)',color:'var(--ink)',outline:'none',boxSizing:'border-box'};
 
   const grouped = FITNESS_CATEGORIES.reduce((acc, cat) => {
     const items = exercises.filter(e => (e.category || 'Other') === cat);
@@ -12545,10 +12847,15 @@ function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose 
                           background:'var(--surface)',color:'var(--ink)',outline:'none'}}>
                         {FITNESS_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
                       </select>
+                      <input list="lp-subcats" placeholder="Sub" title="Subcategory (optional), e.g. Run or Bike" aria-label="Subcategory"
+                        value={ex.subcategory||''} onChange={e=>onUpdate(ex.id,{subcategory:e.target.value})}
+                        onKeyDown={e=>{ if(e.key==='Enter'||e.key==='Escape') setEditId(null); }}
+                        style={subInputStyle}/>
                     </>
                   ) : (
                     <>
-                      <span style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}>{ex.name}</span>
+                      <span style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}>{ex.name}
+                        {ex.subcategory&&<span style={{marginLeft:6,fontSize:10,color:'var(--ink-light)',background:'var(--neutral-bg)',borderRadius:999,padding:'1px 6px'}}>{ex.subcategory}</span>}</span>
                       <button onClick={()=>setEditId(ex.id)}
                         style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:'var(--ink-faint)',padding:'0 3px'}}>✏️</button>
                       <button onClick={()=>{ if(confirmId===ex.id){onDelete(ex.id);setConfirmId(null);}else setConfirmId(ex.id); }}
@@ -12570,10 +12877,11 @@ function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose 
         <div style={{padding:'8px 12px 12px',borderTop:'1px solid var(--border)',flexShrink:0}}>
           <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:4,textTransform:'uppercase',letterSpacing:'0.05em'}}>Add exercise:</div>
           <div style={{display:'flex',gap:6}}>
+            <datalist id="lp-subcats">{existingSubs.map(s=><option key={s} value={s}/>)}</datalist>
             <input value={newName} onChange={e=>setNewName(e.target.value)}
-              onKeyDown={e=>{ if(e.key==='Enter'&&newName.trim()){onAdd(newName.trim(),newCat);setNewName('');} }}
+              onKeyDown={e=>{ if(e.key==='Enter'&&newName.trim()){onAdd(newName.trim(),newCat,newSub);setNewName('');setNewSub('');} }}
               placeholder="Name"
-              style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
+              style={{flex:1,minWidth:0,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',
                 borderRadius:'var(--radius-sm)',padding:'5px 8px',outline:'none',background:'var(--surface)',color:'var(--ink)',boxSizing:'border-box'}}
             />
             <select value={newCat} onChange={e=>setNewCat(e.target.value)}
@@ -12581,7 +12889,11 @@ function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose 
                 padding:'4px 6px',background:'var(--surface)',color:'var(--ink)',outline:'none'}}>
               {FITNESS_CATEGORIES.map(c=><option key={c} value={c}>{c}</option>)}
             </select>
-            <button onClick={()=>{ if(newName.trim()){onAdd(newName.trim(),newCat);setNewName('');} }}
+            <input list="lp-subcats" placeholder="Sub" title="Subcategory (optional), e.g. Run or Bike" aria-label="Subcategory"
+              value={newSub} onChange={e=>setNewSub(e.target.value)}
+              onKeyDown={e=>{ if(e.key==='Enter'&&newName.trim()){onAdd(newName.trim(),newCat,newSub);setNewName('');setNewSub('');} }}
+              style={subInputStyle}/>
+            <button onClick={()=>{ if(newName.trim()){onAdd(newName.trim(),newCat,newSub);setNewName('');setNewSub('');} }}
               disabled={!newName.trim()}
               style={{background:newName.trim()?'var(--accent)':'var(--border)',border:'none',
                 borderRadius:'var(--radius-sm)',padding:'5px 12px',cursor:newName.trim()?'pointer':'default',
