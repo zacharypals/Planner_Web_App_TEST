@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.12.1 -->
+<!-- LP Planner v5.13.0 -->
+<!-- v5.13.0 — Goals: a milestone's auto-check rule can read the Habit Tracker instead of the Fitness log (rule.source 'habits': Days completed, or Total of the Qty field; same since-start / single-week windows). One source per rule. -->
 <!-- v5.12.1 — Milestone auto-check rule editor now has a Hide/Show rule button, so it can be collapsed without unchecking (and clearing) the rule. -->
 <!-- v5.12.0 — Goals: the ↻ auto-check buttons (tasks) and the "Complete automatically from my training" row (milestones) now show only on goals that have Habits & training → Edit → Auto-check → ↻ Fitness log switched on. Anything that already has a rule stays visible. -->
 <!-- v5.11.1 — Exercise Library: editing an exercise no longer snaps shut when you tap the Sub field or category menu (the row now closes only when focus leaves it); Cardio exercises without a subcategory show a dashed "+ sub" chip, and any subcategory chip opens the editor. -->
@@ -3159,7 +3160,11 @@ const GL_RULE_MEASURES = {
   'reps-sum':   { label: 'Total reps',                  unit: 'reps', day: 'reps',      agg: 'sum' },
   'weight-max': { label: 'Heaviest weight',             unit: 'lb',   day: 'weightMax', agg: 'max' },
   'days':       { label: 'Days with a workout logged',  unit: 'days', day: null,        agg: 'days' },
+  // v5.13.0 — measures for rules that read the Habit Tracker instead of the Fitness log (rule.source === 'habits')
+  'h-days':     { label: 'Days completed',              unit: 'days', day: null,        agg: 'days', src: 'habits' },
+  'h-qty':      { label: 'Total of the Qty field',      unit: 'total', day: 'qty',      agg: 'sum',  src: 'habits' },
 };
+function ruleSource(rule) { return rule && rule.source === 'habits' ? 'habits' : 'fitness'; }
 // A day of the fitness log as a flat list of exercise entries (handles the older workout-shaped days too)
 function flDayExs(raw) {
   const r = raw || [];
@@ -3178,7 +3183,37 @@ function ruleSubs(fitnessExercises) {
   (fitnessExercises || []).forEach(e => { const k = ruleSubKey(e.subcategory); if (k && !seen[k]) seen[k] = String(e.subcategory).trim(); });
   return Object.values(seen).sort((a, b) => a.localeCompare(b));
 }
-function glNewRule() { return { src: { exerciseIds: [], subs: [] }, measure: 'dist-sum', target: '', window: 'since' }; }
+function glNewRule(source) {
+  return source === 'habits'
+    ? { source: 'habits', src: { habitIds: [] }, measure: 'h-days', target: '', window: 'since' }
+    : { source: 'fitness', src: { exerciseIds: [], subs: [] }, measure: 'dist-sum', target: '', window: 'since' };
+}
+// Habits a habit rule counts (ids that still exist). A day counts for 'Days completed' when ANY chosen habit is checked
+// off that day; 'Total of the Qty field' adds the Qty of every chosen habit. Keys are fmt() days, like habitCompletions.
+function ruleHabitDays(rule, completions, qty, fromKey, toKey) {
+  const ids = new Set(((rule.src || {}).habitIds) || []);
+  const out = [];
+  const end = parseLocal(toKey);
+  for (let d = parseLocal(fromKey), i = 0; d && end && d <= end && i < 800; d = addDays(d, 1), i++) {
+    const k = fmt(d);
+    const day = { dk: fmtLocal(d), dist: 0, distMax: 0, mins: 0, reps: 0, weightMax: 0, qty: 0 };
+    let hit = false;
+    if (rule.measure === 'h-qty') {
+      const q = (qty || {})[k] || {};
+      ids.forEach(id => { const v = qtyTotal(q[id]); if (v) { day.qty += v; hit = true; } });
+    } else {
+      hit = ((completions || {})[k] || []).some(id => ids.has(id));
+    }
+    if (hit) out.push(day);
+  }
+  return out;
+}
+// The days a rule counts, from whichever log it reads
+function ruleDaysFor(rule, match, fctx, fromKey, toKey) {
+  return ruleSource(rule) === 'habits'
+    ? ruleHabitDays(rule, fctx.habitCompletions, fctx.habitQty, fromKey, toKey)
+    : ruleDays(match, fctx.fitnessLog, fromKey, toKey);
+}
 // Library exercises a rule counts
 function ruleMatchSet(rule, fitnessExercises) {
   const src = (rule && rule.src) || {};
@@ -3236,6 +3271,12 @@ function ruleBase(rule, fctx) {
   const target = ruleTarget(rule);
   const base = { spec, target, unit: spec ? spec.unit : '', value: 0, met: false, pct: 0, ready: false, metOn: null };
   if (!spec || target === null) return { ...base, why: 'Set a target' };
+  if (ruleSource(rule) === 'habits') {
+    const have = new Set(((fctx && fctx.habitGoals) || []).map(h => h.id));
+    const ids = (((rule.src || {}).habitIds) || []).filter(id => have.has(id));
+    if (!ids.length) return { ...base, why: 'Pick a habit' };
+    return { ...base, match: new Set(ids), why: '' };
+  }
   const match = ruleMatchSet(rule, fctx && fctx.fitnessExercises);
   if (!match.size) return { ...base, why: 'Pick what counts' };
   return { ...base, match, why: '' };
@@ -3247,7 +3288,7 @@ function glTaskRule(task, fctx) {
   const b = ruleBase(rule, fctx);
   if (!b.match) return b;
   if (!task.scheduledDate) return { ...b, why: 'Schedule it to use this' };
-  const days = ruleDays(b.match, fctx.fitnessLog, task.scheduledDate, task.scheduledDate);
+  const days = ruleDaysFor(rule, b.match, fctx, task.scheduledDate, task.scheduledDate);
   const value = ruleAgg(rule.measure, days);
   const met = value >= b.target;
   return { ...b, ready: true, value, met, pct: Math.min(1, value / b.target), metOn: met ? task.scheduledDate : null };
@@ -3260,7 +3301,7 @@ function glMsRule(m, goal, fctx, todayKey) {
   if (!b.match) return b;
   const from = m.startDate || (goal && goal.startDate) || todayKey;
   if (from > todayKey) return { ...b, ready: true, notStarted: true, from };
-  const days = ruleDays(b.match, fctx.fitnessLog, from, todayKey);
+  const days = ruleDaysFor(rule, b.match, fctx, from, todayKey);
   if (rule.window === 'week') {
     const byWeek = {};
     days.forEach(d => { const ws = fmtLocal(getWeekStart(parseLocal(d.dk))); (byWeek[ws] = byWeek[ws] || []).push(d); });
@@ -3286,7 +3327,7 @@ function glAutoComplete(goals, mctx, asOf) {
   const reached = [];
   let changed = false;
   const todayKey = fmtLocal(asOf);
-  const fctx = { fitnessLog: mctx.fitnessLog, fitnessExercises: mctx.fitnessExercises };
+  const fctx = { fitnessLog: mctx.fitnessLog, fitnessExercises: mctx.fitnessExercises, habitGoals: mctx.habitGoals, habitCompletions: mctx.habitCompletions, habitQty: mctx.habitQty };
   const out = (goals || []).map(g => {
     if (g.status === 'done' || g.status === 'parked') return g;
     let touched = false;
@@ -9727,10 +9768,10 @@ function GlLinkPicker({ goal, onChange, habitGoals, fitnessExercises }) {
       {/* v5.12.0 — per-goal switch for the ↻ auto-check buttons on this goal's tasks and milestones */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Auto-check</span>
-        <span style={{ fontSize: 11, color: 'var(--ink-light)' }}>Adds a ↻ button to this goal's tasks and milestones so they can check themselves off from your Fitness log. Anything that already has a rule stays visible.</span>
+        <span style={{ fontSize: 11, color: 'var(--ink-light)' }}>Adds a ↻ button to this goal's tasks and milestones so they can check themselves off from your Fitness log (milestones can also read your habits). Anything that already has a rule stays visible.</span>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
           <button className={`gl-chip ${goal.autoTraining ? 'on' : ''}`} aria-pressed={!!goal.autoTraining}
-            onClick={() => onChange(g => ({ ...g, autoTraining: !g.autoTraining }))}>↻ Fitness log</button>
+            onClick={() => onChange(g => ({ ...g, autoTraining: !g.autoTraining }))}>↻ Fitness log &amp; habits</button>
         </div>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -10210,7 +10251,12 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
   const subOn = name => (src.subs || []).some(x => ruleSubKey(x) === ruleSubKey(name));
   const toggleSub = name => onPatch({ src: { ...src, subs: subOn(name) ? (src.subs || []).filter(x => ruleSubKey(x) !== ruleSubKey(name)) : [...(src.subs || []), name] } });
   const toggleEx = id => { const cur = src.exerciseIds || []; onPatch({ src: { ...src, exerciseIds: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] } }); };
-  const spec = GL_RULE_MEASURES[rule.measure] || GL_RULE_MEASURES['dist-sum'];
+  const isHab = ruleSource(rule) === 'habits';
+  const habs = (fctx && fctx.habitGoals) || [];
+  const habIds = (src.habitIds || []);
+  const toggleHab = id => onPatch({ src: { ...src, habitIds: habIds.includes(id) ? habIds.filter(x => x !== id) : [...habIds, id] } });
+  const setSource = source => { if (source !== ruleSource(rule)) onPatch({ ...glNewRule(source), target: rule.target, window: rule.window }); };
+  const spec = GL_RULE_MEASURES[rule.measure] || GL_RULE_MEASURES[isHab ? 'h-days' : 'dist-sum'];
   const match = ruleMatchSet(rule, exs);
   const matched = exs.filter(e => match.has(e.id));
   const cardioOnly = matched.length > 0 && matched.every(e => e.category === 'Cardio');
@@ -10218,7 +10264,8 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
   const distLike = spec.day === 'dist' || spec.day === 'distMax' || spec.day === 'mins';
   const strengthLike = spec.day === 'reps' || spec.day === 'weightMax';
   let warn = '';
-  if (distLike && noCardio) warn = "None of these are Cardio exercises, so they don't log miles or minutes.";
+  if (isHab) warn = '';
+  else if (distLike && noCardio) warn = "None of these are Cardio exercises, so they don't log miles or minutes.";
   else if (strengthLike && cardioOnly) warn = "Cardio exercises don't log reps or weight.";
   let note = '';
   if (held) note = 'Auto-check is paused because you unchecked it. Change the rule to turn it back on.';
@@ -10231,6 +10278,24 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
   }
   return (
     <div className="gl-rule">
+      {scope === 'ms' && (
+        <div className="gl-rule-row">
+          <span className="gl-rule-label" style={{ minWidth: 62 }}>Reads from</span>
+          <button className={`gl-chip ${!isHab ? 'on' : ''}`} aria-pressed={!isHab} onClick={() => setSource('fitness')}>Fitness log</button>
+          <button className={`gl-chip ${isHab ? 'on' : ''}`} aria-pressed={isHab} onClick={() => setSource('habits')}>Habits</button>
+        </div>
+      )}
+      {isHab ? (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+        <span className="gl-rule-label">What counts</span>
+        <div className="gl-rule-row">
+          <span className="gl-rule-label" style={{ minWidth: 62 }}>Habit</span>
+          {habs.map(h => <button key={h.id} className={`gl-chip ${habIds.includes(h.id) ? 'on' : ''}`}
+            aria-pressed={habIds.includes(h.id)} onClick={() => toggleHab(h.id)}>{h.name || 'Habit'}</button>)}
+          {!habs.length && <span style={{ fontSize: 11, color: 'var(--ink-light)' }}>No habits yet. Add one in the Habit Tracker.</span>}
+        </div>
+      </div>
+      ) : (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         <span className="gl-rule-label">What counts</span>
         <div className="gl-rule-row">
@@ -10246,10 +10311,11 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
           </div>
         )}
       </div>
+      )}
       <div className="gl-rule-row">
         <select className="gl-input" style={{ padding: '4px 6px', fontSize: 12 }} aria-label="What to measure" value={rule.measure}
           onChange={e => onPatch({ measure: e.target.value })}>
-          {Object.entries(GL_RULE_MEASURES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          {Object.entries(GL_RULE_MEASURES).filter(([k, v]) => (v.src === 'habits') === isHab).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
         <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>at least</span>
         <input type="number" min="0" step="0.1" inputMode="decimal" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, width: 70 }}
@@ -10266,7 +10332,7 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
       {note && <span style={{ fontSize: 11.5, color: 'var(--ink-light)' }}>{note}</span>}
       {warn && <span style={{ fontSize: 11.5, color: '#b03a2e' }}>{warn}</span>}
       <div className="gl-rule-row" style={{ justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>Counts completed sets only. Checking or unchecking by hand always wins.</span>
+        <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>{isHab ? 'A day counts when any chosen habit is checked off. Checking or unchecking by hand always wins.' : 'Counts completed sets only. Checking or unchecking by hand always wins.'}</span>
         <button className="gl-btn ghost" style={{ fontSize: 12 }} onClick={onRemove}>Remove auto-check</button>
       </div>
     </div>
@@ -10283,7 +10349,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   const [ruleOpen, setRuleOpen] = useState(null);   // task id whose auto-check rule editor is open (v5.11.0)
   const tasks = m.tasks || [];
   const late = glMsOverdue(m, today);
-  const fctx = { fitnessLog: mctx && mctx.fitnessLog, fitnessExercises: mctx && mctx.fitnessExercises };
+  const fctx = { fitnessLog: mctx && mctx.fitnessLog, fitnessExercises: mctx && mctx.fitnessExercises, habitGoals: mctx && mctx.habitGoals, habitCompletions: mctx && mctx.habitCompletions, habitQty: mctx && mctx.habitQty };
   function setTask(tid, patch) {
     onChange(mm => ({ ...mm, tasks: (mm.tasks || []).map(t => t.id === tid ? { ...t, ...patch, ...(('done' in patch) ? glDoneExtra(t, patch.done) : {}) } : t) }));
   }
@@ -10390,7 +10456,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
                     if (e.target.checked) onChange(mm => ({ ...mm, rule: glNewRule(), ruleHold: false }));
                     else onChange(mm => { const { rule, ruleHold, ...rest } = mm; return rest; });
                   }} />
-                ↻ Complete automatically from my training
+                ↻ Complete automatically from my training or habits
               </label>
               {m.rule && (
                 <button type="button" className="gl-sched set" aria-expanded={!msRuleShut} aria-label={msRuleShut ? 'Show auto-check rule' : 'Hide auto-check rule'}
@@ -10618,7 +10684,7 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, hab
                   <span style={{ fontSize: 13, color: 'var(--ink-light)' }}>Link the habits and exercises this goal rests on, and their weekly progress shows here.</span>
                 )}
                 {goal.autoTraining && (
-                  <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>↻ Tasks and milestones can check themselves off from your Fitness log.</span>
+                  <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>↻ Tasks and milestones can check themselves off from your Fitness log; milestones can also read habits.</span>
                 )}
               </>
             )}
@@ -10894,14 +10960,14 @@ function App() {
   const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
   // Weight / calorie readings and their targets, bundled for the goal views (v4.8.0)
   // v5.11.0: the fitness log and exercise library ride along so goal rules can read them
-  const mctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises };
+  const mctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty };
   // Complete weight milestones whose condition is met (7-day average, 3+ readings since the goal began) and
   // tasks / milestones whose training rule is met by the Fitness log (v5.11.0).
   // Debounced; writes only when something changed. The Undo toast reopens it and holds auto-complete.
   useEffect(() => {
     const t = setTimeout(() => {
       const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
-      const ctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises };
+      const ctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty };
       const r = glAutoComplete(goals, ctx, asOf);
       if (r.goals === goals) return;
       setGoals(gs => glAutoComplete(gs, ctx, asOf).goals);
@@ -10911,7 +10977,7 @@ function App() {
             glPatchMs(g, x.mid, m => ({ ...m, done: false, completedAt: null, autoDone: false, metricHold: true, ruleHold: true }))))));
     }, 2500);
     return () => clearTimeout(t);
-  }, [goals, habitMetrics, weightTarget, fitnessLog, fitnessExercises]);
+  }, [goals, habitMetrics, weightTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty]);
   // Keep "never ends" repeating tasks topped up as time passes (v4.6.0). Debounced; only writes when something was added.
   useEffect(() => {
     const t = setTimeout(() => {
@@ -11352,7 +11418,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.12.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.13.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
