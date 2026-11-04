@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.8.1 -->
+<!-- LP Planner v5.9.0 -->
+<!-- v5.9.0 — Week view: tasks can hold a checklist (+ List beside Repeat). Items check off, Enter adds the next, Backspace on an empty one removes it, the grip reorders (touch too). A collapsed card shows a 3/8 pill; "Remove Checked Items" asks before deleting. Repeating tasks: each copy keeps its own list, and new copies start with the items unchecked. Not on events or project tasks. -->
 <!-- v5.8.1 — Week view: removed the per-task Color picker from the expanded task (auto-colors only; old custom colors still show). Task palette grows from 18 to 22 colors (butter, pistachio, clay, aqua) for busy days. -->
 <!-- v5.8.0 — Goals timeline: new Day zoom (10 days from two days before today; ‹ › step a week; weekends lightly shaded). Bars still drag/resize by whole days. -->
 <!-- v5.7.1 — Goals: the "Schedule" week picker on a milestone task is no longer cut off at the bottom of the milestone card; it floats above everything and opens upward when there isn't room below. -->
@@ -711,6 +712,60 @@
     overflow: hidden;
   }
   .task-card.done .task-title-input { text-decoration: line-through; opacity: 0.5; }
+
+  /* TASK CHECKLIST (v5.9.0) */
+  .task-ck-pill {
+    font-family: 'DM Mono', monospace; font-size: 9.5px; font-weight: 500; line-height: 1.4;
+    padding: 1px 6px; border-radius: 999px; background: rgba(42,37,56,0.10); color: var(--ink);
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .task-ck-pill.all-done { opacity: 0.6; }
+  .task-ck {
+    margin-top: 4px; padding: 6px 4px 4px; border-radius: 8px;
+    background: rgba(255,255,255,0.45); display: flex; flex-direction: column; gap: 1px;
+  }
+  .task-ck-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 4px 4px; }
+  .task-ck-label { font-family: 'DM Mono', monospace; font-size: 9.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-light); }
+  .task-ck-link {
+    background: none; border: none; padding: 0; cursor: pointer;
+    font-family: 'DM Mono', monospace; font-size: 9.5px; color: var(--ink-light);
+  }
+  .task-ck-link:hover { color: var(--ink); text-decoration: underline; }
+  .task-ck-link.danger { color: var(--red); font-weight: 600; }
+  .task-ck-row { display: flex; align-items: flex-start; gap: 6px; padding: 3px 4px; border-radius: 6px; }
+  .task-ck-row.drag-over { outline: 2px dashed var(--accent); outline-offset: -2px; }
+  .task-ck-row.dragging { opacity: 0.4; }
+  .task-ck-grip {
+    width: 10px; flex-shrink: 0; cursor: grab; opacity: 0.35; touch-action: none;
+    user-select: none; -webkit-user-select: none; display: flex; justify-content: center; padding-top: 3px;
+  }
+  .task-ck-grip:active { cursor: grabbing; }
+  .task-ck-box {
+    width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; padding: 0; cursor: pointer;
+    border-radius: 3px; border: 1.5px solid rgba(42,37,56,0.35); background: var(--surface);
+    color: #fff; font-size: 10px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  }
+  .task-ck-box.checked { background: var(--accent); border-color: var(--accent); }
+  .task-ck-text {
+    flex: 1; min-width: 0; border: none; background: transparent; outline: none; resize: none;
+    overflow: hidden; padding: 0; font-family: 'DM Sans', sans-serif; font-size: 11.5px;
+    line-height: 1.4; color: var(--ink); min-height: 16px;
+  }
+  .task-ck-row.checked .task-ck-text { text-decoration: line-through; color: var(--ink-light); }
+  .task-ck-add {
+    display: flex; align-items: center; gap: 6px; padding: 3px 4px 3px 20px; background: none; border: none;
+    cursor: text; text-align: left; font-family: 'DM Sans', sans-serif; font-size: 11.5px;
+    color: var(--ink-light); font-style: italic;
+  }
+  .task-ck-add-box { width: 15px; height: 15px; border-radius: 3px; border: 1.5px dashed rgba(42,37,56,0.3); flex-shrink: 0; }
+  @media (max-width: 767px) {
+    .task-ck-box { width: 20px; height: 20px; font-size: 12px; }
+    .task-ck-add-box { width: 20px; height: 20px; }
+    .task-ck-grip { width: 16px; padding-top: 6px; }
+    .task-ck-row { padding: 5px 4px; }
+    .task-ck-add { padding: 6px 4px 6px 26px; }
+    .task-ck-link { font-size: 11px; padding: 4px 0; }
+  }
 
   /* TASK COLOR PICKER */
   .task-type-btn {
@@ -2252,6 +2307,10 @@
     --prio-bg: #4a2228;
   }
   /* v4.5.0: task / event colors come from --tc-N / --ec-N (see taskBg/eventBg); custom colors keep a light dim */
+  [data-theme="dark"] .task-ck { background: rgba(0,0,0,0.20); }
+  [data-theme="dark"] .task-ck-pill { background: rgba(255,255,255,0.14); }
+  [data-theme="dark"] .task-ck-box { border-color: rgba(255,255,255,0.35); }
+  [data-theme="dark"] .task-ck-add-box { border-color: rgba(255,255,255,0.3); }
   [data-theme="dark"] .task-card.custom-color { background-image: linear-gradient(rgba(20,18,27,0.35), rgba(20,18,27,0.35)); }
   /* Status chips and notices that had light pastel fills */
   [data-theme="dark"] .gl-health.ontrack { color: #7fd1a3; background: #16301f; }
@@ -2531,8 +2590,12 @@ function defaultRepeat(dayKey) {
   const d = parseLocal(dayKey);
   return { freq: 'weekly', interval: 1, days: [d ? d.getDay() : 1], monthMode: 'date', endType: 'never', endDate: '', count: 10 };
 }
+// v5.9.0: a repeating task's checklist comes to each new copy with every item unchecked
+function freshItems(items) { return Array.isArray(items) ? items.map(i => (i && i.done ? { ...i, done: false } : i)) : items; }
 function repeatCopy(tpl, repeatId, dk, stored) {
-  return { ...tpl, id: `${repeatId}_${dk}`, repeatId, repeat: stored, done: false, expanded: false, gcalId: null };
+  const t = { ...tpl, id: `${repeatId}_${dk}`, repeatId, repeat: stored, done: false, expanded: false, gcalId: null };
+  if (t.items) t.items = freshItems(t.items);
+  return t;
 }
 // Apply a rule to the task `src` sitting on srcDk.
 //  • Unfinished copies of the old series after srcDk are dropped and rewritten from the rule.
@@ -2630,6 +2693,7 @@ function seriesDates(s, todayKey) {
 }
 function seriesInstanceFor(s, sid, dk, ruleView) {
   const t = { ...(s.tpl || {}), id: `${sid}_${dk}`, repeatId: sid, repeat: ruleView, done: false, expanded: false, gcalId: null };
+  if (t.items) t.items = freshItems(t.items);
   REPEAT_VIRT.set(t, { sid, dk });
   return t;
 }
@@ -2902,6 +2966,7 @@ function repeatConvertLegacy(stored, series, todayKey) {
     dates.forEach(d => { if (!at.has(d)) s.skip.push(d); });
     const tplKey = key(s.tpl);
     const pure = (t, dk) => dk !== anchorDk && dates.has(dk) && (at.get(dk) || []).length === 1 && !t.done && !t.expanded && !t.gcalId
+      && !(t.items || []).some(i => i && i.done)
       && !t.isProjectTask && t.id === `${sid}_${dk}` && key(seriesContent(t)) === tplKey;
     // build the converted form of this group only, then verify it on its own
     const mini = {};
@@ -6268,6 +6333,118 @@ function pickTaskColorIndex(existingTasks) {
   }
   return Math.floor(Math.random() * TASK_COLORS.length);
 }
+// v5.9.0 — a checklist inside a task (e.g. a shopping list). items: [{id, text, done}]
+// Enter adds the next item, Backspace on an empty item removes it, the grip reorders (mouse, touch, Pencil).
+function newCkId() { return 'ck' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
+function TaskChecklist({ items, onChange, focusRef }) {
+  const refs = useRef({});
+  const [dragId, setDragId] = useState(null);
+  const [overId, setOverId] = useState(null);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const pending = useRef(null);            // {id, atEnd}
+  const itemsRef = useRef(items); itemsRef.current = items;   // latest list for delayed handlers
+  const doneCount = items.filter(i => i.done).length;
+
+  useEffect(() => {
+    Object.values(refs.current).forEach(el => { if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } });
+    const want = pending.current || (focusRef && focusRef.current ? { id: focusRef.current, atEnd: true } : null);
+    if (want && refs.current[want.id]) {
+      const el = refs.current[want.id];
+      el.focus();
+      if (want.atEnd) { const n = el.value.length; try { el.setSelectionRange(n, n); } catch (e) {} }
+      pending.current = null;
+      if (focusRef) focusRef.current = null;
+    }
+  });
+  useEffect(() => { if (!doneCount) setConfirmRemove(false); }, [doneCount]);
+
+  const patchItem = (id, p) => onChange(itemsRef.current.map(i => i.id === id ? { ...i, ...p } : i));
+  const insertAfter = (afterId) => {
+    const cur = itemsRef.current;
+    const last = cur[cur.length - 1];
+    if (!afterId && last && !last.text.trim()) {              // "Add item…" with an empty last row: just go to it
+      const el = refs.current[last.id]; if (el) el.focus();
+      return;
+    }
+    const id = newCkId();
+    const idx = afterId ? cur.findIndex(i => i.id === afterId) : cur.length - 1;
+    const next = [...cur]; next.splice(idx + 1, 0, { id, text: '', done: false });
+    pending.current = { id, atEnd: true };
+    onChange(next);
+  };
+  const removeItem = (id, focusPrev) => {
+    const cur = itemsRef.current;
+    const idx = cur.findIndex(i => i.id === id);
+    if (idx === -1) return;
+    if (focusPrev && idx > 0) pending.current = { id: cur[idx - 1].id, atEnd: true };
+    onChange(cur.filter(i => i.id !== id));
+  };
+
+  // Grip reorder with Pointer Events (works for touch on iOS, unlike HTML5 drag)
+  const rowAt = (x, y) => { const el = document.elementFromPoint(x, y); const r = el && el.closest('[data-ck-id]'); return r ? r.getAttribute('data-ck-id') : null; };
+  const gripDown = (e, id) => {
+    e.stopPropagation(); e.preventDefault();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+    setDragId(id); setOverId(null);
+  };
+  const gripMove = (e) => { if (!dragId) return; e.preventDefault(); const o = rowAt(e.clientX, e.clientY); setOverId(o && o !== dragId ? o : null); };
+  const gripUp = (e) => {
+    if (!dragId) return;
+    const o = rowAt(e.clientX, e.clientY);
+    if (o && o !== dragId) {
+      const cur = itemsRef.current;
+      const from = cur.findIndex(i => i.id === dragId), to = cur.findIndex(i => i.id === o);
+      const next = [...cur]; const [m] = next.splice(from, 1); next.splice(to, 0, m);
+      onChange(next);
+    }
+    setDragId(null); setOverId(null);
+  };
+  const stopTouch = e => e.stopPropagation();   // keep the card's long-press and pull-to-refresh out of it
+
+  return (
+    <div className="task-ck" onClick={e => e.stopPropagation()}
+      onDragStart={e => { e.preventDefault(); e.stopPropagation(); }}>
+      <div className="task-ck-head">
+        <span className="task-ck-label">List · {doneCount}/{items.length}</span>
+        {doneCount > 0 && (confirmRemove ? (
+          <span style={{display:'inline-flex',gap:8,alignItems:'center'}}>
+            <button type="button" className="task-ck-link danger"
+              onClick={() => { setConfirmRemove(false); onChange(items.filter(i => !i.done)); }}>Remove {doneCount}</button>
+            <button type="button" className="task-ck-link" onClick={() => setConfirmRemove(false)}>Cancel</button>
+          </span>
+        ) : (
+          <button type="button" className="task-ck-link" onClick={() => setConfirmRemove(true)}>Remove Checked Items</button>
+        ))}
+      </div>
+      {items.map(it => (
+        <div key={it.id} data-ck-id={it.id}
+          className={`task-ck-row ${it.done ? 'checked' : ''} ${overId === it.id ? 'drag-over' : ''} ${dragId === it.id ? 'dragging' : ''}`}>
+          <span className="task-ck-grip" aria-label="Drag to reorder"
+            onPointerDown={e => gripDown(e, it.id)} onPointerMove={gripMove} onPointerUp={gripUp}
+            onPointerCancel={() => { setDragId(null); setOverId(null); }}
+            onTouchStart={stopTouch} onTouchMove={stopTouch}>
+            <svg aria-hidden="true" width="8" height="12" viewBox="0 0 8 12"><g fill="currentColor"><circle cx="2" cy="2" r="1.1"/><circle cx="6" cy="2" r="1.1"/><circle cx="2" cy="6" r="1.1"/><circle cx="6" cy="6" r="1.1"/><circle cx="2" cy="10" r="1.1"/><circle cx="6" cy="10" r="1.1"/></g></svg>
+          </span>
+          <button type="button" className={`task-ck-box ${it.done ? 'checked' : ''}`}
+            aria-label={(it.done ? 'Uncheck ' : 'Check ') + (it.text || 'item')}
+            onClick={() => patchItem(it.id, { done: !it.done })}>{it.done ? '✓' : ''}</button>
+          <textarea ref={el => { refs.current[it.id] = el; }} className="task-ck-text" rows={1}
+            placeholder="Item…" value={it.text} autoCapitalize="sentences"
+            onChange={e => { patchItem(it.id, { text: e.target.value.replace(/\n/g, '') }); e.target.style.height = 'auto'; e.target.style.height = e.target.scrollHeight + 'px'; }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); if (it.text.trim()) insertAfter(it.id); }
+              else if (e.key === 'Backspace' && !it.text) { e.preventDefault(); removeItem(it.id, true); }
+            }}
+            onBlur={() => { setTimeout(() => { const el = refs.current[it.id]; const now = itemsRef.current.find(i => i.id === it.id); if (now && !now.text.trim() && (!el || document.activeElement !== el)) removeItem(it.id, false); }, 150); }}
+          />
+        </div>
+      ))}
+      <button type="button" className="task-ck-add" onClick={() => insertAfter(null)}>
+        <span className="task-ck-add-box" />Add item…
+      </button>
+    </div>
+  );
+}
 function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onStopRepeat, onAskScope, dayKey, onReschedule, weekDays, currentDayKey }) {
   const textareaRef = useRef();
   const titleTextareaRef = useRef();
@@ -6278,6 +6455,9 @@ function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFu
   const [repeatDraft, setRepeatDraft] = useState(null); // rule being edited in the Repeat panel (not saved until Apply)
   const [rescheduleWeekOffset, setRescheduleWeekOffset] = useState(0);
   const longPressTimer = useRef(null);
+  const ckFocusRef = useRef(null);          // v5.9.0: id of a checklist item to focus once it renders
+  const ckItems = Array.isArray(task.items) ? task.items : [];
+  const showChecklist = !task.isEvent && !task.isProjectTask;
 
   // Auto-grow textarea
   useEffect(() => {
@@ -6464,10 +6644,16 @@ function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFu
                       color:'var(--ink-faint)',padding:'0 4px',flexShrink:0}}>✕</button>
           </>
         ) : (
+          <>
+          {showChecklist && !task.expanded && ckItems.length > 0 && (() => {
+            const d = ckItems.filter(i => i.done).length;
+            return <span className={`task-ck-pill ${d === ckItems.length ? 'all-done' : ''}`} title="List items checked">{d}/{ckItems.length}</span>;
+          })()}
           <button className="task-expand-btn"
             onClick={()=>{setMobileConfirming(false);onUpdate({expanded:!task.expanded});}}>
             {task.expanded ? '▲' : '▼'}
           </button>
+          </>
         )}
       </div>
       {task.expanded && (
@@ -6476,6 +6662,9 @@ function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFu
             value={task.details||''} onChange={e=>onUpdate({details:e.target.value})}
             onBlur={()=>{ if(onBlurSync && task.isEvent) onBlurSync(); if(onBlurEdit) onBlurEdit(); }}
             rows={2} />
+          {showChecklist && ckItems.length > 0 && (
+            <TaskChecklist items={ckItems} focusRef={ckFocusRef} onChange={items => onUpdate({ items })} />
+          )}
           {task.isEvent && (
             <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:4}} onClick={e=>e.stopPropagation()}>
               <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Time:</span>
@@ -6628,6 +6817,12 @@ function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFu
                   }}>
                   🔁 Repeat {open ? '▲' : '▼'}
                 </button>
+                {showChecklist && ckItems.length === 0 && (
+                  <button type="button" className="task-repeat-toggle" title="Add a checklist to this task"
+                    onClick={e=>{ e.stopPropagation(); const id = newCkId(); ckFocusRef.current = id; onUpdate({ items: [{ id, text: '', done: false }] }); }}>
+                    ☐ + List
+                  </button>
+                )}
                 {hasRule && task.repeat && (
                   <span className="task-repeat-badge">{repeatSummary(task.repeat, dk)}</span>
                 )}
@@ -10804,7 +10999,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.8.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.9.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
