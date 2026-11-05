@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.18.0 -->
+<!-- LP Planner v5.19.0 -->
+<!-- v5.19.0 — Fitness: Charts tab (5th tab next to Day/Week/Month/Year). Weekly tiles (Sessions, Strength sets, Miles, PRs, each with last week for context); Trends chart for any exercise with a metric switcher (strength: Volume, Sets, Total reps, Top weight, Est. 1RM; cardio: Miles, Duration, Pace, Sessions) over 8/12/26 weeks; Goal progress for milestones with a Fitness or Habit rule (cumulative line vs even pace with a projection after 2 weeks, or weekly bars vs target for in-one-week rules); Compare: pick any groups of subcategories and/or single exercises, with Push/Pull/Legs-style presets built from your own subcategories and saved comparisons. Charts are inline SVG (theme-aware, work offline). New synced key fitnessCompare (small whole document, no SYNC_SPLITS/SPLITS entry needed). Everything else is derived from the existing log, library and goals. -->
 <!-- v5.18.0 — Fitness: interval timer. A ⏱ button on each exercise tile in Day view opens a bottom sheet to set Sets, Work seconds and Rest seconds, then runs work and rest intervals across the sets (the last set has no trailing rest). Minimize the sheet to a pill that stays on screen across tabs while you log sets or look at other pages; tap it to reopen. Pause/resume, skip the current interval, stop, and "Again" when it finishes. Beeps and vibrates at each change plus a 3-2-1 tick (sound on/off toggle; sound needs the app open and unlocked, and vibration is not available on iPhone). Keeps the screen awake while running. The clock is a stored start time, so it is still correct after the phone sleeps or the app is reloaded. Work and rest are remembered per exercise on this device (localStorage, not synced). No new synced data, so no sync or backup changes. -->
 <!-- v5.17.0 — Fitness: personal-record badges. A done set that beats your earlier best for that exercise now shows a gold trophy pill on the exercise tile in Day view (with a detail line such as "190 lb, was 185"). Strength: Weight PR (heaviest done set) and Reps PR (most reps at that weight or heavier; bodyweight sets compare against all earlier sets). Cardio: Distance PR (longest single set) and Pace PR (best min/mi on sets of 1 mile or more). Counts your whole existing history; the first time an exercise is logged earns nothing. Derived from the log each render, so no new stored data and no sync or backup changes. -->
 <!-- v5.16.0 — Time blocks: tasks, events and goal tasks can now have an optional start time and length (new startTime / durMin fields; events keep eventTime). Week view gets a List / Time blocks switch (per device). Time blocks shows each day as an hourly column with timed items as blocks; Habits, Goals and No time are small buttons above each day that open as a popover (desktop) or bottom sheet (phone). Desktop: drag a block to move it, drag its bottom edge to resize, double-click empty space to add, drag a No-time task onto the grid to schedule it. Calendar events now push and pull their real length (was always one hour) and changing an event time now sends the NEW time to Google Calendar. -->
@@ -563,6 +564,43 @@
   .pr-notes { display: flex; flex-direction: column; gap: 3px; padding: 2px 0 6px; }
   .pr-note { font-size: 11px; color: var(--ink-light); font-family: 'DM Sans', sans-serif; }
   .pr-note b { color: var(--gold); font-weight: 700; }
+  /* ── FITNESS CHARTS (v5.19.0) ── */
+  .fc-wrap { display: flex; flex-direction: column; gap: 12px; font-family: 'DM Sans', sans-serif; }
+  .fc-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .fc-tile { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; }
+  .fc-tile-lb { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-family: 'DM Mono', monospace; }
+  .fc-tile-v { font-size: 24px; font-weight: 700; color: var(--ink); line-height: 1.2; }
+  .fc-tile-sub { font-size: 11px; color: var(--ink-light); }
+  .fc-sub-note { font-size: 11px; color: var(--ink-light); margin-top: -6px; }
+  .fc-card { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .fc-card-hd { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .fc-card-hd h3 { margin: 0; font-size: 15px; font-family: 'Playfair Display', serif; color: var(--ink); }
+  .fc-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .fc-chip { border: 1px solid var(--border); background: var(--cream); color: var(--ink-light); border-radius: 999px; padding: 4px 11px; font-size: 12px; cursor: pointer; font-family: inherit; min-height: 28px; }
+  .fc-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .fc-select, .fc-input { width: 100%; box-sizing: border-box; border: 1px solid var(--border); background: var(--paper); color: var(--ink); border-radius: var(--radius-sm); padding: 7px 9px; font-size: 13px; font-family: inherit; min-height: 34px; }
+  .fc-readout { display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline; font-size: 12px; color: var(--ink-light); margin-bottom: 2px; }
+  .fc-readout b { color: var(--ink); }
+  .fc-readout i, .fc-legend i, .fc-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; flex-shrink: 0; }
+  .fc-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--ink-light); }
+  .fc-empty { font-size: 12.5px; color: var(--ink-faint); font-style: italic; padding: 8px 0; }
+  .fc-note { font-size: 12px; color: var(--ink-light); }
+  .fc-note.ok { color: var(--accent); } .fc-note.warn { color: var(--red); }
+  .fc-goal { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 4px; }
+  .fc-goal:first-of-type { border-top: none; padding-top: 0; }
+  .fc-goal-hd { display: flex; align-items: center; font-size: 13px; color: var(--ink); } .fc-goal-hd span { color: var(--ink-light); }
+  .fc-goal-sub { font-size: 11px; color: var(--ink-faint); }
+  .fc-goal-big { font-size: 22px; font-weight: 700; color: var(--ink); } .fc-goal-big small { font-size: 12px; font-weight: 500; color: var(--ink-light); }
+  .fc-edit summary { cursor: pointer; font-size: 12.5px; color: var(--accent); font-weight: 600; padding: 4px 0; }
+  .fc-group { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 8px; margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
+  .fc-group-hd { display: flex; align-items: center; gap: 6px; }
+  .fc-x { border: none; background: transparent; color: var(--ink-faint); cursor: pointer; font-size: 14px; min-width: 28px; min-height: 28px; }
+  .fc-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .fc-btn { border: 1px solid var(--border); background: var(--cream); color: var(--ink); border-radius: var(--radius-sm); padding: 6px 12px; font-size: 12.5px; cursor: pointer; font-family: inherit; min-height: 32px; }
+  .fc-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  .fc-btn.danger { color: var(--red); }
+  .fc-check { font-size: 12px; color: var(--ink-light); display: flex; align-items: center; gap: 5px; }
+  @media (max-width: 767px) { .fc-tiles { grid-template-columns: repeat(2, 1fr); } }
   /* Mobile fitness */
   @media (max-width: 767px) {
     .fitness-sidebar { display: none; }
@@ -11923,6 +11961,7 @@ function App() {
   const [peopleDirectory, setPeopleDirectory] = useSynced('peopleDirectory', []); // [{id, name}] — master list across weeks
   const [fitnessLog, setFitnessLog] = useSynced('fitnessLog', {}); // {[dateKey]: [{id, name, exercises:[{id, exerciseId, sets:[{id,reps,weight,done}]}]}]}
   const [fitnessExercises, setFitnessExercises] = useSynced('fitnessExercises', []); // [{id, name, category}] library
+  const [fitnessCompare, setFitnessCompare] = useSynced('fitnessCompare', []); // v5.19.0 saved Fitness > Charts comparisons [{id,name,metric,untagged,groups:[{id,name,subs,exerciseIds}]}]
   const [fitnessGoals, setFitnessGoals] = useSynced('fitnessGoals', []); // [{id, exerciseId, period, target, unit}]
   const [countdowns, setCountdowns] = useSynced('countdowns', []); // [{id, title, startDate, endDate, color}]
   const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
@@ -12387,7 +12426,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.18.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.19.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -12483,7 +12522,7 @@ function App() {
         calsTarget={calsTarget} setCalsTarget={setCalsTarget}
         onBack={()=>setPage('habit')} />}
       {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} foldersData={foldersData} setFoldersData={setFoldersData} weekData={weekData} setWeekData={setWeekData} selectedId={selectedPagesId} setSelectedId={setSelectedPagesId} />}
-      {page==='fitness' && <FitnessView fitnessLog={fitnessLog} setFitnessLog={setFitnessLog} fitnessExercises={fitnessExercises} setFitnessExercises={setFitnessExercises} fitnessGoals={fitnessGoals} setFitnessGoals={setFitnessGoals} />}
+      {page==='fitness' && <FitnessView fitnessLog={fitnessLog} setFitnessLog={setFitnessLog} fitnessExercises={fitnessExercises} setFitnessExercises={setFitnessExercises} fitnessGoals={fitnessGoals} setFitnessGoals={setFitnessGoals} goals={goals} habitGoals={habitGoals} habitCompletions={habitCompletions} habitQty={habitQty} fitnessCompare={fitnessCompare} setFitnessCompare={setFitnessCompare} />}
       {page==='goals' && <GoalsView goals={goals} setGoals={setGoals} pagesData={pagesData}
         countdowns={countdowns} setCountdowns={setCountdowns}
         selectedId={selectedGoalId} setSelectedId={setSelectedGoalId}
@@ -12626,7 +12665,472 @@ function prForEntry(index, exerciseId, dk, sets, isCardio) {
   return out;
 }
 
-function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessExercises, fitnessGoals, setFitnessGoals }) {
+// ── FITNESS CHARTS DATA (v5.19.0) ──
+// The Charts tab is derived from the fitness log, the exercise library and the goal rules. The only stored thing is
+// the list of saved Compare setups (fitnessCompare). Weeks are Sun–Sat like the rest of the app and are named by their
+// Sunday as a local 'YYYY-MM-DD' (fmtLocal). Only DONE sets count. Charts are plain inline SVG (no Chart.js), so they
+// follow the light/dark theme through CSS variables and keep working offline.
+const FC_COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4'];   // Compare groups, in this fixed order
+function fcWeeks(n, today) {   // n week keys, oldest first, ending with the week that holds `today`
+  const start = getWeekStart(today);
+  return Array.from({ length: n }, (_, i) => fmtLocal(addDays(start, -7 * (n - 1 - i))));
+}
+function fcWeekOf(dk) { const d = parseLocal(dk); return d ? fmtLocal(getWeekStart(d)) : ''; }
+// One bucket per week for the exercises matchFn accepts. Volume follows the exercise tile (reps x weight, or reps when
+// there is no weight); est. 1RM is the best Epley estimate from sets of 1 to 12 reps; pace is total minutes / total miles.
+function fcWeekly(fitnessLog, matchFn, weeks) {
+  const idx = {};
+  weeks.forEach((w, i) => { idx[w] = i; });
+  const out = weeks.map(() => ({ vol: 0, sets: 0, reps: 0, top: 0, orm: 0, mi: 0, mins: 0, paceMi: 0, paceMin: 0, days: new Set() }));
+  Object.keys(fitnessLog || {}).forEach(dk => {
+    const i = idx[fcWeekOf(dk)];
+    if (i === undefined) return;
+    flDayExs(fitnessLog[dk]).forEach(ex => {
+      if (!matchFn(ex.exerciseId)) return;
+      (ex.sets || []).forEach(s => {
+        if (!s || !s.done) return;
+        const n = prSetNums(s);
+        if (!(n.r > 0 || n.d > 0 || n.t > 0)) return;
+        const b = out[i];
+        b.sets += 1; b.reps += n.r; b.vol += n.w > 0 ? n.r * n.w : n.r;
+        if (n.w > b.top) b.top = n.w;
+        if (n.w > 0 && n.r >= 1 && n.r <= 12) b.orm = Math.max(b.orm, n.w * (1 + n.r / 30));
+        b.mi += n.d; b.mins += n.t;
+        if (n.d > 0 && n.t > 0) { b.paceMi += n.d; b.paceMin += n.t; }
+        b.days.add(dk);
+      });
+    });
+  });
+  return out;
+}
+function fcDur(mins) { const m = Math.round(mins); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m} min`; }
+const FC_METRICS = {
+  vol:  { label: 'Volume',    kind: 'bar',  get: b => b.vol,                             fmt: v => `${Math.round(v).toLocaleString()} lb`, ax: v => (v >= 1000 ? `${+(v / 1000).toFixed(1)}k` : String(+v.toFixed(1))) },
+  sets: { label: 'Sets',      kind: 'bar',  get: b => b.sets,                            fmt: v => `${Math.round(v)} ${Math.round(v) === 1 ? 'set' : 'sets'}` },
+  reps: { label: 'Total reps', kind: 'bar', get: b => b.reps,                            fmt: v => `${Math.round(v)} reps` },
+  top:  { label: 'Top weight', kind: 'line', get: b => (b.top > 0 ? b.top : null),       fmt: v => `${+v.toFixed(1)} lb` },
+  orm:  { label: 'Est. 1RM',  kind: 'line', get: b => (b.orm > 0 ? b.orm : null),        fmt: v => `${Math.round(v)} lb` },
+  mi:   { label: 'Miles',     kind: 'bar',  get: b => b.mi,                              fmt: v => `${+v.toFixed(1)} mi` },
+  mins: { label: 'Duration',  kind: 'bar',  get: b => b.mins,                            fmt: v => fcDur(v), ax: v => String(Math.round(v)) },
+  pace: { label: 'Pace',      kind: 'line', get: b => (b.paceMi > 0 && b.paceMin > 0 ? b.paceMin / b.paceMi : null), fmt: v => `${prPaceText(v)} /mi`, ax: v => prPaceText(v), rev: true },
+  ses:  { label: 'Sessions',  kind: 'bar',  get: b => b.days.size,                       fmt: v => `${Math.round(v)} ${Math.round(v) === 1 ? 'session' : 'sessions'}` },
+};
+// Metrics worth offering for one exercise: only those with any data in the range (so a bodyweight lift never offers
+// Volume / Top weight / 1RM, and a time-only cardio exercise never offers Miles / Pace)
+function fcAvail(weekly, isCardio) {
+  const keys = isCardio ? ['mi', 'mins', 'pace', 'ses'] : ['vol', 'sets', 'reps', 'top', 'orm'];
+  return keys.filter(k => weekly.some(b => { const v = FC_METRICS[k].get(b); return v !== null && v > 0; }));
+}
+// The exercise logged most recently (a good default for the trend chart)
+function fcLastExercise(fitnessLog, fitnessExercises) {
+  const have = new Set((fitnessExercises || []).map(e => e.id));
+  const keys = Object.keys(fitnessLog || {}).sort().reverse();
+  for (const dk of keys) {
+    for (const ex of flDayExs(fitnessLog[dk]).slice().reverse()) {
+      if (have.has(ex.exerciseId) && (ex.sets || []).some(s => s && s.done)) return ex.exerciseId;
+    }
+  }
+  return (fitnessExercises && fitnessExercises[0] && fitnessExercises[0].id) || '';
+}
+// The four tiles for one week (volume is deliberately not one of them)
+function fcTiles(fitnessLog, fitnessExercises, prIndex, weekKey) {
+  const cat = {};
+  (fitnessExercises || []).forEach(e => { cat[e.id] = e.category; });
+  const days = new Set();
+  let sets = 0, miles = 0, prs = 0;
+  Object.keys(fitnessLog || {}).forEach(dk => {
+    if (fcWeekOf(dk) !== weekKey) return;
+    flDayExs(fitnessLog[dk]).forEach(ex => {
+      const isCardio = cat[ex.exerciseId] === 'Cardio';
+      let any = false;
+      (ex.sets || []).forEach(s => {
+        if (!s || !s.done) return;
+        const n = prSetNums(s);
+        if (!(n.r > 0 || n.d > 0 || n.t > 0)) return;
+        any = true;
+        if (isCardio) miles += n.d; else sets += 1;
+      });
+      if (any) { days.add(dk); prs += prForEntry(prIndex, ex.exerciseId, dk, ex.sets, isCardio).length; }
+    });
+  });
+  return { sessions: days.size, sets, miles: Math.round(miles * 10) / 10, prs };
+}
+// Axis helpers: a "nice" top for [0, max] and a nice window for [lo, hi]
+function fcNice(max, n) {
+  if (!(max > 0)) return { max: 1, step: 0.25 };
+  const raw = max / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / mag;
+  const step = (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * mag;
+  return { max: Math.ceil(max / step - 1e-9) * step, step };
+}
+function fcNiceRange(lo, hi, n) {
+  if (!(hi > lo)) { const pad = Math.max(1, Math.abs(hi) * 0.05); lo -= pad; hi += pad; }
+  const { step } = fcNice(hi - lo, n);
+  return { lo: Math.floor(lo / step + 1e-9) * step, hi: Math.ceil(hi / step - 1e-9) * step, step };
+}
+function fcTicks(lo, hi, step) {
+  const out = [];
+  for (let v = lo, i = 0; v <= hi + step * 1e-6 && i < 20; v += step, i++) out.push(Math.round(v * 1e6) / 1e6);
+  return out;
+}
+// ── Compare: groups of subcategories and/or exercises ──
+// A group counts an exercise when its id is listed OR its library subcategory is listed (the same rule goal rules use).
+function fcGroupMatch(group, fitnessExercises) {
+  return ruleMatchSet({ src: { exerciseIds: group.exerciseIds || [], subs: group.subs || [] } }, fitnessExercises);
+}
+// Ready-made comparisons built from the subcategories you actually have. {id, name, metric, groups, untagged}
+function fcPresets(fitnessExercises) {
+  const exs = fitnessExercises || [];
+  const subsOf = pred => ruleSubs(exs.filter(pred));
+  const mk = (subs) => subs.map(s => ({ id: 'g_' + ruleSubKey(s), name: s, subs: [s], exerciseIds: [] }));
+  const out = [];
+  const strong = subsOf(e => e.category !== 'Cardio'), cardio = subsOf(e => e.category === 'Cardio');
+  const find = k => strong.find(s => ruleSubKey(s) === k);
+  const pu = find('push'), pl = find('pull'), lg = find('legs') || find('leg');
+  if (pu && pl && lg) out.push({ id: '_ppl', name: 'Push / Pull / Legs', metric: 'sets', groups: mk([pu, pl, lg]) });
+  if (strong.length >= 2) out.push({ id: '_str', name: 'Strength subcategories', metric: 'sets', groups: mk(strong), untagged: true });
+  if (cardio.length >= 2) out.push({ id: '_car', name: 'Cardio subcategories', metric: 'mi', groups: mk(cardio) });
+  return out;
+}
+const FC_ADD_METRICS = ['sets', 'reps', 'vol', 'mi', 'mins'];   // the ones that add up across exercises
+// Weekly numbers per group for one metric. Returns { groups:[{name,color,values,match}], overlap:[exercise names] }
+function fcCompare(cmp, metric, fitnessLog, fitnessExercises, weeks) {
+  const M = FC_METRICS[metric] || FC_METRICS.sets;
+  const groups = (cmp.groups || []).slice(0, FC_COLORS.length).map((g, i) => {
+    const match = fcGroupMatch(g, fitnessExercises);
+    const values = fcWeekly(fitnessLog, id => match.has(id), weeks).map(M.get);
+    return { name: g.name || `Group ${i + 1}`, color: FC_COLORS[i], values, match };
+  });
+  if (cmp.untagged) {
+    const tagged = new Set();
+    groups.forEach(g => g.match.forEach(id => tagged.add(id)));
+    const loose = new Set((fitnessExercises || []).filter(e => e.category !== 'Cardio' && !tagged.has(e.id)).map(e => e.id));
+    const values = fcWeekly(fitnessLog, id => loose.has(id), weeks).map(M.get);
+    if (values.some(v => v > 0) && groups.length < FC_COLORS.length) groups.push({ name: 'Untagged', color: '#898781', values, match: loose });
+  }
+  const seen = {}, overlap = [];
+  groups.forEach(g => g.match.forEach(id => {
+    seen[id] = (seen[id] || 0) + 1;
+    if (seen[id] === 2) overlap.push(((fitnessExercises || []).find(e => e.id === id) || {}).name || 'An exercise');
+  }));
+  return { groups, overlap };
+}
+// ── Goal progress from milestone rules ──
+// Each open milestone with a usable rule becomes one item: a cumulative series (rules that run "since" the start) or
+// weekly values (rules that need the target within one week). Reads the same engine that auto-completes milestones.
+function fcGoalItems(goals, fctx, todayKey) {
+  const out = [];
+  (goals || []).forEach(g => {
+    if (g.status === 'done' || g.status === 'parked') return;
+    (g.milestones || []).forEach(m => {
+      if (!m.rule || m.done) return;
+      const st = glMsRule(m, g, fctx, todayKey);
+      if (!st || !st.ready || st.notStarted || !st.match || !st.target) return;
+      const rule = m.rule, spec = st.spec;
+      const days = ruleDaysFor(rule, st.match, fctx, st.from, todayKey);
+      const item = {
+        gid: g.id, mid: m.id, goal: g.title || 'Untitled goal', ms: m.title || 'Milestone', color: g.color || '#6a50a7',
+        measure: rule.measure, unit: spec.unit, target: st.target, from: st.from, due: m.dueDate || g.targetDate || '', today: todayKey,
+        weekly: !!st.weekly, value: st.value, best: st.best || 0, met: !!st.met, metOn: st.metOn || null,
+        additive: spec.agg === 'sum' || spec.agg === 'days',
+      };
+      if (st.weekly) {
+        const byWeek = {};
+        days.forEach(d => { const ws = fcWeekOf(d.dk); (byWeek[ws] = byWeek[ws] || []).push(d); });
+        const weeks = [];
+        const last = fcWeekOf(todayKey);
+        for (let w = parseLocal(fcWeekOf(st.from)), i = 0; w && fmtLocal(w) <= last && i < 120; w = addDays(w, 7), i++) {
+          const k = fmtLocal(w);
+          weeks.push({ wk: k, v: byWeek[k] ? ruleAgg(rule.measure, byWeek[k]) : 0 });
+        }
+        item.weeks = weeks;
+      } else {
+        item.pts = days.map((d, i) => ({ dk: d.dk, v: ruleAgg(rule.measure, days.slice(0, i + 1)) }));
+      }
+      out.push(item);
+    });
+  });
+  return out;
+}
+// Where a cumulative goal is heading. Totals and day counts only, and not before two weeks of data:
+//   shouldBe  — where an even pace from the start would be today
+//   projected — value on the due date if the average pace so far continues; reachOn — day the target is reached
+//   status    — met | best | early | stalled | pace | ontrack | behind
+function fcProject(item) {
+  const res = { shouldBe: null, projected: null, reachOn: null, status: '' };
+  if (item.weekly) { res.status = item.met ? 'met' : ''; return res; }
+  const total = glDays(item.from, item.due), elapsed = Math.max(1, glDays(item.from, item.today));
+  if (item.due && total > 0) res.shouldBe = Math.min(item.target, item.target * elapsed / total);
+  if (item.met) { res.status = 'met'; return res; }
+  if (!item.additive) { res.status = 'best'; return res; }
+  if (elapsed < 14) { res.status = 'early'; return res; }
+  const rate = item.value / elapsed;
+  if (rate <= 0) { res.status = 'stalled'; return res; }
+  const left = item.due ? Math.max(0, glDays(item.today, item.due)) : 0;
+  res.projected = item.value + rate * left;
+  res.reachOn = glAddDays(item.from, Math.ceil(item.target / rate));
+  res.status = !item.due ? 'pace' : (res.projected >= item.target ? 'ontrack' : 'behind');
+  return res;
+}
+// ── FITNESS CHARTS UI (v5.19.0) ──
+// Inline SVG, 340-wide viewBox that scales to the screen. Colors come from CSS variables so light/dark just work.
+function FcChart({ labels, series, kind, fmtVal, axFmt, rev, target, height }) {
+  const [sel, setSel] = useState(null);
+  const n = labels.length;
+  const W = 340, H = height || 170, L = 38, R = 8, T = 8, B = 22;
+  const iw = W - L - R, ih = H - T - B;
+  const vals = [];
+  series.forEach(s => s.values.forEach(v => { if (v !== null && v !== undefined && isFinite(v)) vals.push(v); }));
+  if (target) vals.push(target);
+  let lo = 0, hi = 1, ticks = [0, 1];
+  if (kind === 'bar') { const nz = fcNice(Math.max(0, ...vals), 4); hi = nz.max; ticks = fcTicks(0, hi, nz.step); }
+  else if (vals.length) { const r = fcNiceRange(Math.min(...vals), Math.max(...vals), 4); lo = r.lo; hi = r.hi; ticks = fcTicks(lo, hi, r.step); }
+  const frac = v => (v - lo) / ((hi - lo) || 1);
+  const y = v => (rev ? T + frac(v) * ih : T + ih - frac(v) * ih);
+  const band = iw / Math.max(1, n);
+  const cx = i => L + band * (i + 0.5);
+  const si = sel === null ? n - 1 : Math.min(sel, n - 1);
+  const ax = axFmt || (v => String(+v.toFixed(2)));
+  const every = n > 14 ? 4 : n > 9 ? 2 : 1;
+  const k = Math.max(1, series.length);
+  return (
+    <div className="fc-chart">
+      <div className="fc-readout">
+        <b>Week of {labels[si]}</b>
+        {series.map((s, j) => (
+          <span key={j}><i style={{ background: s.color }} />{series.length > 1 ? s.name + ' ' : ''}{s.values[si] === null || s.values[si] === undefined ? '–' : fmtVal(s.values[si])}</span>
+        ))}
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Weekly chart" style={{ width: '100%', height: 'auto', display: 'block' }}>
+        {ticks.map((t, i) => (
+          <g key={i}>
+            <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} style={{ stroke: 'var(--border)' }} strokeWidth="1" />
+            <text x={L - 5} y={y(t) + 3} textAnchor="end" fontSize="9" style={{ fill: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>{ax(t)}</text>
+          </g>
+        ))}
+        {si >= 0 && n > 0 && <rect x={L + band * si} y={T} width={band} height={ih} style={{ fill: 'var(--cream)' }} opacity="0.7" />}
+        {target ? <line x1={L} x2={W - R} y1={y(target)} y2={y(target)} strokeDasharray="4 3" strokeWidth="1.5" style={{ stroke: 'var(--gold)' }} /> : null}
+        {kind === 'bar' && series.map((s, j) => s.values.map((v, i) => {
+          if (!(v > 0)) return null;
+          const gw = band * 0.72, bw = gw / k;
+          const yy = y(v), h = Math.max(1.5, T + ih - yy);
+          return <rect key={j + '_' + i} x={cx(i) - gw / 2 + j * bw + (k > 1 ? 0.5 : 0)} y={T + ih - h} width={Math.max(2, bw - (k > 1 ? 1 : 0))} height={h} rx="2" style={{ fill: s.color }} opacity={i === si ? 1 : 0.8} />;
+        }))}
+        {kind === 'line' && series.map((s, j) => {
+          const segs = []; let cur = [];
+          s.values.forEach((v, i) => { if (v === null || v === undefined) { if (cur.length) segs.push(cur); cur = []; } else cur.push([cx(i), y(v)]); });
+          if (cur.length) segs.push(cur);
+          return (
+            <g key={j}>
+              {segs.map((p, q) => p.length > 1 ? <polyline key={q} points={p.map(a => a.join(',')).join(' ')} fill="none" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" style={{ stroke: s.color }} /> : null)}
+              {s.values.map((v, i) => (v === null || v === undefined) ? null : <circle key={i} cx={cx(i)} cy={y(v)} r={i === si ? 4 : 2.8} style={{ fill: s.color }} />)}
+            </g>
+          );
+        })}
+        {labels.map((lb, i) => (i % every === (n - 1) % every) ? <text key={i} x={cx(i)} y={H - 7} textAnchor="middle" fontSize="9" style={{ fill: i === si ? 'var(--ink)' : 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>{lb}</text> : null)}
+        {labels.map((lb, i) => <rect key={'h' + i} x={L + band * i} y={T} width={band} height={ih} fill="transparent" style={{ cursor: 'pointer' }} onClick={() => setSel(i)} />)}
+      </svg>
+    </div>
+  );
+}
+// One goal milestone: cumulative line (since-rules) with the even-pace line and a dashed projection
+function FcGoalLine({ item, proj }) {
+  const W = 340, H = 170, L = 38, R = 12, T = 10, B = 22;
+  const iw = W - L - R, ih = H - T - B;
+  const end = item.due && item.due > item.today ? item.due : item.today;
+  const span = Math.max(1, glDays(item.from, end));
+  const x = dk => L + Math.max(0, Math.min(1, glDays(item.from, dk) / span)) * iw;
+  const maxV = Math.max(item.target, item.value, proj.projected || 0, proj.shouldBe || 0);
+  const nz = fcNice(maxV, 4);
+  const y = v => T + ih - (v / nz.max) * ih;
+  let d = `M${x(item.from)},${y(0)}`, prev = 0;
+  (item.pts || []).forEach(p => { d += ` H${x(p.dk)} V${y(p.v)}`; prev = p.v; });
+  d += ` H${x(item.today)}`;
+  const tx = x(item.today), fr = (tx - L) / iw;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Goal progress chart" style={{ width: '100%', height: 'auto', display: 'block' }}>
+      {fcTicks(0, nz.max, nz.step).map((t, i) => (
+        <g key={i}>
+          <line x1={L} x2={W - R} y1={y(t)} y2={y(t)} style={{ stroke: 'var(--border)' }} strokeWidth="1" />
+          <text x={L - 5} y={y(t) + 3} textAnchor="end" fontSize="9" style={{ fill: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>{+t.toFixed(1)}</text>
+        </g>
+      ))}
+      <line x1={L} x2={W - R} y1={y(item.target)} y2={y(item.target)} strokeDasharray="4 3" strokeWidth="1.5" style={{ stroke: 'var(--gold)' }} />
+      {item.due ? <line x1={x(item.from)} y1={y(0)} x2={x(item.due)} y2={y(item.target)} strokeWidth="1.5" strokeDasharray="2 3" style={{ stroke: 'var(--ink-faint)' }} /> : null}
+      <line x1={tx} x2={tx} y1={T} y2={T + ih} strokeWidth="1" style={{ stroke: 'var(--ink-faint)' }} opacity="0.6" />
+      {proj.projected !== null && item.due > item.today ? <line x1={tx} y1={y(item.value)} x2={x(item.due)} y2={y(proj.projected)} strokeWidth="2" strokeDasharray="5 4" style={{ stroke: item.color }} opacity="0.7" /> : null}
+      <path d={d} fill="none" strokeWidth="2.4" strokeLinejoin="round" style={{ stroke: item.color }} />
+      <circle cx={tx} cy={y(item.value)} r="3.5" style={{ fill: item.color }} />
+      <text x={L} y={H - 7} textAnchor="start" fontSize="9" style={{ fill: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>{glShort(item.from)}</text>
+      {fr > 0.2 && fr < 0.8 ? <text x={tx} y={H - 7} textAnchor="middle" fontSize="9" style={{ fill: 'var(--ink)', fontFamily: "'DM Mono',monospace" }}>today</text> : null}
+      <text x={W - R} y={H - 7} textAnchor="end" fontSize="9" style={{ fill: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>{glShort(end)}</text>
+    </svg>
+  );
+}
+function FcGoalCard({ item }) {
+  const spec = GL_RULE_MEASURES[item.measure] || {};
+  const proj = fcProject(item);
+  const fv = v => `${+Number(v).toFixed(1)} ${item.unit}`;
+  let note = '', tone = '';
+  if (item.weekly) {
+    note = item.met ? `Reached the week of ${glShort(item.metOn)}` : `This week ${fv(item.value)} · best week ${fv(item.best)} · target ${fv(item.target)} in one week`;
+    tone = item.met ? 'ok' : '';
+  } else if (proj.status === 'met') { note = `Reached${item.metOn ? ' on ' + glShort(item.metOn) : ''}`; tone = 'ok'; }
+  else if (proj.status === 'best') { note = `Best so far ${fv(item.value)} · target ${fv(item.target)}`; }
+  else if (proj.status === 'early') { note = `Too early to project (needs 2 weeks of data)${proj.shouldBe !== null ? ` · even pace would be ${fv(proj.shouldBe)} by now` : ''}`; }
+  else if (proj.status === 'stalled') { note = 'Nothing logged yet toward this'; tone = 'warn'; }
+  else if (proj.status === 'ontrack') { note = `On track · about ${fv(proj.projected)} by ${glShort(item.due)} (even pace: ${fv(proj.shouldBe)} by now)`; tone = 'ok'; }
+  else if (proj.status === 'behind') { note = `Behind · about ${fv(proj.projected)} by ${glShort(item.due)}, target ${fv(item.target)}. At this pace you'd get there ~${glShort(proj.reachOn)}`; tone = 'warn'; }
+  else if (proj.status === 'pace') { note = `At this pace you'd get there ~${glShort(proj.reachOn)}`; }
+  return (
+    <div className="fc-goal">
+      <div className="fc-goal-hd"><span className="fc-dot" style={{ background: item.color }} /><b>{item.goal}</b><span style={{ marginLeft: 6 }}>· {item.ms}</span></div>
+      <div className="fc-goal-sub">{spec.label || item.measure}{item.weekly ? ' · in one week' : ''}</div>
+      <div className="fc-goal-big">{+Number(item.weekly ? item.value : item.value).toFixed(1)}<small> / {+item.target.toFixed(1)} {item.unit}</small></div>
+      {item.weekly
+        ? <FcChart labels={item.weeks.slice(-12).map(w => glShort(w.wk))} series={[{ name: spec.label, color: item.color, values: item.weeks.slice(-12).map(w => w.v) }]} kind="bar" fmtVal={fv} target={item.target} height={150} />
+        : <FcGoalLine item={item} proj={proj} />}
+      <div className={`fc-note ${tone}`}>{note}</div>
+    </div>
+  );
+}
+function FcChips({ items, value, onPick }) {
+  return <div className="fc-chips">{items.map(it => <button key={it.k} className={`fc-chip${value === it.k ? ' on' : ''}`} onClick={() => onPick(it.k)}>{it.label}</button>)}</div>;
+}
+function FitnessCharts({ fitnessLog, fitnessExercises, goals, habitGoals, habitCompletions, habitQty, fitnessCompare, setFitnessCompare, prIndex }) {
+  const todayKey = fmtLocal(new Date());
+  const exs = fitnessExercises || [];
+  const [range, setRange] = useState(8);
+  const [exId, setExId] = useState('');
+  const [metricKey, setMetricKey] = useState('');
+  const presets = React.useMemo(() => fcPresets(exs), [exs]);
+  const saved = fitnessCompare || [];
+  const blank = () => ({ id: '', name: '', metric: 'sets', untagged: false, groups: [{ id: 'g' + Math.random().toString(36).slice(2, 7), name: '', subs: [], exerciseIds: [] }] });
+  const [cmp, setCmp] = useState(null);
+  const cur = cmp || saved[0] || presets[0] || blank();
+  const weeks = React.useMemo(() => fcWeeks(range, new Date()), [range, todayKey]);
+  const wlabels = weeks.map(glShort);
+
+  // tiles
+  const thisWk = weeks[weeks.length - 1];
+  const lastWk = fmtLocal(addDays(parseLocal(thisWk), -7));
+  const t1 = React.useMemo(() => fcTiles(fitnessLog, exs, prIndex, thisWk), [fitnessLog, exs, prIndex, thisWk]);
+  const t0 = React.useMemo(() => fcTiles(fitnessLog, exs, prIndex, lastWk), [fitnessLog, exs, prIndex, lastWk]);
+  // per-exercise trend
+  const logged = React.useMemo(() => {
+    const ids = new Set();
+    Object.keys(fitnessLog || {}).forEach(dk => flDayExs(fitnessLog[dk]).forEach(ex => { if ((ex.sets || []).some(s => s && s.done)) ids.add(ex.exerciseId); }));
+    return exs.filter(e => ids.has(e.id)).sort((a, b) => a.name.localeCompare(b.name));
+  }, [fitnessLog, exs]);
+  const pickId = logged.some(e => e.id === exId) ? exId : fcLastExercise(fitnessLog, logged);
+  const pickEx = exs.find(e => e.id === pickId);
+  const isCardio = !!pickEx && pickEx.category === 'Cardio';
+  const weekly = React.useMemo(() => fcWeekly(fitnessLog, id => id === pickId, weeks), [fitnessLog, pickId, weeks]);
+  const avail = fcAvail(weekly, isCardio);
+  const mk = avail.includes(metricKey) ? metricKey : avail[0];
+  const M = mk ? FC_METRICS[mk] : null;
+  // goals
+  const fctx = { fitnessLog, fitnessExercises: exs, habitGoals, habitCompletions, habitQty };
+  const goalItems = React.useMemo(() => fcGoalItems(goals, fctx, todayKey), [goals, fitnessLog, exs, habitGoals, habitCompletions, habitQty, todayKey]);
+  // compare
+  const cres = React.useMemo(() => fcCompare(cur, cur.metric, fitnessLog, exs, weeks), [cur, fitnessLog, exs, weeks]);
+  const subs = ruleSubs(exs);
+  const setC = patch => setCmp({ ...cur, ...patch });
+  const setG = (gi, patch) => setC({ groups: cur.groups.map((g, i) => i === gi ? { ...g, ...patch } : g) });
+  const isSaved = !!cur.id && saved.some(s => s.id === cur.id);
+  function saveCmp() {
+    const name = (cur.name || '').trim() || 'My comparison';
+    const rec = { id: isSaved ? cur.id : 'cmp_' + Date.now().toString(36), name, metric: cur.metric, untagged: !!cur.untagged, groups: cur.groups.map(g => ({ id: g.id, name: g.name, subs: g.subs || [], exerciseIds: g.exerciseIds || [] })) };
+    setFitnessCompare(isSaved ? saved.map(s => s.id === rec.id ? rec : s) : [...saved, rec]);
+    setCmp(rec);
+  }
+  function delCmp() { setFitnessCompare(saved.filter(s => s.id !== cur.id)); setCmp(null); }
+  const clone = o => JSON.parse(JSON.stringify(o));
+  const mUnit = k => FC_METRICS[k].fmt;
+
+  return (
+    <div className="fc-wrap">
+      <div className="fc-tiles">
+        {[['Sessions', t1.sessions, t0.sessions, ''], ['Strength sets', t1.sets, t0.sets, ''], ['Miles', t1.miles, t0.miles, ''], ['PRs', t1.prs, t0.prs, '🏆 ']].map(([lb, a, b, ic]) => (
+          <div key={lb} className="fc-tile"><div className="fc-tile-lb">{lb}</div><div className="fc-tile-v">{ic}{a}</div><div className="fc-tile-sub">Last week: {b}</div></div>
+        ))}
+      </div>
+      <div className="fc-sub-note">This week so far, Sun–Sat. Sessions = days with a finished set.</div>
+
+      <section className="fc-card">
+        <div className="fc-card-hd"><h3>Trends</h3>
+          <FcChips items={[{ k: 8, label: '8w' }, { k: 12, label: '12w' }, { k: 26, label: '26w' }]} value={range} onPick={setRange} />
+        </div>
+        {logged.length === 0 ? <div className="fc-empty">Finish a few sets and your trends show up here.</div> : (<>
+          <select className="fc-select" value={pickId} onChange={e => setExId(e.target.value)}>
+            {logged.map(e => <option key={e.id} value={e.id}>{e.name}{e.subcategory ? ` · ${e.subcategory}` : ''}</option>)}
+          </select>
+          {M ? (<>
+            <FcChips items={avail.map(k => ({ k, label: FC_METRICS[k].label }))} value={mk} onPick={setMetricKey} />
+            <FcChart labels={wlabels} series={[{ name: M.label, color: isCardio ? 'var(--teal)' : 'var(--accent)', values: weekly.map(M.get) }]} kind={M.kind} fmtVal={M.fmt} axFmt={M.ax} rev={M.rev} />
+            {M.rev && <div className="fc-sub-note">Faster is higher.</div>}
+          </>) : <div className="fc-empty">Nothing logged for this exercise in the last {range} weeks.</div>}
+        </>)}
+      </section>
+
+      <section className="fc-card">
+        <div className="fc-card-hd"><h3>Goal progress</h3></div>
+        {goalItems.length === 0
+          ? <div className="fc-empty">Milestones with a Fitness or Habit rule show their progress here. Add a rule to a milestone in Goals.</div>
+          : goalItems.map(it => <FcGoalCard key={it.gid + it.mid} item={it} />)}
+      </section>
+
+      <section className="fc-card">
+        <div className="fc-card-hd"><h3>Compare</h3></div>
+        <div className="fc-sub-note" style={{ marginTop: 0 }}>Group subcategories (or single exercises) and compare them week by week.</div>
+        <div className="fc-chips">
+          {presets.map(p => <button key={p.id} className={`fc-chip${cur.id === p.id ? ' on' : ''}`} onClick={() => setCmp(clone(p))}>{p.name}</button>)}
+          {saved.map(p => <button key={p.id} className={`fc-chip${cur.id === p.id ? ' on' : ''}`} onClick={() => setCmp(clone(p))}>★ {p.name}</button>)}
+          <button className="fc-chip" onClick={() => setCmp(blank())}>+ New</button>
+        </div>
+        <FcChips items={FC_ADD_METRICS.map(k => ({ k, label: FC_METRICS[k].label }))} value={cur.metric} onPick={k => setC({ metric: k })} />
+        {cres.groups.some(g => g.values.some(v => v > 0))
+          ? <FcChart labels={wlabels} series={cres.groups.map(g => ({ name: g.name, color: g.color, values: g.values }))} kind="bar" fmtVal={mUnit(cur.metric)} axFmt={FC_METRICS[cur.metric].ax} />
+          : <div className="fc-empty">No finished sets in these groups for the last {range} weeks.</div>}
+        <div className="fc-legend">{cres.groups.map((g, i) => <span key={i}><i style={{ background: g.color }} />{g.name}</span>)}</div>
+        {cres.overlap.length > 0 && <div className="fc-note warn">Counted in more than one group: {cres.overlap.slice(0, 4).join(', ')}{cres.overlap.length > 4 ? '…' : ''}. Those sets are added to each group.</div>}
+        <details className="fc-edit" open={!isSaved && !presets.some(p => p.id === cur.id)}>
+          <summary>Edit groups</summary>
+          <input className="fc-input" placeholder="Name this comparison" value={cur.name || ''} onChange={e => setC({ name: e.target.value })} />
+          {cur.groups.map((g, gi) => (
+            <div key={g.id || gi} className="fc-group">
+              <div className="fc-group-hd">
+                <i className="fc-dot" style={{ background: FC_COLORS[gi] }} />
+                <input className="fc-input" placeholder={`Group ${gi + 1} name`} value={g.name || ''} onChange={e => setG(gi, { name: e.target.value })} />
+                {cur.groups.length > 1 && <button className="fc-x" aria-label="Remove group" onClick={() => setC({ groups: cur.groups.filter((_, i) => i !== gi) })}>✕</button>}
+              </div>
+              <div className="fc-chips">
+                {subs.map(s => {
+                  const on = (g.subs || []).some(x => ruleSubKey(x) === ruleSubKey(s));
+                  return <button key={s} className={`fc-chip${on ? ' on' : ''}`} onClick={() => setG(gi, { subs: on ? g.subs.filter(x => ruleSubKey(x) !== ruleSubKey(s)) : [...(g.subs || []), s] })}>{s}</button>;
+                })}
+                {(g.exerciseIds || []).map(id => { const e = exs.find(x => x.id === id); return e ? <button key={id} className="fc-chip on" onClick={() => setG(gi, { exerciseIds: g.exerciseIds.filter(x => x !== id) })}>{e.name} ✕</button> : null; })}
+              </div>
+              <select className="fc-select" value="" onChange={e => { if (e.target.value) setG(gi, { exerciseIds: [...(g.exerciseIds || []), e.target.value] }); }}>
+                <option value="">+ Add a single exercise…</option>
+                {exs.filter(e => !(g.exerciseIds || []).includes(e.id)).sort((a, b) => a.name.localeCompare(b.name)).map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+              </select>
+            </div>
+          ))}
+          <div className="fc-actions">
+            {cur.groups.length < FC_COLORS.length && <button className="fc-btn" onClick={() => setC({ groups: [...cur.groups, { id: 'g' + Math.random().toString(36).slice(2, 7), name: '', subs: [], exerciseIds: [] }] })}>+ Add group</button>}
+            <label className="fc-check"><input type="checkbox" checked={!!cur.untagged} onChange={e => setC({ untagged: e.target.checked })} /> Show “Untagged” strength</label>
+          </div>
+          <div className="fc-actions">
+            <button className="fc-btn primary" onClick={saveCmp}>{isSaved ? 'Save changes' : '★ Save comparison'}</button>
+            {isSaved && <button className="fc-btn danger" onClick={delCmp}>Delete</button>}
+          </div>
+        </details>
+      </section>
+    </div>
+  );
+}
+
+function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessExercises, fitnessGoals, setFitnessGoals, goals, habitGoals, habitCompletions, habitQty, fitnessCompare, setFitnessCompare }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDate] = useState(today);
   const [fitView, setFitView] = useState('week');
@@ -13318,7 +13822,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
       <div className="fitness-main">
         {/* View tabs row — full width on mobile */}
         <div className="fitness-view-tabs" style={{alignSelf:'stretch'}}>
-          {['day','week','month','year'].map(v=>(
+          {['day','week','month','year','charts'].map(v=>(
             <button key={v} className={`fitness-view-tab ${fitView===v?'active':''}`}
               onClick={()=>setFitView(v)} style={{flex:1}}>
               {v.charAt(0).toUpperCase()+v.slice(1)}
@@ -13326,7 +13830,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           ))}
         </div>
         {/* Date nav + add button row */}
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
+        <div style={{display:fitView==='charts'?'none':'flex',alignItems:'center',gap:8}}>
           <button className="nav-arrow" style={{flexShrink:0}} onClick={()=>{
             if(fitView==='day') setSelectedDate(d=>addDays(d,-1));
             else if(fitView==='week') setSelectedDate(d=>addDays(d,-7));
@@ -13354,6 +13858,9 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             </button>
           )}
         </div>
+
+        {/* CHARTS (v5.19.0) */}
+        {fitView==='charts'&&<FitnessCharts fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} goals={goals} habitGoals={habitGoals} habitCompletions={habitCompletions} habitQty={habitQty} fitnessCompare={fitnessCompare} setFitnessCompare={setFitnessCompare} prIndex={prIndex}/>}
 
         {/* DAY VIEW */}
         {fitView==='day'&&(()=>{
