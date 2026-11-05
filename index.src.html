@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.14.0 -->
+<!-- LP Planner v5.15.0 -->
+<!-- v5.15.0 — Goals timeline: a third row level for tasks. Each milestone with tasks gets a ▸/▾ caret (collapsed by default, remembered only until you leave the page); open it to see its tasks under it, with a small diamond on each scheduled task's day (faded when done, red when late). Unscheduled tasks show "not scheduled". Click a task or diamond to open the goal. No data change, and diamonds do not drag. -->
 <!-- v5.14.0 — Goals: a milestone only shows its "Complete automatically from my weight / training or habits" rows once you turn one on. Until then they are two small dashed chips ("⚖ Auto from weight", "↻ Auto from training or habits") on the "Add a task" line, so a hand-managed milestone has no extra lines. Turning a link off (uncheck, or Remove auto-check) collapses it back to a chip and keeps the milestone's done state. No data change. -->
 <!-- v5.13.0 — Goals: a milestone's auto-check rule can read the Habit Tracker instead of the Fitness log (rule.source 'habits': Days completed, or Total of the Qty field; same since-start / single-week windows). One source per rule. -->
 <!-- v5.12.1 — Milestone auto-check rule editor now has a Hide/Show rule button, so it can be collapsed without unchecking (and clearing) the rule. -->
@@ -2212,6 +2213,7 @@
   .gl-tl-row { position: relative; border-bottom: 1px solid var(--grid-line); }
   .gl-tl-row.goal { height: 46px; }
   .gl-tl-row.ms { height: 34px; }
+  .gl-tl-row.task { height: 28px; }
   .gl-tl-lab { display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 13px; overflow: hidden; }
   .gl-tl-lab span.t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .gl-tl-bar { position: absolute; border-radius: 9px; cursor: pointer; overflow: hidden; box-sizing: border-box; }
@@ -10004,6 +10006,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   const [offset, setOffset] = useState(0);
   const [show, setShow] = useState('active');   // 'active' | 'all' | <goalId>
   const [collapsed, setCollapsed] = useState({});
+  const [msOpen, setMsOpen] = useState({});   // v5.15.0 — milestone ids whose tasks are showing (collapsed by default)
   const range = glRange(zoom, offset);
   const total = range.end - range.start;
 
@@ -10093,7 +10096,10 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   const rows = [];
   shown.forEach(g => {
     rows.push({ type: 'goal', g });
-    if (!collapsed[g.id]) (g.milestones || []).forEach(m => rows.push({ type: 'ms', g, m }));
+    if (!collapsed[g.id]) (g.milestones || []).forEach(m => {
+      rows.push({ type: 'ms', g, m });
+      if (msOpen[m.id]) (m.tasks || []).forEach(t => rows.push({ type: 'task', g, m, t }));
+    });
   });
   const todayPct = pct(today);
   const endCol = range.cols[range.cols.length - 1];
@@ -10135,8 +10141,15 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
       <div className="gl-tl-scroll">
         <div className="gl-tl">
           <div className="gl-tl-labels">
-            <div className="gl-tl-head gl-label" style={{ padding: '0 14px' }}>Goal / milestone</div>
-            {rows.map(r => r.type === 'goal' ? (
+            <div className="gl-tl-head gl-label" style={{ padding: '0 14px' }}>Goal / milestone / task</div>
+            {rows.map(r => r.type === 'task' ? (
+              <div key={r.t.id} className="gl-tl-row task gl-tl-lab" style={{ paddingLeft: 60 }}>
+                <span aria-hidden="true" style={{ color: r.t.done ? 'var(--accent)' : 'var(--ink-faint)', width: 12 }}>{r.t.done ? '✓' : '○'}</span>
+                <span className="t" style={{ fontSize: 12.5, color: r.t.done ? 'var(--ink-light)' : 'var(--ink)', textDecoration: r.t.done ? 'line-through' : 'none', cursor: 'pointer' }}
+                  onClick={() => onOpenGoal(r.g.id)}>{r.t.title || 'Untitled task'}</span>
+                {!r.t.scheduledDate && !r.t.done && <span style={{ fontSize: 11, color: 'var(--ink-faint)', whiteSpace: 'nowrap' }}>not scheduled</span>}
+              </div>
+            ) : r.type === 'goal' ? (
               <div key={r.g.id} className="gl-tl-row goal gl-tl-lab" style={{ background: glTint(r.g.color, 0.05) }}>
                 <button className="gl-caret" aria-label={collapsed[r.g.id] ? 'Expand' : 'Collapse'}
                   onClick={() => setCollapsed(c => ({ ...c, [r.g.id]: !c[r.g.id] }))}>{collapsed[r.g.id] ? '▸' : '▾'}</button>
@@ -10145,7 +10158,11 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
                 <span className="gl-mono" style={{ fontSize: 11, color: 'var(--ink-light)' }}>{Math.round(glProgress(r.g) * 100)}%</span>
               </div>
             ) : (
-              <div key={r.m.id} className="gl-tl-row ms gl-tl-lab" style={{ paddingLeft: 40 }}>
+              <div key={r.m.id} className="gl-tl-row ms gl-tl-lab" style={{ paddingLeft: 10 }}>
+                {(r.m.tasks || []).length > 0
+                  ? <button className="gl-caret" aria-expanded={!!msOpen[r.m.id]} aria-label={msOpen[r.m.id] ? 'Hide tasks' : 'Show tasks'} style={{ flexShrink: 0 }}
+                      onClick={() => setMsOpen(o => ({ ...o, [r.m.id]: !o[r.m.id] }))}>{msOpen[r.m.id] ? '▾' : '▸'}</button>
+                  : <span aria-hidden="true" style={{ width: 22, flexShrink: 0 }} />}
                 <span aria-hidden="true" style={{ color: r.m.done ? 'var(--accent)' : glMsOverdue(r.m, today) ? 'var(--red)' : r.g.color, width: 12 }}>{r.m.done ? '✓' : '◆'}</span>
                 <span className="t" style={{ color: r.m.done ? 'var(--ink-light)' : glMsOverdue(r.m, today) ? '#b03a2e' : 'var(--ink)', textDecoration: r.m.done ? 'line-through' : 'none', cursor: 'pointer' }}
                   onClick={() => onOpenGoal(r.g.id)}>{r.m.title || 'Untitled milestone'}</span>
@@ -10168,6 +10185,21 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
               ))}
             </div>
             {rows.map(r => {
+              if (r.type === 'task') {
+                const { g, t } = r;
+                const c = t.scheduledDate ? pct(t.scheduledDate) : null;
+                const mid = c == null ? null : c + (86400000 / total * 100) / 2;
+                const lateT = !t.done && t.scheduledDate && t.scheduledDate < today;
+                return (
+                  <div key={t.id} className="gl-tl-row task">
+                    {mid != null && mid >= 0 && mid <= 100 && (
+                      <div className="gl-tl-dia" onClick={() => openGoal(g.id)} title={`${t.title || 'Task'} · ${glShortDay(t.scheduledDate)}${t.done ? ' · done' : lateT ? ' · late' : ''}`}
+                        style={{ width: 9, height: 9, top: 9.5, left: `calc(${mid}% - 4.5px)`, pointerEvents: 'auto', cursor: 'pointer', zIndex: 1,
+                          background: lateT ? 'var(--red)' : g.color, opacity: t.done ? 0.45 : 1 }} />
+                    )}
+                  </div>
+                );
+              }
               if (r.type === 'goal') {
                 const g = r.g;
                 const d = dragOn(g.id, null);
@@ -10237,6 +10269,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px solid #6a50a7', boxSizing: 'border-box' }} />In progress</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px dashed #6a50a7', boxSizing: 'border-box' }} />Upcoming</span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 18, height: 8, borderRadius: 4, border: '1.5px solid var(--red)', boxSizing: 'border-box' }} />Overdue</span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 8, height: 8, transform: 'rotate(45deg)', background: '#6a50a7' }} />Task on its day (▸ beside a milestone)</span>
         <span style={{ marginLeft: 'auto' }}>{canDrag ? 'Click to open · drag a bar to move it · drag an edge to resize' : 'Click a bar or name to open the goal'}</span>
       </div>
     </section>
@@ -11439,7 +11472,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.14.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.15.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
