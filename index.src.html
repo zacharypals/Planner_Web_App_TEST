@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.15.0 -->
+<!-- LP Planner v5.15.1 -->
+<!-- v5.15.1 — Goals: the ↻ auto-check button is back on every task, and the ↻ training/habits chip is offered on every milestone, with no per-goal "Auto-check" switch needed (the switch added in v5.12.0 is removed). Weight stays offered only on goals that link Weight. -->
 <!-- v5.15.0 — Goals timeline: a third row level for tasks. Each milestone with tasks gets a ▸/▾ caret (collapsed by default, remembered only until you leave the page); open it to see its tasks under it, with a small diamond on each scheduled task's day (faded when done, red when late). Unscheduled tasks show "not scheduled". Click a task or diamond to open the goal. No data change, and diamonds do not drag. -->
 <!-- v5.14.0 — Goals: a milestone only shows its "Complete automatically from my weight / training or habits" rows once you turn one on. Until then they are two small dashed chips ("⚖ Auto from weight", "↻ Auto from training or habits") on the "Add a task" line, so a hand-managed milestone has no extra lines. Turning a link off (uncheck, or Remove auto-check) collapses it back to a chip and keeps the milestone's done state. No data change. -->
 <!-- v5.13.0 — Goals: a milestone's auto-check rule can read the Habit Tracker instead of the Fitness log (rule.source 'habits': Days completed, or Total of the Qty field; same since-start / single-week windows). One source per rule. -->
@@ -9768,15 +9769,6 @@ function GlLinkPicker({ goal, onChange, habitGoals, fitnessExercises }) {
   });
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {/* v5.12.0 — per-goal switch for the ↻ auto-check buttons on this goal's tasks and milestones */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-        <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Auto-check</span>
-        <span style={{ fontSize: 11, color: 'var(--ink-light)' }}>Adds a ↻ button to this goal's tasks and milestones so they can check themselves off from your Fitness log (milestones can also read your habits). Anything that already has a rule stays visible.</span>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-          <button className={`gl-chip ${goal.autoTraining ? 'on' : ''}`} aria-pressed={!!goal.autoTraining}
-            onClick={() => onChange(g => ({ ...g, autoTraining: !g.autoTraining }))}>↻ Fitness log &amp; habits</button>
-        </div>
-      </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
         <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Measurements</span>
         {!metricIds.includes('weight') && <span style={{ fontSize: 11, color: 'var(--ink-light)' }}>Link Weight to also let a milestone complete itself from your weight.</span>}
@@ -10399,7 +10391,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   // v5.14.0 — which auto-complete links this goal offers, and how to switch each on/off for just this milestone.
   // A milestone with neither link set is a plain manual one and shows no extra rows (only the chips on the add-task line).
   const wtOffered = !!((goal && (goal.linkedMetrics || []).includes('weight')) || m.metric);
-  const trOffered = !!((goal && goal.autoTraining) || m.rule);
+  const trOffered = true;   // v5.15.1 — training/habits auto-check is always offered (no per-goal switch)
   function enableWeight() {
     const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
     const cur = mctx ? smoothWeight(mctx.metrics, asOf, goal && goal.startDate) : { n: 0, avg: null };
@@ -10527,7 +10519,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
                 onClick={() => setPicker(p => p === t.id ? null : t.id)}>
                 {t.scheduledDate ? glShortDay(t.scheduledDate) : '+ Schedule'}
               </button>
-              {((goal && goal.autoTraining) || t.rule) && (
+              {(
                 <button className={`gl-sched ${t.rule ? 'set' : ''}`} aria-expanded={ruleOpen === t.id} aria-label="Check off automatically from my Fitness log"
                   title="Check this off automatically from my Fitness log"
                   style={t.rule ? { background: glTint(color, 0.14), color: glInk(color) } : undefined}
@@ -10734,11 +10726,8 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, hab
                       habitCompletions={habitCompletions} fitnessLog={fitnessLog} weekStart={linkWeekStart} />
                     <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>This week. Shown alongside the milestones — it doesn't change the goal's progress.</span>
                   </>
-                ) : !goal.autoTraining && (
+                ) : (
                   <span style={{ fontSize: 13, color: 'var(--ink-light)' }}>Link the habits and exercises this goal rests on, and their weekly progress shows here.</span>
-                )}
-                {goal.autoTraining && (
-                  <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>↻ Tasks and milestones can check themselves off from your Fitness log; milestones can also read habits.</span>
                 )}
               </>
             )}
@@ -11472,7 +11461,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.15.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.15.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
