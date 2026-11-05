@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.17.0 -->
+<!-- LP Planner v5.18.0 -->
+<!-- v5.18.0 — Fitness: interval timer. A ⏱ button on each exercise tile in Day view opens a bottom sheet to set Sets, Work seconds and Rest seconds, then runs work and rest intervals across the sets (the last set has no trailing rest). Minimize the sheet to a pill that stays on screen across tabs while you log sets or look at other pages; tap it to reopen. Pause/resume, skip the current interval, stop, and "Again" when it finishes. Beeps and vibrates at each change plus a 3-2-1 tick (sound on/off toggle; sound needs the app open and unlocked, and vibration is not available on iPhone). Keeps the screen awake while running. The clock is a stored start time, so it is still correct after the phone sleeps or the app is reloaded. Work and rest are remembered per exercise on this device (localStorage, not synced). No new synced data, so no sync or backup changes. -->
 <!-- v5.17.0 — Fitness: personal-record badges. A done set that beats your earlier best for that exercise now shows a gold trophy pill on the exercise tile in Day view (with a detail line such as "190 lb, was 185"). Strength: Weight PR (heaviest done set) and Reps PR (most reps at that weight or heavier; bodyweight sets compare against all earlier sets). Cardio: Distance PR (longest single set) and Pace PR (best min/mi on sets of 1 mile or more). Counts your whole existing history; the first time an exercise is logged earns nothing. Derived from the log each render, so no new stored data and no sync or backup changes. -->
 <!-- v5.16.0 — Time blocks: tasks, events and goal tasks can now have an optional start time and length (new startTime / durMin fields; events keep eventTime). Week view gets a List / Time blocks switch (per device). Time blocks shows each day as an hourly column with timed items as blocks; Habits, Goals and No time are small buttons above each day that open as a popover (desktop) or bottom sheet (phone). Desktop: drag a block to move it, drag its bottom edge to resize, double-click empty space to add, drag a No-time task onto the grid to schedule it. Calendar events now push and pull their real length (was always one hour) and changing an event time now sends the NEW time to Google Calendar. -->
 <!-- v5.15.2 — Goals: when a milestone's "Auto from weight" / "Auto from training or habits" chip is switched on, its row now reads as a plain label with a Remove button instead of a pre-ticked checkbox (which looked like the milestone was already satisfied). Behavior is unchanged: turning a link on never completes a milestone by itself. -->
@@ -558,6 +559,7 @@
     padding: 1px 8px; font-size: 10px; font-family: 'DM Mono', monospace;
     color: var(--gold); font-weight: 700; white-space: nowrap;
   }
+  @media (max-width: 767px) { .pr-pill .pr-txt { display: none; } .pr-pill { padding: 1px 6px; } }  /* phones: trophy only, the open tile says which PR */
   .pr-notes { display: flex; flex-direction: column; gap: 3px; padding: 2px 0 6px; }
   .pr-note { font-size: 11px; color: var(--ink-light); font-family: 'DM Sans', sans-serif; }
   .pr-note b { color: var(--gold); font-weight: 700; }
@@ -1455,6 +1457,50 @@
   .undo-toast-more { font-size: 11px; opacity: 0.7; flex-shrink: 0; }
   .series-toast { bottom: 84px; flex-wrap: wrap; row-gap: 0; max-width: min(94vw, 540px); }
   .series-toast .undo-toast-label { flex: 1 1 100%; padding-top: 6px; white-space: normal; }
+
+  /* ── FITNESS INTERVAL TIMER (v5.18.0) ── bottom sheet + minimized pill; logic in FitTimer / FitTimerHost.
+     z-index 9996 sits above the Weekly Review overlay (9995) and below the undo toast (9998),
+     save-error toast (10000) and sign-in wall (20000). */
+  .ft-open-btn { background: none; border: none; cursor: pointer; font-size: 14px; line-height: 1; padding: 0 4px; min-width: 28px; min-height: 28px; opacity: 0.75; flex-shrink: 0; }
+  .ft-open-btn:hover { opacity: 1; }
+  .ft-scrim { position: fixed; inset: 0; background: rgba(20,16,30,0.45); z-index: 9996; display: flex; align-items: flex-end; justify-content: center; }
+  .ft-sheet { width: 100%; max-width: 460px; background: var(--surface); color: var(--ink); border-radius: 16px 16px 0 0; padding: 8px 18px calc(20px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -8px 30px rgba(0,0,0,0.3); font-family: 'DM Sans', sans-serif; }
+  .ft-grab { width: 38px; height: 4px; border-radius: 2px; background: var(--border); margin: 0 auto 8px; }
+  .ft-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+  .ft-title { font-size: 15px; font-weight: 700; }
+  .ft-sub { font-size: 12px; color: var(--ink-light); }
+  .ft-iconbtn { background: none; border: none; cursor: pointer; color: var(--ink-light); font-size: 18px; width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0; }
+  .ft-iconbtn:hover { background: var(--accent-light); }
+  .ft-body { display: flex; align-items: center; gap: 16px; }
+  .ft-ring { position: relative; width: 112px; height: 112px; flex-shrink: 0; }
+  .ft-ring-in { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+  .ft-clock { font-family: 'DM Mono', monospace; font-size: 26px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .ft-clock.paused { opacity: 0.45; }
+  .ft-phase { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 9px; border-radius: 999px; font-family: 'DM Sans', sans-serif; }
+  .ft-phase.work { background: var(--teal-light); color: var(--teal); }
+  .ft-phase.rest { background: var(--gold-light); color: var(--gold); }
+  .ft-phase.done { background: var(--accent-light); color: var(--accent); }
+  .ft-side { flex: 1; min-width: 0; }
+  .ft-setlbl { font-size: 12px; color: var(--ink-light); margin-bottom: 6px; }
+  .ft-seg { display: flex; gap: 3px; margin-bottom: 12px; }
+  .ft-seg b { height: 6px; border-radius: 2px; min-width: 2px; }
+  .ft-ctrls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .ft-cbtn { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: var(--paper); color: var(--ink); cursor: pointer; font-size: 17px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+  .ft-cbtn.main { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .ft-textbtn { height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid var(--border); background: var(--paper); color: var(--ink); cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; }
+  .ft-textbtn.main { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .ft-form { display: flex; gap: 10px; margin-bottom: 8px; }
+  .ft-field { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--ink-light); }
+  .ft-field input { height: 46px; width: 100%; font-size: 16px; text-align: center; border: 1px solid var(--border); border-radius: 10px; background: var(--paper); color: var(--ink); font-family: 'DM Mono', monospace; }
+  .ft-total { font-size: 12px; color: var(--ink-light); min-height: 16px; }
+  .ft-err { font-size: 12px; color: var(--red); min-height: 16px; margin-bottom: 6px; }
+  .ft-start { width: 100%; height: 48px; border: none; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 700; font-size: 15px; cursor: pointer; font-family: inherit; }
+  .ft-pill { position: fixed; z-index: 9996; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 4px; background: #2a2538; color: #fff; border-radius: 999px; padding: 4px 4px 4px 6px; box-shadow: 0 6px 24px rgba(0,0,0,0.35); font-family: 'DM Sans', sans-serif; max-width: 94vw; }
+  @media (min-width: 768px) { .ft-pill { left: auto; right: 20px; transform: none; } }
+  .ft-pill-main { display: flex; align-items: center; gap: 8px; background: none; border: none; color: inherit; cursor: pointer; padding: 6px 8px; min-height: 40px; font-family: inherit; }
+  .ft-pill-time { font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ft-pill-set { font-size: 12px; opacity: 0.8; white-space: nowrap; }
+  .ft-pill-btn { width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(255,255,255,0.14); color: #fff; cursor: pointer; font-size: 15px; flex-shrink: 0; }
 
   /* ── MOBILE (< 768px) ── */
   @media (max-width: 767px) {
@@ -3484,6 +3530,312 @@ function UndoToast({ lift }) {
       <span className="undo-toast-label">{top.label}</span>
       {items.length > 1 && <span className="undo-toast-more">+{items.length - 1} earlier</span>}
       <button type="button" className="undo-toast-btn" onClick={() => Undo.run()}>Undo</button>
+    </div>
+  );
+}
+// ── FITNESS INTERVAL TIMER (v5.18.0) ──
+// Work / rest intervals across sets. Like Undo, the store lives outside FitnessView so the minimized pill can follow you
+// to other tabs; FitnessView only calls FitTimer.openFor(). The clock is a stored START TIMESTAMP, never a tick count, so
+// it stays right after the phone sleeps or the tab is throttled: every render asks Date.now() where the timer stands.
+// Device-local (lsGet/lsSet), never synced — a running timer belongs to the phone in your hand.
+// Beeps and vibration only fire while the app is open and awake (a home-screen web app cannot sound off when the phone is
+// locked), so the host also asks for a screen wake lock while a timer runs. iPhone has no vibration API.
+const FT_DEFAULTS = { sets: 3, work: 40, rest: 60 };
+function ftClean(c) {
+  const n = (v, lo, hi, d) => { const x = Math.round(parseFloat(v)); return Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : d; };
+  return { sets: n(c.sets, 1, 30, FT_DEFAULTS.sets), work: n(c.work, 5, 3600, FT_DEFAULTS.work), rest: n(c.rest, 0, 3600, FT_DEFAULTS.rest), name: String(c.name || ''), exerciseId: String(c.exerciseId || '') };
+}
+// work, rest, work, rest, ..., work — the last set has no trailing rest
+function ftPhases(cfg) {
+  const out = [];
+  for (let i = 1; i <= cfg.sets; i++) {
+    out.push({ t: 'work', d: cfg.work, set: i });
+    if (cfg.rest > 0 && i < cfg.sets) out.push({ t: 'rest', d: cfg.rest, set: i });
+  }
+  return out;
+}
+// ms the timer has actually run (paused time is not counted)
+function ftElapsed(s, now) { return Math.max(0, (s.pausedAt || now) - s.startedAt - (s.pausedMs || 0)); }
+// Where a timer stands after elapsedMs: which phase, seconds left in it, and whether everything has finished
+function ftAt(cfg, elapsedMs) {
+  const phases = ftPhases(cfg);
+  let left = elapsedMs / 1000;
+  for (let i = 0; i < phases.length; i++) {
+    if (left < phases[i].d) return { idx: i, phase: phases[i], remain: phases[i].d - left, total: phases[i].d, count: phases.length, done: false };
+    left -= phases[i].d;
+  }
+  const last = phases[phases.length - 1];
+  return { idx: phases.length, phase: last, remain: 0, total: last ? last.d : 0, count: phases.length, done: true };
+}
+function ftFmt(sec) { const s = Math.max(0, Math.round(sec)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+let _ftAudio = null;
+function ftTone(freq, ms, delay) {
+  const run = () => {
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return;
+      if (!_ftAudio) _ftAudio = new AC();
+      if (_ftAudio.state === 'suspended') _ftAudio.resume();
+      const o = _ftAudio.createOscillator(), g = _ftAudio.createGain(), t = _ftAudio.currentTime;
+      o.type = 'sine'; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.18, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+      o.connect(g); g.connect(_ftAudio.destination);
+      o.start(t); o.stop(t + ms / 1000 + 0.02);
+    } catch (e) {}
+  };
+  if (delay) setTimeout(run, delay); else run();   // the first tone runs inside the tap so iOS lets the audio start
+}
+function ftAlert(kind) {
+  if (FitTimer.sound) {
+    if (kind === 'work') { ftTone(880, 140, 0); ftTone(880, 140, 180); }
+    else if (kind === 'rest') ftTone(520, 320, 0);
+    else if (kind === 'done') { ftTone(660, 150, 0); ftTone(880, 150, 200); ftTone(1175, 300, 400); }
+    else if (kind === 'tick') ftTone(700, 70, 0);
+  }
+  try { if (navigator.vibrate) navigator.vibrate(kind === 'tick' ? 25 : kind === 'done' ? [200, 100, 200, 100, 200] : kind === 'rest' ? 250 : [120, 80, 120]); } catch (e) {}
+}
+const FitTimer = {
+  s: null,          // running timer { cfg, startedAt, pausedAt, pausedMs } or null
+  ui: 'closed',     // 'closed' | 'setup' | 'open' | 'mini'
+  setup: null,      // initial values for the setup form while ui === 'setup'
+  sound: true, subs: new Set(), _restored: false,
+  gen: 0,           // bumped by start() so the host knows a NEW run began (no alert for the first look at it)
+  emit() { this.subs.forEach(f => f()); },
+  save() { if (this.s) lsSet('fitTimer', JSON.stringify(this.s)); else lsDel('fitTimer'); },
+  restore() {
+    if (this._restored) return;
+    this._restored = true;
+    try {
+      this.sound = lsGet('fitTimerSound') !== '0';
+      const raw = JSON.parse(lsGet('fitTimer') || 'null');
+      if (raw && raw.cfg && raw.startedAt) {
+        const st = { cfg: ftClean(raw.cfg), startedAt: +raw.startedAt, pausedAt: raw.pausedAt ? +raw.pausedAt : null, pausedMs: +raw.pausedMs || 0 };
+        if (!ftAt(st.cfg, ftElapsed(st, Date.now())).done) { this.s = st; this.ui = 'mini'; }
+        else lsDel('fitTimer');   // it finished while the app was closed — nothing to resume
+      }
+    } catch (e) {}
+    this.emit();
+  },
+  presets() { try { return JSON.parse(lsGet('fitTimerPresets') || '{}') || {}; } catch (e) { return {}; } },
+  // Opens the setup sheet for an exercise (or, if a timer is already running, just brings that one up)
+  openFor(info) {
+    if (this.s) { this.ui = 'open'; this.emit(); return; }
+    const all = this.presets();
+    const p = all[info.exerciseId] || all._last || {};
+    this.setup = {
+      exerciseId: info.exerciseId, name: info.name,
+      sets: info.sets > 1 ? info.sets : (p.sets || FT_DEFAULTS.sets),   // 2+ set rows on the tile = that is the plan
+      work: p.work || FT_DEFAULTS.work, rest: p.rest != null ? p.rest : FT_DEFAULTS.rest,
+    };
+    this.ui = 'setup'; this.emit();
+  },
+  start(cfg) {
+    const c = ftClean(cfg);
+    const all = this.presets();
+    const p = { sets: c.sets, work: c.work, rest: c.rest };
+    all[c.exerciseId || '_none'] = p; all._last = p;
+    lsSet('fitTimerPresets', JSON.stringify(all));
+    this.s = { cfg: c, startedAt: Date.now(), pausedAt: null, pausedMs: 0 };
+    this.gen += 1;
+    this.setup = null; this.ui = 'open';
+    this.save(); ftAlert('work'); this.emit();
+  },
+  pause() { if (this.s && !this.s.pausedAt) { this.s = { ...this.s, pausedAt: Date.now() }; this.save(); this.emit(); } },
+  resume() {
+    if (this.s && this.s.pausedAt) {
+      this.s = { ...this.s, pausedMs: (this.s.pausedMs || 0) + (Date.now() - this.s.pausedAt), pausedAt: null };
+      this.save(); this.emit();
+    }
+  },
+  // Jump to the start of the next interval (or to the end, from the last one)
+  skip() {
+    if (!this.s) return;
+    const at = ftAt(this.s.cfg, ftElapsed(this.s, Date.now()));
+    if (at.done) return;
+    this.s = { ...this.s, startedAt: this.s.startedAt - Math.ceil(at.remain * 1000) - 1 };
+    this.save(); this.emit();
+  },
+  stop() { this.s = null; this.setup = null; this.ui = 'closed'; this.save(); this.emit(); },
+  setUi(ui) { this.ui = ui; this.emit(); },
+  setSound(on) { this.sound = !!on; lsSet('fitTimerSound', on ? '1' : '0'); this.emit(); },
+};
+function FitTimerSetup({ init }) {
+  const [sets, setSets] = useState(String(init.sets));
+  const [work, setWork] = useState(String(init.work));
+  const [rest, setRest] = useState(String(init.rest));
+  const [err, setErr] = useState('');
+  const nSets = parseInt(sets, 10), nWork = parseInt(work, 10), nRest = parseInt(rest, 10);
+  const okAll = nSets >= 1 && nSets <= 30 && nWork >= 5 && nWork <= 3600 && nRest >= 0 && nRest <= 3600;
+  const total = okAll ? nSets * nWork + (nSets - 1) * nRest : 0;
+  function go() {
+    if (!(nSets >= 1 && nSets <= 30)) { setErr('Enter 1 to 30 sets'); return; }
+    if (!(nWork >= 5 && nWork <= 3600)) { setErr('Work needs at least 5 seconds'); return; }
+    if (!(nRest >= 0 && nRest <= 3600)) { setErr('Enter rest in seconds (0 for none)'); return; }
+    FitTimer.start({ exerciseId: init.exerciseId, name: init.name, sets: nSets, work: nWork, rest: nRest });
+  }
+  const field = (label, val, set) => (
+    <label className="ft-field"><span>{label}</span>
+      <input type="number" inputMode="numeric" min="0" value={val}
+        onFocus={e => e.target.select()}
+        onChange={e => { set(e.target.value); setErr(''); }}
+        onKeyDown={e => { if (e.key === 'Enter') go(); }} />
+    </label>
+  );
+  return (<>
+    <div className="ft-form">{field('Sets', sets, setSets)}{field('Work (sec)', work, setWork)}{field('Rest (sec)', rest, setRest)}</div>
+    <div className="ft-total">{total ? `Total time ${ftFmt(total)}` : ''}</div>
+    <div className="ft-err" role="alert">{err}</div>
+    <button type="button" className="ft-start" onClick={go}>Start</button>
+  </>);
+}
+// Rendered once at the App root. Shows the setup sheet, the running sheet, or the minimized pill.
+function FitTimerHost({ lift }) {
+  const [, force] = useState(0);
+  const [, setTick] = useState(0);
+  const [undoOn, setUndoOn] = useState(Undo.items.length > 0);
+  const seen = useRef({ idx: null, tick: null, gen: null });
+  const lock = useRef(null);
+  useEffect(() => {
+    const f = () => force(n => n + 1);
+    const u = items => setUndoOn(items.length > 0);
+    FitTimer.subs.add(f); Undo.subs.add(u);
+    FitTimer.restore();
+    return () => { FitTimer.subs.delete(f); Undo.subs.delete(u); };
+  }, []);
+  const s = FitTimer.s;
+  const now = Date.now();
+  const at = s ? ftAt(s.cfg, ftElapsed(s, now)) : null;
+  const done = !!at && at.done;
+  const running = !!s && !s.pausedAt && !done;
+  // Re-render a few times a second while running; the clock itself comes from Date.now()
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setTick(n => n + 1), 250);
+    return () => clearInterval(id);
+  }, [running]);
+  // Beep + buzz when the interval changes, and tick through the last 3 seconds
+  useEffect(() => {
+    if (!s || !at) { seen.current = { idx: null, tick: null, gen: null }; return; }
+    const L = seen.current;
+    // first look at a timer (new run or reloaded app): no alert — start() already beeped
+    if (L.idx === null || L.gen !== FitTimer.gen) { seen.current = { idx: at.idx, tick: null, gen: FitTimer.gen }; return; }
+    if (at.idx !== L.idx) { L.idx = at.idx; L.tick = null; ftAlert(at.done ? 'done' : at.phase.t); return; }
+    if (!at.done && !s.pausedAt) {
+      const sec = Math.ceil(at.remain);
+      if (sec >= 1 && sec <= 3 && L.tick !== sec) { L.tick = sec; ftAlert('tick'); }
+    }
+  });
+  // Keep the screen awake while running
+  useEffect(() => {
+    if (!running) return;
+    let alive = true;
+    const grab = async () => {
+      try {
+        if (!navigator.wakeLock || lock.current) return;
+        const l = await navigator.wakeLock.request('screen');
+        if (!alive) { l.release(); return; }
+        lock.current = l;
+        l.addEventListener('release', () => { if (lock.current === l) lock.current = null; });
+      } catch (e) {}
+    };
+    const vis = () => { if (document.visibilityState === 'visible') grab(); };
+    grab();
+    document.addEventListener('visibilitychange', vis);
+    return () => {
+      alive = false;
+      document.removeEventListener('visibilitychange', vis);
+      try { if (lock.current) lock.current.release(); } catch (e) {}
+      lock.current = null;
+    };
+  }, [running]);
+
+  const ui = FitTimer.ui;
+  if (ui === 'closed' || (ui !== 'setup' && !s) || (ui === 'setup' && !FitTimer.setup)) return null;
+  const kind = done ? 'done' : at ? at.phase.t : 'work';
+  const kindLabel = kind === 'work' ? 'Work' : kind === 'rest' ? 'Rest' : 'Done';
+  const nSets = s ? s.cfg.sets : 0;
+  const setLabel = !at ? '' : done ? 'All sets complete' : at.phase.t === 'work' ? `Set ${at.phase.set} of ${nSets}` : `Next: set ${at.phase.set + 1} of ${nSets}`;
+  const clockText = !at ? '' : done ? '0:00' : ftFmt(Math.ceil(at.remain - 0.001));
+
+  if (ui === 'mini') {
+    const mobile = !!(window.matchMedia && window.matchMedia('(max-width: 767px)').matches);
+    let bottom = mobile ? 64 : 20;
+    if (mobile && undoOn) bottom += 60;
+    if (lift) bottom += mobile ? 56 : 70;
+    return (
+      <div className="ft-pill" style={{ bottom }} role="group" aria-label="Interval timer">
+        <button type="button" className="ft-pill-main" aria-label="Open interval timer" onClick={() => FitTimer.setUi('open')}>
+          <span className={`ft-phase ${kind}`}>{kindLabel}</span>
+          <span className="ft-pill-time" style={{ opacity: s.pausedAt ? 0.5 : 1 }}>{clockText}</span>
+          {!done && <span className="ft-pill-set">Set {at.phase.t === 'work' ? at.phase.set : at.phase.set + 1}/{nSets}</span>}
+        </button>
+        {!done && <button type="button" className="ft-pill-btn" aria-label={s.pausedAt ? 'Resume timer' : 'Pause timer'} onClick={() => (s.pausedAt ? FitTimer.resume() : FitTimer.pause())}>{s.pausedAt ? '▶' : '⏸'}</button>}
+        <button type="button" className="ft-pill-btn" aria-label={done ? 'Close timer' : 'Expand timer'} onClick={() => (done ? FitTimer.stop() : FitTimer.setUi('open'))}>{done ? '✕' : '▴'}</button>
+      </div>
+    );
+  }
+
+  if (ui === 'setup') {
+    const init = FitTimer.setup;
+    return (
+      <div className="ft-scrim" onClick={e => { if (e.target === e.currentTarget) FitTimer.stop(); }}>
+        <div className="ft-sheet" role="dialog" aria-label="Interval timer setup">
+          <div className="ft-grab" />
+          <div className="ft-head">
+            <div><div className="ft-title">Interval timer</div><div className="ft-sub">{init.name}</div></div>
+            <button type="button" className="ft-iconbtn" aria-label="Close" onClick={() => FitTimer.stop()}>✕</button>
+          </div>
+          <FitTimerSetup key={init.exerciseId} init={init} />
+        </div>
+      </div>
+    );
+  }
+
+  const C = 2 * Math.PI * 44;
+  const ringColor = kind === 'rest' ? 'var(--gold)' : kind === 'done' ? 'var(--accent)' : 'var(--teal)';
+  const frac = done ? 0 : at.remain / at.total;
+  const phases = ftPhases(s.cfg);
+  return (
+    <div className="ft-scrim" onClick={e => { if (e.target === e.currentTarget) FitTimer.setUi('mini'); }}>
+      <div className="ft-sheet" role="dialog" aria-label="Interval timer">
+        <div className="ft-grab" />
+        <div className="ft-head">
+          <div><div className="ft-title">{s.cfg.name || 'Interval timer'}</div><div className="ft-sub">{s.cfg.sets} sets · {s.cfg.work}s work{s.cfg.rest > 0 ? ` · ${s.cfg.rest}s rest` : ''}</div></div>
+          <button type="button" className="ft-iconbtn" aria-label="Minimize timer" onClick={() => FitTimer.setUi('mini')}>▾</button>
+        </div>
+        <div className="ft-body">
+          <div className="ft-ring">
+            <svg viewBox="0 0 104 104" width="112" height="112" aria-hidden="true">
+              <circle cx="52" cy="52" r="44" fill="none" stroke="var(--border)" strokeWidth="8" />
+              <circle cx="52" cy="52" r="44" fill="none" stroke={ringColor} strokeWidth="8" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - frac)} transform="rotate(-90 52 52)" />
+            </svg>
+            <div className="ft-ring-in">
+              <span className={`ft-phase ${kind}`}>{kindLabel}</span>
+              <span className={`ft-clock${s.pausedAt ? ' paused' : ''}`}>{clockText}</span>
+            </div>
+          </div>
+          <div className="ft-side">
+            <div className="ft-setlbl">{setLabel}{s.pausedAt && !done ? ' · paused' : ''}</div>
+            <div className="ft-seg" aria-hidden="true">
+              {phases.map((p, i) => (
+                <b key={i} style={{ flex: p.d, background: (i < at.idx || (i === at.idx && !done)) ? (p.t === 'rest' ? 'var(--gold)' : 'var(--teal)') : 'var(--border)', opacity: i === at.idx && !done ? 0.55 : 1 }} />
+              ))}
+            </div>
+            <div className="ft-ctrls">
+              {done ? (<>
+                <button type="button" className="ft-textbtn main" onClick={() => FitTimer.start(s.cfg)}>Again</button>
+                <button type="button" className="ft-textbtn" onClick={() => FitTimer.stop()}>Close</button>
+              </>) : (<>
+                <button type="button" className="ft-cbtn main" aria-label={s.pausedAt ? 'Resume' : 'Pause'} onClick={() => (s.pausedAt ? FitTimer.resume() : FitTimer.pause())}>{s.pausedAt ? '▶' : '⏸'}</button>
+                <button type="button" className="ft-cbtn" aria-label="Skip to next interval" onClick={() => FitTimer.skip()}>⏭</button>
+                <button type="button" className="ft-cbtn" aria-label="Stop timer" onClick={() => FitTimer.stop()}>✕</button>
+              </>)}
+              <button type="button" className="ft-cbtn" aria-label={FitTimer.sound ? 'Turn sound off' : 'Turn sound on'} title={FitTimer.sound ? 'Sound on' : 'Sound off'} onClick={() => FitTimer.setSound(!FitTimer.sound)}>{FitTimer.sound ? '🔔' : '🔕'}</button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -11913,6 +12265,7 @@ function App() {
   return (
     <div className="app">
       <UndoToast lift={isErr || !!authError} />
+      <FitTimerHost lift={isErr || !!authError} />
       {/* ── SAVE ERROR TOAST — bottom, persistent until save actually succeeds ── */}
       {(isErr || authError) && (
         <div className="save-error-toast" style={{
@@ -12034,7 +12387,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.17.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.18.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -12759,8 +13112,10 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             </span>
           )}
           <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:'var(--accent)',flex:1}}>{exName(ex.exerciseId)}</span>
-          {prs.length>0&&<span className="pr-pill" title={prs.map(p=>p.label+': '+p.text).join('\n')}>🏆 {prs.length>1?`${prs.length} PRs`:prs[0].label}</span>}
+          {prs.length>0&&<span className="pr-pill" title={prs.map(p=>p.label+': '+p.text).join('\n')}>🏆{prs.length>1&&` ${prs.length}`}<span className="pr-txt">{prs.length>1?' PRs':' '+prs[0].label}</span></span>}
           {stats.done>0&&<span className="fitness-stat-pill">{stats.done}/{stats.total} sets{stats.totalReps>0&&` · ${stats.totalReps} reps`}{stats.hasWeight&&stats.volume>0&&` · ${stats.volume.toLocaleString()} lbs`}</span>}
+          <button type="button" className="ft-open-btn" title="Interval timer" aria-label={`Interval timer for ${exName(ex.exerciseId)}`}
+            onClick={e=>{e.stopPropagation();FitTimer.openFor({exerciseId:ex.exerciseId,name:exName(ex.exerciseId),sets:ex.sets.filter(s=>!s.done).length||ex.sets.length});}}>⏱</button>
           <button onClick={e=>{e.stopPropagation();deleteExercise(dk,ex.id);}}
             style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 2px',lineHeight:1,opacity:0.5}}>✕</button>
         </div>
