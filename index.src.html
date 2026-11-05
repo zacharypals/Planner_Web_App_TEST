@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.16.0 -->
+<!-- LP Planner v5.17.0 -->
+<!-- v5.17.0 — Fitness: personal-record badges. A done set that beats your earlier best for that exercise now shows a gold trophy pill on the exercise tile in Day view (with a detail line such as "190 lb, was 185"). Strength: Weight PR (heaviest done set) and Reps PR (most reps at that weight or heavier; bodyweight sets compare against all earlier sets). Cardio: Distance PR (longest single set) and Pace PR (best min/mi on sets of 1 mile or more). Counts your whole existing history; the first time an exercise is logged earns nothing. Derived from the log each render, so no new stored data and no sync or backup changes. -->
 <!-- v5.16.0 — Time blocks: tasks, events and goal tasks can now have an optional start time and length (new startTime / durMin fields; events keep eventTime). Week view gets a List / Time blocks switch (per device). Time blocks shows each day as an hourly column with timed items as blocks; Habits, Goals and No time are small buttons above each day that open as a popover (desktop) or bottom sheet (phone). Desktop: drag a block to move it, drag its bottom edge to resize, double-click empty space to add, drag a No-time task onto the grid to schedule it. Calendar events now push and pull their real length (was always one hour) and changing an event time now sends the NEW time to Google Calendar. -->
 <!-- v5.15.2 — Goals: when a milestone's "Auto from weight" / "Auto from training or habits" chip is switched on, its row now reads as a plain label with a Remove button instead of a pre-ticked checkbox (which looked like the milestone was already satisfied). Behavior is unchanged: turning a link on never completes a milestone by itself. -->
 <!-- v5.15.1 — Goals: the ↻ auto-check button is back on every task, and the ↻ training/habits chip is offered on every milestone, with no per-goal "Auto-check" switch needed (the switch added in v5.12.0 is removed). Weight stays offered only on goals that link Weight. -->
@@ -550,6 +551,16 @@
     padding: 2px 8px; font-size: 10px; font-family: 'DM Mono', monospace;
     color: var(--accent); font-weight: 600;
   }
+  /* v5.17.0 personal-record badge (header pill) and detail lines (inside the open tile) */
+  .pr-pill {
+    display: inline-flex; align-items: center; gap: 3px; flex-shrink: 0;
+    background: var(--gold-light); border: 1px solid var(--gold); border-radius: 20px;
+    padding: 1px 8px; font-size: 10px; font-family: 'DM Mono', monospace;
+    color: var(--gold); font-weight: 700; white-space: nowrap;
+  }
+  .pr-notes { display: flex; flex-direction: column; gap: 3px; padding: 2px 0 6px; }
+  .pr-note { font-size: 11px; color: var(--ink-light); font-family: 'DM Sans', sans-serif; }
+  .pr-note b { color: var(--gold); font-weight: 700; }
   /* Mobile fitness */
   @media (max-width: 767px) {
     .fitness-sidebar { display: none; }
@@ -12023,7 +12034,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.16.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.17.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -12185,6 +12196,83 @@ function App() {
 const FITNESS_CATEGORIES = ['Strength','Cardio','Mobility','Sport','Other'];
 const UNCATEGORIZED = 'Other';
 
+// ── PERSONAL RECORDS (v5.17.0) ──
+// Derived from the fitness log on every render; nothing is stored, so there is no sync or backup surface.
+// Only DONE sets count. "Earlier" means a strictly earlier day (log keys sort as YYYY-MM-DD), and an exercise
+// needs at least one earlier day with a done set before anything can beat it, so first-ever logs earn nothing.
+//   Weight PR   — a set heavier than every earlier set (weighted sets only; needs an earlier weighted set).
+//   Reps PR     — more reps than any earlier set at that weight or heavier (bodyweight sets compare to all earlier sets).
+//   Distance PR — a single set longer than any earlier set (Cardio).
+//   Pace PR     — best min/mi, on sets of PR_MIN_PACE_DIST miles or more (a 0.1 mi dash is not a pace record),
+//                 compared in whole seconds so a badge never reads "was 9:31, now 9:31".
+const PR_MIN_PACE_DIST = 1;
+function prSetNums(s) {
+  return { r: parseFloat(s.reps) || 0, w: parseFloat(s.weight) || 0, d: parseFloat(s.dist) || 0, t: flMins(s.time) };
+}
+// exerciseId -> [{ dk, sets:[{r,w,d,t}] }], oldest day first, done sets with real numbers only
+function prBuildIndex(fitnessLog) {
+  const out = {};
+  Object.keys(fitnessLog || {}).sort().forEach(dk => {
+    const byEx = {};
+    flDayExs(fitnessLog[dk]).forEach(ex => {
+      (ex.sets || []).forEach(s => {
+        if (!s || !s.done) return;
+        const n = prSetNums(s);
+        if (!(n.r > 0 || n.d > 0)) return;
+        (byEx[ex.exerciseId] = byEx[ex.exerciseId] || []).push(n);
+      });
+    });
+    Object.keys(byEx).forEach(id => { (out[id] = out[id] || []).push({ dk, sets: byEx[id] }); });
+  });
+  return out;
+}
+// "M:SS" for decimal minutes, rounding the total seconds first so it can never print "9:60"
+function prPaceText(mins) {
+  const total = Math.round(mins * 60);
+  return Math.floor(total / 60) + ':' + String(total % 60).padStart(2, '0');
+}
+// The records one exercise entry set on day dk. Returns [{ kind, label, text }] (empty when none).
+function prForEntry(index, exerciseId, dk, sets, isCardio) {
+  const prior = [];
+  (index[exerciseId] || []).forEach(day => { if (day.dk < dk) day.sets.forEach(n => prior.push(n)); });
+  if (!prior.length) return [];
+  const mine = (sets || []).filter(s => s && s.done).map(prSetNums);
+  if (!mine.length) return [];
+  const out = [];
+  if (isCardio) {
+    const priorDist = prior.reduce((m, n) => Math.max(m, n.d), 0);
+    const myDist = mine.reduce((m, n) => Math.max(m, n.d), 0);
+    if (priorDist > 0 && myDist > priorDist) {
+      out.push({ kind: 'dist', label: 'Distance PR', text: `${+myDist.toFixed(2)} mi, was ${+priorDist.toFixed(2)}` });
+    }
+    const paces = list => list.filter(n => n.d >= PR_MIN_PACE_DIST && n.t > 0).map(n => n.t / n.d);
+    const pp = paces(prior), mp = paces(mine);
+    if (pp.length && mp.length) {
+      const was = Math.min(...pp), now = Math.min(...mp);
+      if (Math.round(now * 60) < Math.round(was * 60)) {
+        out.push({ kind: 'pace', label: 'Pace PR', text: `${prPaceText(now)} /mi, was ${prPaceText(was)}` });
+      }
+    }
+    return out;
+  }
+  const priorMaxW = prior.reduce((m, n) => Math.max(m, n.w), 0);
+  let bestW = null, bestR = null;
+  mine.forEach(n => {
+    if (n.r <= 0) return;
+    if (n.w > 0 && priorMaxW > 0 && n.w > priorMaxW) {
+      if (!bestW || n.w > bestW.w) bestW = { w: n.w, r: n.r, was: priorMaxW };
+      return;
+    }
+    const compare = prior.filter(p => p.w >= n.w);
+    if (!compare.length) return;
+    const was = compare.reduce((m, p) => Math.max(m, p.r), 0);
+    if (n.r > was && (!bestR || n.r > bestR.r)) bestR = { r: n.r, w: n.w, was };
+  });
+  if (bestW) out.push({ kind: 'weight', label: 'Weight PR', text: `${+bestW.w.toFixed(2)} lb × ${+bestW.r.toFixed(2)}, was ${+bestW.was.toFixed(2)} lb` });
+  if (bestR) out.push({ kind: 'reps', label: 'Reps PR', text: bestR.w > 0 ? `${bestR.r} reps at ${+bestR.w.toFixed(2)} lb, was ${bestR.was}` : `${bestR.r} reps, was ${bestR.was}` });
+  return out;
+}
+
 function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessExercises, fitnessGoals, setFitnessGoals }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDate] = useState(today);
@@ -12196,6 +12284,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const [showLibManager, setShowLibManager] = useState(false);
   const [showGoalManager, setShowGoalManager] = useState(false);
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
+  const prIndex = React.useMemo(() => prBuildIndex(fitnessLog), [fitnessLog]); // v5.17.0 PR history, derived
   // Collapsed/expanded state for Day-view exercise tiles is stored on the exercise
   // itself (ex.collapsed in fitnessLog) so it survives tab switches, reloads, and
   // syncs across devices with the rest of the log.
@@ -12597,6 +12686,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     const isCardio=libEx?.category==='Cardio';
     const isDropTarget = isDayView && dragOverExId===ex.id && dragEx?.exId!==ex.id;
     const isCollapsed = isDayView && !!ex.collapsed;
+    const prs = prForEntry(prIndex, ex.exerciseId, dk, ex.sets, isCardio);   // v5.17.0
     return (
       <div key={ex.id}
         data-ex-id={ex.id}
@@ -12669,11 +12759,13 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             </span>
           )}
           <span style={{fontFamily:"'DM Sans',sans-serif",fontSize:13,fontWeight:700,color:'var(--accent)',flex:1}}>{exName(ex.exerciseId)}</span>
+          {prs.length>0&&<span className="pr-pill" title={prs.map(p=>p.label+': '+p.text).join('\n')}>🏆 {prs.length>1?`${prs.length} PRs`:prs[0].label}</span>}
           {stats.done>0&&<span className="fitness-stat-pill">{stats.done}/{stats.total} sets{stats.totalReps>0&&` · ${stats.totalReps} reps`}{stats.hasWeight&&stats.volume>0&&` · ${stats.volume.toLocaleString()} lbs`}</span>}
           <button onClick={e=>{e.stopPropagation();deleteExercise(dk,ex.id);}}
             style={{background:'none',border:'none',cursor:'pointer',fontSize:13,color:'var(--ink-faint)',padding:'0 2px',lineHeight:1,opacity:0.5}}>✕</button>
         </div>
         {!isCollapsed && <div className="exercise-block">
+          {prs.length>0&&<div className="pr-notes">{prs.map(p=><div key={p.kind} className="pr-note">🏆 <b>{p.label}</b> · {p.text}</div>)}</div>}
           <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:2}}>
             <span className="set-num"></span>
             {isCardio?(<><span className="set-label" style={{width:60,textAlign:'center'}}>Dist (mi)</span>
