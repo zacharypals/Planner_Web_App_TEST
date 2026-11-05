@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.20.0 -->
+<!-- LP Planner v5.20.1 -->
+<!-- v5.20.1 — Fitness > Charts: the PRs tile no longer stretches to fit the exercise names; the names are cut off with … and the full list is one tap away. -->
 <!-- v5.20.0 — Fitness > Charts: PR list. The PRs tile is now tappable (when above 0) and opens this week's PRs, with the exercise names shown under the count. New "Recent PRs" card lists every PR newest first, grouped by week, with All / Strength / Cardio filter and Show more; tap a row to open that day in Day view. Uses the same rules as the 🏆 badges (prForEntry), nothing new stored or synced. The tile count and list share one function, so they always agree. -->
 <!-- v5.19.0 — Fitness: Charts tab (5th tab next to Day/Week/Month/Year). Weekly tiles (Sessions, Strength sets, Miles, PRs, each with last week for context); Trends chart for any exercise with a metric switcher (strength: Volume, Sets, Total reps, Top weight, Est. 1RM; cardio: Miles, Duration, Pace, Sessions) over 8/12/26 weeks; Goal progress for milestones with a Fitness or Habit rule (cumulative line vs even pace with a projection after 2 weeks, or weekly bars vs target for in-one-week rules); Compare: pick any groups of subcategories and/or single exercises, with Push/Pull/Legs-style presets built from your own subcategories and saved comparisons. Charts are inline SVG (theme-aware, work offline). New synced key fitnessCompare (small whole document, no SYNC_SPLITS/SPLITS entry needed). Everything else is derived from the existing log, library and goals. -->
 <!-- v5.18.0 — Fitness: interval timer. A ⏱ button on each exercise tile in Day view opens a bottom sheet to set Sets, Work seconds and Rest seconds, then runs work and rest intervals across the sets (the last set has no trailing rest). Minimize the sheet to a pill that stays on screen across tabs while you log sets or look at other pages; tap it to reopen. Pause/resume, skip the current interval, stop, and "Again" when it finishes. Beeps and vibrates at each change plus a 3-2-1 tick (sound on/off toggle; sound needs the app open and unlocked, and vibration is not available on iPhone). Keeps the screen awake while running. The clock is a stored start time, so it is still correct after the phone sleeps or the app is reloaded. Work and rest are remembered per exercise on this device (localStorage, not synced). No new synced data, so no sync or backup changes. -->
@@ -567,8 +568,8 @@
   .pr-note b { color: var(--gold); font-weight: 700; }
   /* ── FITNESS CHARTS (v5.19.0) ── */
   .fc-wrap { display: flex; flex-direction: column; gap: 12px; font-family: 'DM Sans', sans-serif; }
-  .fc-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .fc-tile { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; }
+  .fc-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .fc-tile { background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 12px; min-width: 0; overflow: hidden; box-sizing: border-box; }
   .fc-tile-lb { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-family: 'DM Mono', monospace; }
   .fc-tile-v { font-size: 24px; font-weight: 700; color: var(--ink); line-height: 1.2; }
   .fc-tile-sub { font-size: 11px; color: var(--ink-light); }
@@ -611,7 +612,7 @@
   .fc-pr-txt { font-size: 12px; color: var(--ink-light); }
   .fc-pr-date { font-size: 11px; color: var(--ink-faint); font-family: 'DM Mono', monospace; white-space: nowrap; padding-top: 2px; }
   .fc-pr-wk { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-family: 'DM Mono', monospace; margin-top: 4px; }
-  @media (max-width: 767px) { .fc-tiles { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 767px) { .fc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   /* Mobile fitness */
   @media (max-width: 767px) {
     .fitness-sidebar { display: none; }
@@ -12437,7 +12438,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.20.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.20.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
