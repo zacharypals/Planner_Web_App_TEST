@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.20.1 -->
+<!-- LP Planner v5.21.0 -->
+<!-- v5.21.0 — Fitness > Charts: Recent PRs trimmed. One row per exercise (its latest PR, with every kind it set that day joined as Weight PR + Reps PR), only the last 30 days and at most 8 rows, with a Show older (n) button for the rest. Each row shows how long ago it was (today, 3d ago, 2w ago, 3mo ago) instead of a date. The PRs tile's "PRs this week" list is also one row per exercise; the tile count still counts every PR set. -->
 <!-- v5.20.1 — Fitness > Charts: the PRs tile no longer stretches to fit the exercise names; the names are cut off with … and the full list is one tap away. -->
 <!-- v5.20.0 — Fitness > Charts: PR list. The PRs tile is now tappable (when above 0) and opens this week's PRs, with the exercise names shown under the count. New "Recent PRs" card lists every PR newest first, grouped by week, with All / Strength / Cardio filter and Show more; tap a row to open that day in Day view. Uses the same rules as the 🏆 badges (prForEntry), nothing new stored or synced. The tile count and list share one function, so they always agree. -->
 <!-- v5.19.0 — Fitness: Charts tab (5th tab next to Day/Week/Month/Year). Weekly tiles (Sessions, Strength sets, Miles, PRs, each with last week for context); Trends chart for any exercise with a metric switcher (strength: Volume, Sets, Total reps, Top weight, Est. 1RM; cardio: Miles, Duration, Pace, Sessions) over 8/12/26 weeks; Goal progress for milestones with a Fitness or Habit rule (cumulative line vs even pace with a projection after 2 weeks, or weekly bars vs target for in-one-week rules); Compare: pick any groups of subcategories and/or single exercises, with Push/Pull/Legs-style presets built from your own subcategories and saved comparisons. Charts are inline SVG (theme-aware, work offline). New synced key fitnessCompare (small whole document, no SYNC_SPLITS/SPLITS entry needed). Everything else is derived from the existing log, library and goals. -->
@@ -611,6 +612,7 @@
   .fc-pr-main b { font-weight: 700; }
   .fc-pr-txt { font-size: 12px; color: var(--ink-light); }
   .fc-pr-date { font-size: 11px; color: var(--ink-faint); font-family: 'DM Mono', monospace; white-space: nowrap; padding-top: 2px; }
+  .fc-pr-date.new { color: var(--gold); font-weight: 700; }
   .fc-pr-wk { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-family: 'DM Mono', monospace; margin-top: 4px; }
   @media (max-width: 767px) { .fc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   /* Mobile fitness */
@@ -12438,7 +12440,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.20.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.21.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -12766,6 +12768,26 @@ function fcPrList(fitnessLog, fitnessExercises, prIndex) {
   });
   return out;
 }
+// One row per exercise: its most recent PR day, with every kind it set that day joined ("Weight PR + Reps PR").
+// Input is fcPrList (newest first); output keeps newest first.
+function fcPrByExercise(list) {
+  const out = [], at = {};
+  (list || []).forEach(p => {
+    const i = at[p.exerciseId];
+    if (i === undefined) { at[p.exerciseId] = out.length; out.push({ ...p, labels: [p.label], texts: [p.text] }); }
+    else if (out[i].dk === p.dk) { out[i].labels.push(p.label); out[i].texts.push(p.text); }
+  });
+  return out.map(r => ({ dk: r.dk, exerciseId: r.exerciseId, name: r.name, cardio: r.cardio, label: r.labels.join(' + '), text: r.texts.join(' · ') }));
+}
+// "today", "3d ago", "2w ago", "3mo ago"
+function fcAgo(dk, todayKey) {
+  const n = glDays(dk, todayKey);
+  if (n <= 0) return 'today';
+  if (n < 14) return n + 'd ago';
+  if (n < 60) return Math.floor(n / 7) + 'w ago';
+  return Math.floor(n / 30) + 'mo ago';
+}
+const FC_PR_DAYS = 30, FC_PR_ROWS = 8;   // Recent PRs shows at most this many, from this many days back, until "Show older"
 // The four tiles for one week (volume is deliberately not one of them)
 function fcTiles(fitnessLog, fitnessExercises, prIndex, weekKey) {
   const cat = {};
@@ -13031,12 +13053,13 @@ function FcGoalCard({ item }) {
 function FcChips({ items, value, onPick }) {
   return <div className="fc-chips">{items.map(it => <button key={it.k} className={`fc-chip${value === it.k ? ' on' : ''}`} onClick={() => onPick(it.k)}>{it.label}</button>)}</div>;
 }
-function FcPrRow({ pr, onOpenDay }) {
+function FcPrRow({ pr, onOpenDay, todayKey }) {
+  const ago = fcAgo(pr.dk, todayKey);
   return (
     <button className="fc-pr-row" onClick={() => onOpenDay && onOpenDay(pr.dk)}>
       <span className="fc-pr-ic">🏆</span>
       <span className="fc-pr-main"><span><b>{pr.name}</b> · {pr.label}</span><span className="fc-pr-txt">{pr.text}</span></span>
-      <span className="fc-pr-date">{glShortDay(pr.dk)}</span>
+      <span className={`fc-pr-date${ago === 'today' ? ' new' : ''}`}>{ago}</span>
     </button>
   );
 }
@@ -13060,12 +13083,15 @@ function FitnessCharts({ fitnessLog, fitnessExercises, goals, habitGoals, habitC
   const t1 = React.useMemo(() => fcTiles(fitnessLog, exs, prIndex, thisWk), [fitnessLog, exs, prIndex, thisWk]);
   const t0 = React.useMemo(() => fcTiles(fitnessLog, exs, prIndex, lastWk), [fitnessLog, exs, prIndex, lastWk]);
   const prAll = React.useMemo(() => fcPrList(fitnessLog, exs, prIndex), [fitnessLog, exs, prIndex]);
-  const prWeek = prAll.filter(p => fcWeekOf(p.dk) === thisWk);
+  const prWeek = fcPrByExercise(prAll.filter(p => fcWeekOf(p.dk) === thisWk));
   const [prOpen, setPrOpen] = useState(false);
   const [prFilter, setPrFilter] = useState('all');
-  const [prShown, setPrShown] = useState(10);
-  const prFiltered = prAll.filter(p => prFilter === 'all' || (prFilter === 'cardio') === p.cardio);
-  const prNames = [...new Set(prWeek.map(p => p.name))];
+  const [prOlder, setPrOlder] = useState(false);
+  const prFiltered = fcPrByExercise(prAll.filter(p => prFilter === 'all' || (prFilter === 'cardio') === p.cardio));
+  const prRecent = prFiltered.filter(p => glDays(p.dk, todayKey) <= FC_PR_DAYS).slice(0, FC_PR_ROWS);
+  const prShownRows = prOlder ? prFiltered : prRecent;
+  const prHidden = prFiltered.length - prRecent.length;
+  const prNames = prWeek.map(p => p.name);
   // per-exercise trend
   const logged = React.useMemo(() => {
     const ids = new Set();
@@ -13117,27 +13143,23 @@ function FitnessCharts({ fitnessLog, fitnessExercises, goals, habitGoals, habitC
       {prOpen && prWeek.length > 0 && (
         <div className="fc-card fc-pr-week">
           <div className="fc-card-hd"><h3>PRs this week</h3></div>
-          {prWeek.map((p, i) => <FcPrRow key={i} pr={p} onOpenDay={onOpenDay} />)}
+          {prWeek.map((p, i) => <FcPrRow key={i} pr={p} onOpenDay={onOpenDay} todayKey={todayKey} />)}
         </div>
       )}
       <div className="fc-sub-note">This week so far, Sun–Sat. Sessions = days with a finished set.</div>
 
       <section className="fc-card">
         <div className="fc-card-hd"><h3>Recent PRs</h3>
-          <FcChips items={[{ k: 'all', label: 'All' }, { k: 'strength', label: 'Strength' }, { k: 'cardio', label: 'Cardio' }]} value={prFilter} onPick={k => { setPrFilter(k); setPrShown(10); }} />
+          <FcChips items={[{ k: 'all', label: 'All' }, { k: 'strength', label: 'Strength' }, { k: 'cardio', label: 'Cardio' }]} value={prFilter} onPick={k => { setPrFilter(k); setPrOlder(false); }} />
         </div>
         {prFiltered.length === 0
           ? <div className="fc-empty">{prAll.length === 0 ? 'No PRs yet. They show up when you beat an earlier best (your first log of an exercise sets the baseline).' : 'No PRs in this filter.'}</div>
           : (<>
-            {prFiltered.slice(0, prShown).map((p, i, arr) => {
-              const wk = fcWeekOf(p.dk), newWk = i === 0 || fcWeekOf(arr[i - 1].dk) !== wk;
-              return (<React.Fragment key={i}>
-                {newWk && <div className="fc-pr-wk">{wk === thisWk ? 'This week' : wk === lastWk ? 'Last week' : 'Week of ' + glShort(wk)}</div>}
-                <FcPrRow pr={p} onOpenDay={onOpenDay} />
-              </React.Fragment>);
-            })}
-            {prFiltered.length > prShown && <button className="fc-btn" onClick={() => setPrShown(n => n + 20)}>Show more ({prFiltered.length - prShown})</button>}
-            <div className="fc-sub-note" style={{ marginTop: 0 }}>Tap one to open that day.</div>
+            {prShownRows.length === 0 && <div className="fc-empty">No PRs in the last {FC_PR_DAYS} days.</div>}
+            {prShownRows.map((p, i) => <FcPrRow key={i} pr={p} onOpenDay={onOpenDay} todayKey={todayKey} />)}
+            {prHidden > 0 && !prOlder && <button className="fc-btn" onClick={() => setPrOlder(true)}>Show older ({prHidden})</button>}
+            {prOlder && prHidden > 0 && <button className="fc-btn" onClick={() => setPrOlder(false)}>Show fewer</button>}
+            <div className="fc-sub-note" style={{ marginTop: 0 }}>Each exercise's latest PR · tap one to open that day.</div>
           </>)}
       </section>
 
