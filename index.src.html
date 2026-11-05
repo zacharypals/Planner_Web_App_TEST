@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.15.2 -->
+<!-- LP Planner v5.16.0 -->
+<!-- v5.16.0 — Time blocks: tasks, events and goal tasks can now have an optional start time and length (new startTime / durMin fields; events keep eventTime). Week view gets a List / Time blocks switch (per device). Time blocks shows each day as an hourly column with timed items as blocks; Habits, Goals and No time are small buttons above each day that open as a popover (desktop) or bottom sheet (phone). Desktop: drag a block to move it, drag its bottom edge to resize, double-click empty space to add, drag a No-time task onto the grid to schedule it. Calendar events now push and pull their real length (was always one hour) and changing an event time now sends the NEW time to Google Calendar. -->
 <!-- v5.15.2 — Goals: when a milestone's "Auto from weight" / "Auto from training or habits" chip is switched on, its row now reads as a plain label with a Remove button instead of a pre-ticked checkbox (which looked like the milestone was already satisfied). Behavior is unchanged: turning a link on never completes a milestone by itself. -->
 <!-- v5.15.1 — Goals: the ↻ auto-check button is back on every task, and the ↻ training/habits chip is offered on every milestone, with no per-goal "Auto-check" switch needed (the switch added in v5.12.0 is removed). Weight stays offered only on goals that link Weight. -->
 <!-- v5.15.0 — Goals timeline: a third row level for tasks. Each milestone with tasks gets a ▸/▾ caret (collapsed by default, remembered only until you leave the page); open it to see its tasks under it, with a small diamond on each scheduled task's day (faded when done, red when late). Unscheduled tasks show "not scheduled". Click a task or diamond to open the goal. No data change, and diamonds do not drag. -->
@@ -2346,6 +2347,57 @@
   [data-theme="dark"] ::placeholder { color: var(--ink-faint); }
   .theme-btn { min-width: 0; }
   @media (max-width: 767px) { .auth-btn.theme-btn { display: none; } }
+
+  /* ── v5.16.0 TIME BLOCKS ── */
+  .tb-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--paper); }
+  .tb-switch button { border: none; background: transparent; padding: 4px 12px; font-size: 12px; font-family: 'DM Sans', sans-serif; color: var(--ink-light); cursor: pointer; }
+  .tb-switch button.on { background: var(--accent); color: #fff; }
+  .tb-wrap { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .tb-viewbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 10px; background: var(--paper); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .tb-hint { font-size: 11px; color: var(--ink-faint); }
+  .tb-scroll { flex: 1; overflow: auto; position: relative; background: var(--paper); min-height: 0; }
+  .tb-head { position: sticky; top: 0; z-index: 25; display: grid; background: var(--paper); border-bottom: 1px solid var(--border); }
+  .tb-head-day { min-width: 0; border-left: 1px solid rgba(255,255,255,0.12); }
+  .tb-hcell { position: static !important; border-radius: 0 !important; padding: 6px 4px !important; }
+  .tb-pills { display: flex; flex-wrap: wrap; gap: 4px; padding: 5px 4px; justify-content: center; background: var(--paper); }
+  .tb-pill { font-size: 10.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); background: var(--cream); color: var(--ink-light); cursor: pointer; font-family: 'DM Sans', sans-serif; white-space: nowrap; }
+  .tb-pill:hover { border-color: var(--accent); }
+  .tb-pill.on { border-color: var(--accent); color: var(--ink); background: var(--accent-light); font-weight: 600; }
+  .tb-pill.all { color: var(--accent); }
+  .tb-pills-m { padding: 8px 12px; gap: 6px; justify-content: flex-start; flex-shrink: 0; }
+  .tb-pills-m .tb-pill { font-size: 13px; padding: 6px 12px; }
+  .tb-grid { display: grid; position: relative; }
+  .tb-gutter { position: relative; }
+  .tb-gl { position: absolute; right: 4px; transform: translateY(-50%); font-size: 10px; color: var(--ink-faint); font-family: 'DM Mono', monospace; background: var(--paper); padding-left: 2px; }
+  .tb-col { position: relative; border-left: 1px solid var(--border); }
+  .tb-col.today { background: var(--gold-light); }
+  .tb-hl { position: absolute; left: 0; right: 0; border-top: 1px solid var(--border); pointer-events: none; }
+  .tb-block { position: absolute; box-sizing: border-box; border-radius: 6px; padding: 2px 6px; overflow: hidden; font-size: 11px; line-height: 1.25; color: var(--ink); border: 1px solid rgba(0,0,0,0.08); cursor: pointer; user-select: none; -webkit-user-select: none; z-index: 5; }
+  .tb-block.canDrag { cursor: grab; touch-action: none; }
+  .tb-block.dragging { cursor: grabbing; z-index: 30; box-shadow: 0 6px 18px rgba(0,0,0,0.25); opacity: 0.92; }
+  .tb-block.done .tb-b-title { text-decoration: line-through; opacity: 0.6; }
+  .tb-block:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .tb-b-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
+  .tb-b-time { opacity: 0.7; font-family: 'DM Mono', monospace; font-size: 10px; }
+  .tb-resize { position: absolute; left: 0; right: 0; bottom: 0; height: 7px; cursor: ns-resize; touch-action: none; }
+  .tb-chk { flex: none; width: 13px; height: 13px; padding: 0; border: 1.5px solid var(--ink-light); border-radius: 3px; background: transparent; color: var(--ink); font-size: 10px; line-height: 1; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+  .tb-chk.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tb-now { position: absolute; left: 0; right: 0; border-top: 2px solid var(--red); z-index: 20; pointer-events: none; }
+  .tb-now::before { content: ''; position: absolute; left: -4px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+  .tb-pop { position: fixed; z-index: 600; background: var(--paper); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: 0 10px 30px rgba(0,0,0,0.22); padding: 8px; overflow: auto; }
+  .tb-pop.hide { opacity: 0; pointer-events: none; }
+  .tb-pop-head { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: var(--ink); margin: 0 0 6px; }
+  .tb-x { border: none; background: transparent; color: var(--ink-light); cursor: pointer; font-size: 14px; padding: 2px 6px; }
+  .tb-link { border: none; background: transparent; color: var(--accent); cursor: pointer; font-size: 12px; padding: 2px 0; font-family: 'DM Sans', sans-serif; }
+  .tb-timerow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .tb-goalrow { margin-bottom: 8px; }
+  .tb-goalrow .tb-timerow { padding: 4px 2px 0; }
+  .tb-empty { font-size: 12px; color: var(--ink-faint); padding: 4px 2px 8px; }
+  .tb-day { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+  .tb-sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.38); z-index: 140; }
+  .tb-sheet { position: fixed; left: 0; right: 0; bottom: 0; max-height: 78vh; display: flex; flex-direction: column; background: var(--paper); border-radius: 18px 18px 0 0; z-index: 141; box-shadow: 0 -4px 24px rgba(0,0,0,0.2); padding-bottom: env(safe-area-inset-bottom); }
+  .tb-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px 4px; }
+  .tb-sheet-body { overflow-y: auto; padding: 8px 12px 18px; }
 </style>
 </head>
 <body>
@@ -2472,7 +2524,7 @@ function habitFreqSummary(goal) {
 // colours, dragging etc. all work as before); "never ends" series are topped up as time passes.
 const REPEAT_HORIZON_DAYS = { daily: 60, weekly: 182, monthly: 400, yearly: 800 };
 // Fields of a repeating task that can be copied to the rest of its series (not done, expanded, gcalId, isEvent or response status)
-const SERIES_EDIT_FIELDS = ['title', 'details', 'eventTime', 'colorIndex', 'customColor', 'priority', 'star', 'invitees'];
+const SERIES_EDIT_FIELDS = ['title', 'details', 'eventTime', 'startTime', 'durMin', 'colorIndex', 'customColor', 'priority', 'star', 'invitees'];
 const REPEAT_DAY_NAMES = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 function normalizeRepeat(r) {
   if (!r) return null;
@@ -4136,10 +4188,8 @@ async function pushEventToCalendar(event, dateKey) {
   const dateStr = dateKey; // YYYY-MM-DD
   let start, end;
   if (event.eventTime) {
-    const [h, m] = event.eventTime.split(':');
     start = { dateTime: `${dateStr}T${event.eventTime}:00`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
-    const endH = String(parseInt(h) + 1).padStart(2, '0');
-    end = { dateTime: `${dateStr}T${endH}:${m}:00`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    end = { dateTime: `${dateStr}T${tbEndClock(event.eventTime, event.durMin)}:00`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
   } else {
     const nextDay = new Date(dateObj); nextDay.setDate(nextDay.getDate() + 1);
     const nextStr = fmt(nextDay);
@@ -4205,10 +4255,8 @@ async function updateEventInCalendar(gcalId, event, dateKey) {
   const dateStr = dateKey;
   let start, end;
   if (event.eventTime) {
-    const [h, m] = event.eventTime.split(':');
-    const endH = String(parseInt(h) + 1).padStart(2, '0');
     start = { dateTime: `${dateStr}T${event.eventTime}:00`, timeZone: tz };
-    end   = { dateTime: `${dateStr}T${endH}:${m}:00`, timeZone: tz };
+    end   = { dateTime: `${dateStr}T${tbEndClock(event.eventTime, event.durMin)}:00`, timeZone: tz };
   } else {
     const nextDay = new Date(dateStr + 'T00:00:00'); nextDay.setDate(nextDay.getDate() + 1);
     start = { date: dateStr };
@@ -4299,7 +4347,7 @@ async function pullNewFromCalendar(weekData) {
   });
 
   const newWeekData = JSON.parse(JSON.stringify(weekData));
-  let added = 0, updated = 0;
+  let added = 0, updated = 0, durFixed = 0;
   const addedDates = [];
 
   gcalEvents.forEach(ev => {
@@ -4309,6 +4357,12 @@ async function pullNewFromCalendar(weekData) {
       return;
     }
     const newTimeStr = ev.start?.dateTime ? ev.start.dateTime.slice(11, 16) : '';
+    // v5.16.0: real length of a timed event, in minutes (same-day events only; otherwise left to the default)
+    let newDur = 0;
+    if (ev.start?.dateTime && ev.end?.dateTime && ev.end.dateTime.slice(0, 10) === newDateStr) {
+      const a = tbMin(newTimeStr), b = tbMin(ev.end.dateTime.slice(11, 16));
+      if (a != null && b != null && b > a) newDur = b - a;
+    }
 
     if (gcalIdToTask[ev.id]) {
       // Event exists in app — update title, details, time, and date if changed
@@ -4318,6 +4372,12 @@ async function pullNewFromCalendar(weekData) {
         task.eventTime !== newTimeStr ||
         dayKey !== newDateStr;
       if (!changed) {
+        // Only the length differs: store it in place (no move, no "updated" count)
+        if (newDur && (task.durMin || 0) !== newDur) {
+          const tl = newWeekData[wk].tasks[dayKey] || [];
+          const ti = tl.findIndex(t => t.id === task.id);
+          if (ti >= 0) { tl[ti] = { ...tl[ti], durMin: newDur }; durFixed++; }
+        }
         console.log('Calendar sync: already up-to-date', ev.id, ev.summary, 'on', dayKey);
         return;
       }
@@ -4335,6 +4395,7 @@ async function pullNewFromCalendar(weekData) {
       const responseStatus = myAttendee?.responseStatus || null;
       newWeekData[newWeekKey].tasks[newDateStr].push({
         ...task, title: ev.summary||'', details: ev.description||'', eventTime: newTimeStr,
+        ...(newDur ? { durMin: newDur } : {}),
         responseStatus, calendarInvite: !!myAttendee,
       });
     } else {
@@ -4357,13 +4418,13 @@ async function pullNewFromCalendar(weekData) {
         id: 'gcal_' + ev.id, gcalId: ev.id,
         title: ev.summary||'', details: ev.description||'',
         done: false, expanded: false, colorIndex: 3,
-        isEvent: true, eventTime: newTimeStr,
+        isEvent: true, eventTime: newTimeStr, ...(newDur ? { durMin: newDur } : {}),
         responseStatus: responseStatus2, calendarInvite: !!myAttendee2,
       });
     }
   });
 
-  return { added, updated, newWeekData, addedDates };
+  return { added, updated, durFixed, newWeekData, addedDates };
 }
 
 function useStorage(key, init) {
@@ -4832,6 +4893,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     return next;
   });
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [wkView, setWkView] = useWeekView();   // v5.16.0: 'list' | 'blocks' (per device)
   const [showPeoplePicker, setShowPeoplePicker] = useState(false);
   const [showRepeatCleanup, setShowRepeatCleanup] = useState(false);
   const [repeatScope, setRepeatScope] = useState(null); // {kind:'delete'|'apply', task, dayKey, rule?}
@@ -5079,7 +5141,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     }
 
     // For non-text fields (isEvent toggle, eventTime), sync immediately with debounce
-    const immediateFields = ['eventTime', 'isEvent'];
+    const immediateFields = ['eventTime', 'isEvent', 'durMin'];
     if (Object.keys(patch).some(k => immediateFields.includes(k))) {
       syncTaskToCalendar(dayKey, id, patch);
     }
@@ -5162,7 +5224,10 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
 
   function syncTaskToCalendar(dayKey, id, patch = {}) {
     // Always reads fresh state from ref so we get the latest title/details/time
-    const task = getTasksFresh(weekKey, dayKey).find(t => t.id===id);
+    const task0 = getTasksFresh(weekKey, dayKey).find(t => t.id===id);
+    // v5.16.0: the ref still holds the pre-edit task when this runs straight after updateTask, so merge the
+    // time fields from the patch (otherwise Google Calendar was sent the OLD time/length).
+    const task = (task0 && ('eventTime' in patch || 'durMin' in patch)) ? { ...task0, ...('eventTime' in patch ? { eventTime: patch.eventTime } : {}), ...('durMin' in patch ? { durMin: patch.durMin } : {}) } : task0;
     if (!task || !getToken()) return;
 
     if (task.isEvent) {
@@ -5434,9 +5499,10 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     });
   }
 
-  function moveTaskBetweenDays(fromDayKey, toDayKey, taskId, targetId) {
+  function moveTaskBetweenDays(fromDayKey, toDayKey, taskId, targetId, patch) {
     // Capture task reference for calendar sync (needs to happen outside updater)
-    const taskForSync = getTasks(fromDayKey).find(t => t.id === taskId);
+    const taskForSync0 = getTasks(fromDayKey).find(t => t.id === taskId);
+    const taskForSync = taskForSync0 && patch ? { ...taskForSync0, ...patch } : taskForSync0;   // v5.16.0: optional patch applied as the task moves (time blocks)
     // NOTE: weekData is keyed by week-start date, then by day within that week.
     // fromDayKey and toDayKey can belong to DIFFERENT weeks (e.g. reschedule
     // across a week boundary), so each day must be resolved to its own week key
@@ -5450,8 +5516,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       const fromWD = allWD[fromWk] || emptyWeek();
       const srcList = (fromWD.tasks || {})[fromDayKey] || [];
       // Find task from FRESH state — if already moved (double-fire guard), bail out
-      const task = srcList.find(t => t.id === taskId);
-      if (!task) return allWD;
+      const task0 = srcList.find(t => t.id === taskId);
+      if (!task0) return allWD;
+      const task = patch ? { ...task0, ...patch } : task0;
       const srcTasks = srcList.filter(t => t.id !== taskId);
       const nextFromWD = { ...fromWD, tasks: { ...fromWD.tasks, [fromDayKey]: srcTasks } };
       // If destination is the same week, chain off nextFromWD so the removal isn't lost
@@ -5529,6 +5596,168 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     };
   }, [mobileDayKey]);
 
+  // ── v5.16.0 TIME BLOCKS (week/day views; see the block comment above TbGrid) ──
+  const tbFocusRef = useRef(null);
+  function tbDayModel(d) {
+    const dk = fmt(d), lk = fmtLocal(d);
+    const items = [], untimed = [];
+    getTasks(dk).forEach(t => {
+      const s = tbMin(tbTaskStart(t));
+      if (s == null) { untimed.push(t); return; }
+      items.push({ k: 't:' + t.id, kind: 'task', id: t.id, start: s, dur: Math.max(5, Math.min(tbTaskDur(t), 1440 - s)), title: t.title, done: !!t.done, event: !!t.isEvent,
+        bg: t.customColor ? t.customColor + '55' : paletteBg(t.isEvent, t.colorIndex) });
+    });
+    const gl = goalTasksByDay[lk] || [];
+    gl.forEach(({ goal, ms, task }) => {
+      const s = tbMin(task.startTime); if (s == null) return;
+      items.push({ k: 'g:' + task.id, kind: 'goal', id: task.id, ref: { goalId: goal.id, msId: ms.id, taskId: task.id }, start: s, dur: Math.max(5, Math.min(task.durMin > 0 ? task.durMin : 30, 1440 - s)),
+        title: task.title, done: !!task.done, event: false, color: goal.color || 'var(--accent)' });
+    });
+    const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily');
+    return { key: dk, lkey: lk, date: d, today: isSameDay(d, today), items, untimed,
+      goalsTotal: gl.length, goalsDone: gl.filter(x => x.task.done).length,
+      habitsTotal: dailyHabits.length, habitsDone: dailyHabits.filter(g => ((habitCompletions || {})[dk] || []).includes(g.id)).length };
+  }
+  function tbFindGoalTask(ref) {
+    const g = (goals || []).find(x => x.id === ref.goalId); const m = g && (g.milestones || []).find(x => x.id === ref.msId);
+    return m && (m.tasks || []).find(x => x.id === ref.taskId);
+  }
+  function tbPlace(it, fromKey, toKey, start, dur) {
+    if (it.kind === 'goal') {
+      setGoalTask(it.ref, { scheduledDate: fmtLocal(parseLocal(toKey)), startTime: tbStr(start), durMin: dur });
+      return;
+    }
+    const patch = it.event ? { eventTime: tbStr(start), durMin: dur } : { startTime: tbStr(start), durMin: dur };
+    if (fromKey === toKey) { updateTask(fromKey, it.id, patch); return; }
+    const task = getTasks(fromKey).find(t => t.id === it.id);
+    moveTaskBetweenDays(fromKey, toKey, it.id, null, patch);
+    if (task && task.isProjectTask && task.projectDocId && setPagesData) {
+      setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : { ...doc, tasks: (doc.tasks||[]).map(t => t.id === it.id ? { ...t, scheduledDate: toKey } : t) }));
+    }
+  }
+  function tbToggleDone(it, dayKey) {
+    if (it.kind === 'goal') setGoalTask(it.ref, { done: !it.done });
+    else updateTask(dayKey, it.id, { done: !it.done });
+  }
+  function tbDropMin(dayKey, min) {
+    if (dragGoal) {
+      const gt = tbFindGoalTask(dragGoal);
+      setGoalTask(dragGoal, { scheduledDate: fmtLocal(parseLocal(dayKey)), startTime: tbStr(min), durMin: (gt && gt.durMin > 0) ? gt.durMin : 30 });
+      setDragGoal(null); return;
+    }
+    if (dragging) {
+      const t = getTasks(dragging.dayKey).find(x => x.id === dragging.id);
+      if (t) tbPlace({ kind: 'task', id: t.id, event: !!t.isEvent }, dragging.dayKey, dayKey, min, tbTaskDur(t));
+      setDragging(null); setDragOver(null);
+    }
+  }
+  function tbCreateTimed(dayKey, min) {
+    const id = Date.now().toString();
+    tbFocusRef.current = id;
+    setTasks(dayKey, t => [...t, { id, title: '', details: '', done: false, expanded: false, colorIndex: pickTaskColorIndex(t), startTime: tbStr(min), durMin: 30 }]);
+    return { kind: 'task', id };
+  }
+  function tbPruneEmpty(ref, dayKey) {
+    if (!ref || ref.kind !== 'task') return;
+    const t = getTasks(dayKey).find(x => x.id === ref.id);
+    if (t && !(t.title || '').trim() && !(t.details || '').trim() && !(Array.isArray(t.items) && t.items.length)) deleteTask(dayKey, ref.id);
+  }
+  function tbItemExists(ref, dayKey) {
+    if (!ref) return false;
+    if (ref.kind === 'goal') return !!(goalTasksByDay[fmtLocal(parseLocal(dayKey))] || []).some(x => x.task.id === ref.id);
+    return getTasks(dayKey).some(x => x.id === ref.id);
+  }
+  function tbTaskCard(task, dk, forceOpen) {
+    return (
+      <TaskCard key={task.id} task={task} forceOpen={forceOpen}
+        onUpdate={p => { if (forceOpen && Object.keys(p).length === 1 && 'expanded' in p) return; updateTask(dk, task.id, p); }}
+        onBlurSync={() => syncTaskToCalendar(dk, task.id)}
+        onBlurEdit={flushSeriesPrompt}
+        onDelete={() => deleteTask(dk, task.id)}
+        onDeleteFuture={taskIsRepeating(task) ? () => deleteTaskAndFuture(dk, task.id) : null}
+        onAskScope={taskIsRepeating(task) ? () => setRepeatScope({ kind: 'delete', task, dayKey: dk }) : null}
+        dayKey={dk}
+        titleRef={el => { if (el && tbFocusRef.current === task.id) { tbFocusRef.current = null; setTimeout(() => { try { el.focus(); } catch (x) {} }, 30); } }}
+        deleteIfEmpty={() => { if (!task.title.trim() && !forceOpen) deleteTask(dk, task.id); }}
+        onApplyRepeat={rule => requestApplyRepeat(task, dk, rule)}
+        onStopRepeat={() => stopRepeating(task, dk)}
+        isDragOver={false}
+        onDragStart={() => setDragging({ dayKey: dk, id: task.id })}
+        onDragOver={() => {}}
+        onDragEnd={() => { setDragging(null); setDragOver(null); }}
+        onDrop={() => {}}
+        onReschedule={toDayKey => {
+          moveTaskBetweenDays(dk, toDayKey, task.id, null);
+          if (task.isProjectTask && task.projectDocId && setPagesData) {
+            setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : { ...doc, tasks: (doc.tasks||[]).map(t => t.id === task.id ? { ...t, scheduledDate: toDayKey } : t) }));
+          }
+        }}
+        weekDays={weekDays}
+        currentDayKey={dk} />
+    );
+  }
+  function tbGoalRows(lk, desktop, onlyId) {
+    const list = (goalTasksByDay[lk] || []).filter(x => !onlyId || x.task.id === onlyId);
+    return list.map(({ goal, ms, task }) => {
+      const ref = { goalId: goal.id, msId: ms.id, taskId: task.id };
+      return (
+        <div key={'tg-' + task.id} className="tb-goalrow">
+          {renderGoalTaskCards([{ goal, ms, task }], desktop)}
+          <TbTimeRow start={task.startTime} dur={task.durMin} onChange={p => setGoalTask(ref, p)} />
+        </div>
+      );
+    });
+  }
+  const tbRender = {
+    renderHabits: m => <DailyHabitsSection forceOpen dayKey={m.key}
+      habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
+      habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />,
+    renderGoals: (m, desktop) => <div className="tb-goals">{tbGoalRows(m.lkey, desktop !== false)}</div>,
+    renderNoTime: m => (
+      <div className="tb-notime">
+        {m.untimed.length === 0 && <div className="tb-empty">Nothing without a time. Tasks you add here stay untimed until you give them one.</div>}
+        {m.untimed.map(t => tbTaskCard(t, m.key, false))}
+        <button className="add-task-btn" onClick={() => addTask(m.key)}>+</button>
+      </div>
+    ),
+    renderItem: (ref, dk) => {
+      if (!ref) return null;
+      if (ref.kind === 'goal') {
+        const lk = fmtLocal(parseLocal(dk));
+        const f = (goalTasksByDay[lk] || []).find(x => x.task.id === ref.id);
+        if (!f) return null;
+        const gref = { goalId: f.goal.id, msId: f.ms.id, taskId: f.task.id };
+        return (
+          <div className="tb-goalrow">
+            {renderGoalTaskCards([f], true)}
+            <TbTimeRow start={f.task.startTime} dur={f.task.durMin} onChange={p => setGoalTask(gref, p)} />
+            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+              <button className="tb-link" onClick={() => setGoalTask(gref, { startTime: '' })}>Remove time</button>
+              {onOpenGoal && <button className="tb-link" onClick={() => onOpenGoal(f.goal.id)}>Open goal →</button>}
+            </div>
+          </div>
+        );
+      }
+      const t = getTasks(dk).find(x => x.id === ref.id);
+      if (!t) return null;
+      return (
+        <div>
+          {tbTaskCard(t, dk, true)}
+          {!t.isEvent && <button className="tb-link" style={{ marginTop: 6 }} onClick={() => updateTask(dk, t.id, { startTime: '' })}>Remove time (keep task)</button>}
+        </div>
+      );
+    },
+  };
+  const tbCommon = {
+    ...tbRender, view: wkView, setView: setWkView, dropActive: !!(dragging || dragGoal),
+    toggleDone: tbToggleDone, place: tbPlace, dropMin: tbDropMin, createTimed: tbCreateTimed, pruneEmpty: tbPruneEmpty, itemExists: tbItemExists,
+    scrollKey: weekKey, dayName: m => DAYS[m.date.getDay()],
+  };
+  const tbWeekModels = wkView === 'blocks' ? weekDays.map(tbDayModel) : [];
+  const tbWeekCtx = wkView === 'blocks' ? { ...tbCommon, days: tbWeekModels, range: tbRangeOf(tbWeekModels), headerBg: themeColor(calHeaderColor) } : null;
+  const tbDayM = wkView === 'blocks' ? tbDayModel(weekDays[mobileDayIndex]) : null;
+  const tbDayCtx = wkView === 'blocks' ? { ...tbCommon, day: tbDayM, range: tbRangeOf([tbDayM]), scrollKey: mobileDayKey } : null;
+
   const sidebarContent = (
     <>
       <div className="week-nav">
@@ -5536,6 +5765,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         <span className="week-nav-label">{weekLabel}</span>
         <button className="nav-arrow" onClick={()=>setWeekStart(ws=>addDays(ws,7))}>›</button>
       </div>
+      <div style={{margin:'0 0 8px'}}><TbViewSwitch view={wkView} onChange={setWkView} /></div>
       {/* v4.7.0 — Weekly Review. Highlighted Sat–Mon, when closing out a week is the natural thing to do. */}
       <button className={`wr-review-btn ${reviewDue ? 'due' : ''}`} onClick={()=>setReviewOpen(true)}
         title={`Reviews ${fmtDisplay(reviewTarget)} – ${fmtDisplay(addDays(reviewTarget, 6))}`}>
@@ -5620,6 +5850,9 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
 
       {/* MAIN */}
       <div className="main-panel weekly-main-panel">
+        {wkView === 'blocks' ? (
+        <div className="weekly-calendar tb-cal"><TbWeek ctx={tbWeekCtx} /></div>
+        ) : (
         <div className="weekly-calendar">
           <div className="cal-scroll-wrapper">
             <div className="cal-grid">
@@ -5717,6 +5950,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
             </div>
           </div>
         </div>
+        )}
 
         <div className="week-review">
           <div className="review-section">
@@ -5756,12 +5990,19 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
               style={{background:'none',border:'none',cursor:'pointer',fontSize:16,opacity:swipeNav?1:0.35,padding:'2px 4px',lineHeight:1}}>
               👆
             </button>
+            <button onClick={()=>setWkView(wkView==='blocks'?'list':'blocks')} title={wkView==='blocks' ? 'Showing time blocks — tap for the task list' : 'Show time blocks'}
+              style={{background:'none',border:'none',cursor:'pointer',fontSize:16,opacity:wkView==='blocks'?1:0.35,padding:'2px 4px',lineHeight:1}}>
+              ⏱
+            </button>
           </div>
           <button className="nav-arrow" onClick={()=>setMobileDayIndex(i=>{
             if(i===6){setWeekStart(ws=>addDays(ws,7));return 0;}
             return i+1;
           })}>›</button>
         </div>
+        {wkView === 'blocks' ? (
+          <TbDay ctx={{...tbDayCtx, renderGoals: m => <div className="tb-goals">{tbGoalRows(m.lkey, false)}</div>}} />
+        ) : (
         <div className="mobile-day-tasks" ref={mobileTasksContainerRef}>
           <DailyHabitsSection dayKey={mobileDayKey}
             habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
@@ -5815,6 +6056,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           <button className="mobile-add-btn" onClick={()=>addTask(mobileDayKey)}>+ Add task</button>
           <DayNote dayKey={mobileDayKey} note={getDayNote(mobileDayKey)} onChange={note=>setDayNote(mobileDayKey,note)} />
         </div>
+        )}
         {/* Week dot row */}
         <div className="mobile-week-dots">
           <button
@@ -6419,10 +6661,10 @@ function useDayOpen(section, dayKey) {
 // ─────────────────────────────────────────────
 // DAILY HABITS SECTION (shown in WeeklyPlanner day columns)
 // ─────────────────────────────────────────────
-function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes }) {
+function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, forceOpen }) {
   const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily');
   const [habitsOpen, toggleHabitsOpen] = useDayOpen('habits', dayKey);
-  const collapsed = !habitsOpen;
+  const collapsed = forceOpen ? false : !habitsOpen;   // v5.16.0: forceOpen = shown inside the time-blocks popover / sheet
   const [expandedIds, setExpandedIds] = React.useState({});
 
   if (dailyHabits.length === 0) return null;
@@ -6456,7 +6698,7 @@ function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitComp
 
   return (
     <div className="habit-task-section">
-      <div className="habit-task-label" onClick={toggleHabitsOpen}>
+      <div className="habit-task-label" onClick={forceOpen ? undefined : toggleHabitsOpen} style={forceOpen ? {cursor:'default'} : undefined}>
         <span style={{fontSize:8}}>{collapsed ? '▸' : '▾'}</span>
         <span>Habits</span>
         <span style={{marginLeft:'auto', fontSize:9, fontWeight:700, opacity:0.8}}>
@@ -6689,7 +6931,8 @@ function TaskChecklist({ items, onChange, focusRef }) {
     </div>
   );
 }
-function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onStopRepeat, onAskScope, dayKey, onReschedule, weekDays, currentDayKey }) {
+function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFuture, onEnterKey, titleRef, deleteIfEmpty, onCopy, hasCopied, onPasteBelow, onShowCtxMenu, onDragStart, onDragOver, onDragEnd, onDrop, isDragOver, onApplyRepeat, onStopRepeat, onAskScope, dayKey, onReschedule, weekDays, currentDayKey, forceOpen }) {
+  const open = !!(forceOpen || task.expanded);   // v5.16.0: the time-blocks popover shows the full card regardless of the saved 'expanded' flag
   const textareaRef = useRef();
   const titleTextareaRef = useRef();
   const [confirming, setConfirming] = useState(false);
@@ -6889,18 +7132,18 @@ function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFu
           </>
         ) : (
           <>
-          {showChecklist && !task.expanded && ckItems.length > 0 && (() => {
+          {showChecklist && !open && ckItems.length > 0 && (() => {
             const d = ckItems.filter(i => i.done).length;
             return <span className={`task-ck-pill ${d === ckItems.length ? 'all-done' : ''}`} title="List items checked">{d}/{ckItems.length}</span>;
           })()}
           <button className="task-expand-btn"
             onClick={()=>{setMobileConfirming(false);onUpdate({expanded:!task.expanded});}}>
-            {task.expanded ? '▲' : '▼'}
+            {open ? '▲' : '▼'}
           </button>
           </>
         )}
       </div>
-      {task.expanded && (
+      {open && (
         <div className="task-details">
           <textarea ref={textareaRef} className="task-details-input" placeholder="Details…"
             value={task.details||''} onChange={e=>onUpdate({details:e.target.value})}
@@ -6909,12 +7152,16 @@ function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFu
           {showChecklist && ckItems.length > 0 && (
             <TaskChecklist items={ckItems} focusRef={ckFocusRef} onChange={items => onUpdate({ items })} />
           )}
-          {task.isEvent && (
-            <div style={{display:'flex',alignItems:'center',gap:6,paddingTop:4}} onClick={e=>e.stopPropagation()}>
-              <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Time:</span>
-              <TimeSelect value={task.eventTime||''} onChange={v=>onUpdate({eventTime:v})} />
-            </div>
-          )}
+          <div style={{paddingTop:4}} onClick={e=>e.stopPropagation()}>
+            <TbTimeRow start={task.isEvent ? (task.eventTime||'') : (task.startTime||'')}
+              dur={task.durMin}
+              defaultDur={task.isEvent ? 60 : 30}
+              clearable={!task.isEvent}
+              onChange={p => {
+                if (task.isEvent) onUpdate({ ...(('startTime' in p) ? { eventTime: p.startTime } : {}), ...(('durMin' in p) ? { durMin: p.durMin } : {}) });
+                else onUpdate(p);
+              }} />
+          </div>
           {task.isEvent && (
             <div style={{paddingTop:5}} onClick={e=>e.stopPropagation()}>
               <div style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:3}}>Invite (emails):</div>
@@ -8522,6 +8769,327 @@ function DailyView({date, goals, completions, onToggle}) {
 // ─────────────────────────────────────────────
 // MONTHLY CALENDAR
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// v5.16.0 — TIME BLOCKS
+// Optional time on tasks: `startTime` 'HH:MM' + `durMin` minutes (events keep `eventTime`; goal tasks use the same two fields).
+// Anything without a time behaves exactly as before. The week view has a per-device List / Time blocks switch (localStorage 'weekView').
+// Time blocks view: each day is an hourly column; Habits / Goals / No time are small buttons above the day that open a popover
+// (desktop) or a bottom sheet (phone), so the grid never moves. Desktop drag/resize use pointer events; HTML5 drag from the
+// No-time list drops onto the grid. Defaults: tasks 30 min, events 60 min.
+// ─────────────────────────────────────────────
+const TB_VIEW_LS = 'weekView';
+const TB_DURS = [15, 30, 45, 60, 90, 120, 180, 240];
+function tbMin(s) { const m = /^(\d{1,2}):(\d{2})$/.exec(s || ''); if (!m) return null; const v = (+m[1]) * 60 + (+m[2]); return v < 1440 ? v : null; }
+function tbStr(min) { const v = Math.max(0, Math.min(1439, Math.round(min))); return String(Math.floor(v / 60)).padStart(2, '0') + ':' + String(v % 60).padStart(2, '0'); }
+// End clock for Google Calendar (clamped to 23:59 so an event never runs past midnight)
+function tbEndClock(startStr, durMin) { const a = tbMin(startStr); if (a == null) return '00:00'; return tbStr(Math.min(a + (durMin > 0 ? durMin : 60), 1439)); }
+function tbFmt12(min) { const h = Math.floor(min / 60) % 24, m = min % 60; return ((h % 12) || 12) + (m ? ':' + String(m).padStart(2, '0') : '') + (h >= 12 ? 'p' : 'a'); }
+function tbDurLabel(d) { return d < 60 ? d + ' min' : (Math.floor(d / 60) + ' h' + (d % 60 ? ' ' + (d % 60) + ' min' : '')); }
+function tbTaskStart(t) { return t.isEvent ? t.eventTime : t.startTime; }
+function tbTaskDur(t) { return t.durMin > 0 ? t.durMin : (t.isEvent ? 60 : 30); }
+// Side-by-side lanes for overlapping items
+function tbLayout(items) {
+  const s = [...items].sort((a, b) => a.start - b.start || b.dur - a.dur);
+  const res = []; let cl = [], end = -1, laneEnds = [];
+  const flush = () => { const n = laneEnds.length || 1; cl.forEach(r => { r.n = n; }); res.push(...cl); cl = []; laneEnds = []; end = -1; };
+  s.forEach(it => {
+    if (cl.length && it.start >= end) flush();
+    let lane = laneEnds.findIndex(e => e <= it.start);
+    if (lane < 0) { lane = laneEnds.length; laneEnds.push(it.start + it.dur); } else laneEnds[lane] = it.start + it.dur;
+    end = Math.max(end, it.start + it.dur);
+    cl.push({ it, lane, n: 1 });
+  });
+  flush();
+  return res;
+}
+// Visible hour range: 7am–8pm, stretched to fit anything outside it
+function tbRangeOf(models) {
+  let lo = 7 * 60, hi = 20 * 60;
+  models.forEach(m => m.items.forEach(i => { lo = Math.min(lo, i.start); hi = Math.max(hi, i.start + i.dur); }));
+  return { h0: Math.max(0, Math.floor(lo / 60)), h1: Math.min(24, Math.ceil(hi / 60)) };
+}
+function useWeekView() {
+  const [, bump] = React.useReducer(x => x + 1, 0);
+  React.useEffect(() => {
+    const h = () => bump();
+    window.addEventListener('lp-weekview', h);
+    return () => window.removeEventListener('lp-weekview', h);
+  }, []);
+  const view = lsGet(TB_VIEW_LS) === 'blocks' ? 'blocks' : 'list';
+  const set = v => { lsSet(TB_VIEW_LS, v === 'blocks' ? 'blocks' : 'list'); window.dispatchEvent(new Event('lp-weekview')); };
+  return [view, set];
+}
+function TbViewSwitch({ view, onChange }) {
+  return (
+    <div className="tb-switch" role="group" aria-label="Week view">
+      <button className={view === 'list' ? 'on' : ''} onClick={() => onChange('list')}>List</button>
+      <button className={view === 'blocks' ? 'on' : ''} onClick={() => onChange('blocks')}>Time blocks</button>
+    </div>
+  );
+}
+// Start time + length controls (used in the expanded task card, goal tasks and the item popover)
+function TbTimeRow({ start, dur, defaultDur = 30, onChange }) {
+  const shown = dur > 0 ? dur : defaultDur;
+  const opts = (TB_DURS.includes(shown) ? TB_DURS : [...TB_DURS, shown]).sort((a, b) => a - b);
+  const lab = { fontSize: 10, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" };
+  return (
+    <div className="tb-timerow">
+      <span style={lab}>Time:</span>
+      <TimeSelect value={start || ''} onChange={v => onChange(v ? { startTime: v, ...(dur > 0 ? {} : { durMin: defaultDur }) } : { startTime: '' })} />
+      {start ? (
+        <>
+          <span style={lab}>Length:</span>
+          <select className="task-time-input" style={{ padding: '3px 2px' }} value={shown} onChange={e => onChange({ durMin: +e.target.value })}>
+            {opts.map(d => <option key={d} value={d}>{tbDurLabel(d)}</option>)}
+          </select>
+        </>
+      ) : null}
+    </div>
+  );
+}
+function TbPopover({ anchor, width = 300, hidden, onClose, title, children }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const down = e => {
+      if (e.target && e.target.closest && e.target.closest('[data-tb-pill]')) return;   // the pill toggles itself
+      if (ref.current && !ref.current.contains(e.target)) onClose();
+    };
+    const key = e => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('pointerdown', down, true);
+    document.addEventListener('keydown', key);
+    return () => { document.removeEventListener('pointerdown', down, true); document.removeEventListener('keydown', key); };
+  }, [onClose]);
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const left = Math.max(8, Math.min(anchor.left, vw - width - 8));
+  const top = Math.min(anchor.bottom + 4, Math.max(8, vh - 380));
+  return (
+    <div ref={ref} className={`tb-pop ${hidden ? 'hide' : ''}`} style={{ left, top, width, maxHeight: vh - top - 12 }}>
+      <div className="tb-pop-head"><span>{title}</span><button className="tb-x" onClick={onClose} aria-label="Close">✕</button></div>
+      {children}
+    </div>
+  );
+}
+function TbSheet({ tabs, tab, onTab, onClose, title, children }) {
+  return (
+    <>
+      <div className="tb-sheet-overlay" onClick={onClose} />
+      <div className="tb-sheet" role="dialog" aria-label={title}>
+        <div className="mobile-sheet-handle" />
+        <div className="tb-sheet-head">
+          {tabs ? (
+            <div className="tb-pills tb-pills-m" style={{ padding: 0 }}>
+              {tabs.map(t => <button key={t.id} className={`tb-pill ${tab === t.id ? 'on' : ''}`} onClick={() => onTab(t.id)}>{t.label}</button>)}
+            </div>
+          ) : <span style={{ fontWeight: 600, fontSize: 14 }}>{title}</span>}
+          <button className="tb-x" onClick={onClose} aria-label="Close">✕</button>
+        </div>
+        <div className="tb-sheet-body">{children}</div>
+      </div>
+    </>
+  );
+}
+// The hourly grid shared by the desktop week and the phone day.
+// days: [{ key, today, items:[{k, kind, id, start, dur, title, done, event, bg, color}] }]
+function TbGrid({ days, hourPx, h0, h1, labelEvery, canDrag, header, dropActive, scrollKey, onOpen, onToggle, onPlace, onCreate, onDropMin }) {
+  const scrollRef = useRef(null), gridRef = useRef(null), st = useRef(null);
+  const [drag, setDrag] = useState(null);                 // { k, day, start, dur }
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => { const t = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(t); }, []);
+  const H = (h1 - h0) * hourPx;
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const px = m => (m - h0 * 60) / 60 * hourPx;
+  useEffect(() => {
+    const el = scrollRef.current; if (!el) return;
+    const starts = days.flatMap(d => d.items.map(i => i.start));
+    const nm = new Date(); const cur = nm.getHours() * 60 + nm.getMinutes();
+    const target = starts.length ? Math.min(...starts) : (days.some(d => d.today) ? Math.max(cur - 60, 0) : 8 * 60);
+    el.scrollTop = Math.max(0, px(target - 30));
+  }, [scrollKey]);
+  const snap = m => Math.round(m / 15) * 15;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const minAt = (colEl, y) => h0 * 60 + (y - colEl.getBoundingClientRect().top) / hourPx * 60;
+  function down(e, it, dayKey, mode) {
+    if (!canDrag || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    e.stopPropagation();
+    const el = e.currentTarget;
+    try { el.setPointerCapture(e.pointerId); } catch (x) {}
+    const colEl = el.closest('.tb-col');
+    const grab = e.clientY - (colEl.getBoundingClientRect().top + px(it.start));
+    st.current = { it, dayKey, mode, x0: e.clientX, y0: e.clientY, grab, moved: false, start: it.start, dur: it.dur, day: dayKey };
+  }
+  function move(e) {
+    const s = st.current; if (!s) return;
+    if (!s.moved && Math.abs(e.clientX - s.x0) < 4 && Math.abs(e.clientY - s.y0) < 4) return;
+    s.moved = true;
+    const cols = [...gridRef.current.querySelectorAll('.tb-col')];
+    const col = cols.find(c => { const r = c.getBoundingClientRect(); return e.clientX >= r.left && e.clientX < r.right; }) || cols.find(c => c.dataset.day === s.day);
+    if (s.mode === 'move') {
+      const m = snap(minAt(col, e.clientY - s.grab));
+      s.start = clamp(m, h0 * 60, h1 * 60 - s.dur); s.day = col.dataset.day;
+    } else {
+      const end = snap(minAt(col, e.clientY));
+      s.dur = clamp(end - s.start, 15, h1 * 60 - s.start);
+    }
+    setDrag({ k: s.it.k, day: s.day, start: s.start, dur: s.dur });
+  }
+  function up(e) {
+    const s = st.current; st.current = null; if (!s) return;
+    setDrag(null);
+    if (!s.moved) { if (s.mode === 'move') { const r = e.currentTarget.getBoundingClientRect(); onOpen(s.it, s.dayKey, { left: r.left, top: r.top, bottom: r.bottom }); } return; }
+    onPlace(s.it, s.dayKey, s.day, s.start, s.dur);
+  }
+  function cancel() { st.current = null; setDrag(null); }
+  const labels = [];
+  for (let h = h0; h <= h1; h += labelEvery) labels.push(h);
+  return (
+    <div className="tb-scroll" ref={scrollRef}>
+      {header}
+      <div className="tb-grid" ref={gridRef} style={{ gridTemplateColumns: `38px repeat(${days.length}, minmax(0,1fr))` }}>
+        <div className="tb-gutter" style={{ height: H }}>
+          {labels.map(h => <span key={h} className="tb-gl" style={{ top: (h - h0) * hourPx }}>{h === 24 ? '' : tbFmt12(h * 60)}</span>)}
+        </div>
+        {days.map(d => {
+          const list = d.items.filter(i => !(drag && drag.k === i.k));
+          if (drag && drag.day === d.key) {
+            const src = days.flatMap(x => x.items).find(i => i.k === drag.k);
+            if (src) list.push({ ...src, start: drag.start, dur: drag.dur, dragging: true });
+          }
+          return (
+            <div key={d.key} data-day={d.key} className={`tb-col ${d.today ? 'today' : ''}`} style={{ height: H }}
+              onDoubleClick={e => {
+                if (!canDrag || !onCreate || (e.target.closest && e.target.closest('.tb-block'))) return;
+                onCreate(d.key, clamp(Math.floor(minAt(e.currentTarget, e.clientY) / 15) * 15, h0 * 60, h1 * 60 - 15), e);
+              }}
+              onDragOver={e => { if (dropActive) e.preventDefault(); }}
+              onDrop={e => {
+                if (!dropActive || !onDropMin) return;
+                e.preventDefault();
+                onDropMin(d.key, clamp(Math.floor(minAt(e.currentTarget, e.clientY) / 15) * 15, h0 * 60, h1 * 60 - 15));
+              }}>
+              {labels.slice(0, -1).map(h => <div key={h} className="tb-hl" style={{ top: (h - h0) * hourPx }} />)}
+              {tbLayout(list).map(({ it, lane, n }) => {
+                const h = Math.max(it.dur / 60 * hourPx - 2, 13);
+                const bg = it.kind === 'goal' ? `color-mix(in srgb, ${it.color} 24%, var(--surface))` : it.bg;
+                return (
+                  <div key={it.k} className={`tb-block ${canDrag ? 'canDrag' : ''} ${it.dragging ? 'dragging' : ''} ${it.done ? 'done' : ''}`}
+                    tabIndex={0}
+                    style={{ top: px(it.start) + 1, height: h, left: `calc(${lane / n * 100}% + 1px)`, width: `calc(${100 / n}% - 2px)`, background: bg, borderLeft: `3px solid ${it.kind === 'goal' ? it.color : 'rgba(0,0,0,0.28)'}` }}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); const r = e.currentTarget.getBoundingClientRect(); onOpen(it, d.key, { left: r.left, top: r.top, bottom: r.bottom }); } }}
+                    onClick={canDrag ? undefined : e => { const r = e.currentTarget.getBoundingClientRect(); onOpen(it, d.key, { left: r.left, top: r.top, bottom: r.bottom }); }}
+                    onPointerDown={e => down(e, it, d.key, 'move')} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel}>
+                    <div className="tb-b-title">
+                      {!it.event && <button className={`tb-chk ${it.done ? 'on' : ''}`} aria-label={it.done ? 'Mark not done' : 'Mark done'}
+                        onPointerDown={e => e.stopPropagation()} onClick={e => { e.stopPropagation(); onToggle(it, d.key); }}>{it.done ? '✓' : ''}</button>}
+                      {it.event ? '📅 ' : ''}{it.title || '(untitled)'}
+                    </div>
+                    {h >= 34 && <div className="tb-b-time">{tbFmt12(it.start)}–{tbFmt12(it.start + it.dur)}</div>}
+                    {canDrag && <div className="tb-resize" onPointerDown={e => down(e, it, d.key, 'resize')} onPointerMove={move} onPointerUp={up} onPointerCancel={cancel} />}
+                  </div>
+                );
+              })}
+              {d.today && nowMin >= h0 * 60 && nowMin <= h1 * 60 && <div className="tb-now" style={{ top: px(nowMin) }} />}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+function TbPills({ d, openSec, onPick, onAdd, mobile }) {
+  const on = s => openSec === s;
+  return (
+    <div className={`tb-pills ${mobile ? 'tb-pills-m' : ''}`}>
+      {d.habitsTotal > 0 && <button data-tb-pill className={`tb-pill ${on('habits') ? 'on' : ''} ${d.habitsDone === d.habitsTotal ? 'all' : ''}`} onClick={e => onPick('habits', e.currentTarget)}>Habits {d.habitsDone}/{d.habitsTotal}</button>}
+      {d.goalsTotal > 0 && <button data-tb-pill className={`tb-pill ${on('goals') ? 'on' : ''} ${d.goalsDone === d.goalsTotal ? 'all' : ''}`} onClick={e => onPick('goals', e.currentTarget)}>Goals {d.goalsDone}/{d.goalsTotal}</button>}
+      <button data-tb-pill className={`tb-pill ${on('notime') ? 'on' : ''}`} onClick={e => onPick('notime', e.currentTarget)}>{d.untimed.length ? `No time ${d.untimed.length}` : '+ Task'}</button>
+      {mobile && <button className="tb-pill" onClick={onAdd}>＋ Time block</button>}
+    </div>
+  );
+}
+function TbWeek({ ctx }) {
+  const [pop, setPop] = useState(null);   // { sec, dayKey, anchor, ref?, created? }
+  const { days } = ctx, { h0, h1 } = ctx.range;
+  const close = () => {
+    if (pop && pop.created) ctx.pruneEmpty(pop.ref, pop.dayKey);
+    setPop(null);
+  };
+  useEffect(() => { if (pop && pop.sec === 'item' && !ctx.itemExists(pop.ref, pop.dayKey)) setPop(null); });
+  function pick(sec, dayKey, el) {
+    const r = el.getBoundingClientRect();
+    setPop(p => (p && p.sec === sec && p.dayKey === dayKey) ? null : { sec, dayKey, anchor: { left: r.left, top: r.top, bottom: r.bottom } });
+  }
+  function openItem(it, dayKey, anchor) { setPop({ sec: 'item', dayKey, ref: { kind: it.kind, id: it.id }, anchor }); }
+  function create(dayKey, min, e) {
+    const ref = ctx.createTimed(dayKey, min);
+    setPop({ sec: 'item', dayKey, ref, created: true, anchor: { left: e.clientX, top: e.clientY, bottom: e.clientY } });
+  }
+  const model = pop ? days.find(x => x.key === pop.dayKey) : null;
+  const head = (
+    <div className="tb-head" style={{ gridTemplateColumns: `38px repeat(${days.length}, minmax(0,1fr))` }}>
+      <div />
+      {days.map(d => (
+        <div key={d.key} className={`tb-head-day ${d.today ? 'today' : ''}`}>
+          <div className={`cal-header-cell tb-hcell ${d.today ? 'today' : ''}`} style={{ background: ctx.headerBg }}>
+            <div className="day-name">{ctx.dayName(d)}</div>
+            <div className="day-date">{d.date.getDate()}</div>
+          </div>
+          <TbPills d={d} openSec={pop && pop.dayKey === d.key ? pop.sec : null} onPick={(sec, el) => pick(sec, d.key, el)} />
+        </div>
+      ))}
+    </div>
+  );
+  const secTitle = !pop || !model ? '' : ({ habits: 'Habits', goals: 'Goals', notime: 'No time', item: 'Time block' }[pop.sec]) + ' · ' + ctx.dayName(model) + ' ' + model.date.getDate();
+  return (
+    <div className="tb-wrap">
+      <div className="tb-viewbar">
+        <TbViewSwitch view={ctx.view} onChange={ctx.setView} />
+        <span className="tb-hint">Drag a block to move it · drag its bottom edge to resize · double-click empty space to add</span>
+      </div>
+      <TbGrid days={days} hourPx={30} h0={h0} h1={h1} labelEvery={2} canDrag header={head} scrollKey={ctx.scrollKey}
+        dropActive={ctx.dropActive} onOpen={openItem} onToggle={ctx.toggleDone} onPlace={ctx.place} onCreate={create} onDropMin={ctx.dropMin} />
+      {pop && model && (
+        <TbPopover anchor={pop.anchor} width={pop.sec === 'item' ? 330 : 310} hidden={ctx.dropActive} onClose={close} title={secTitle}>
+          {pop.sec === 'habits' && ctx.renderHabits(model)}
+          {pop.sec === 'goals' && ctx.renderGoals(model)}
+          {pop.sec === 'notime' && ctx.renderNoTime(model)}
+          {pop.sec === 'item' && ctx.renderItem(pop.ref, pop.dayKey)}
+        </TbPopover>
+      )}
+    </div>
+  );
+}
+function TbDay({ ctx }) {
+  const [sheet, setSheet] = useState(null);   // { tab, ref?, created? }
+  const d = ctx.day, { h0, h1 } = ctx.range;
+  const close = () => { if (sheet && sheet.created) ctx.pruneEmpty(sheet.ref, d.key); setSheet(null); };
+  useEffect(() => { if (sheet && sheet.tab === 'item' && !ctx.itemExists(sheet.ref, d.key)) setSheet(null); });
+  const tabs = [];
+  if (d.habitsTotal > 0) tabs.push({ id: 'habits', label: `Habits ${d.habitsDone}/${d.habitsTotal}` });
+  if (d.goalsTotal > 0) tabs.push({ id: 'goals', label: `Goals ${d.goalsDone}/${d.goalsTotal}` });
+  tabs.push({ id: 'notime', label: d.untimed.length ? `No time ${d.untimed.length}` : '+ Task' });
+  function addBlock() {
+    const nm = new Date(); const cur = nm.getHours() * 60 + nm.getMinutes();
+    const min = d.today ? Math.min(Math.ceil((cur + 1) / 30) * 30, 23 * 60) : 9 * 60;
+    const ref = ctx.createTimed(d.key, min);
+    setSheet({ tab: 'item', ref, created: true });
+  }
+  return (
+    <div className="tb-day">
+      <TbPills d={d} mobile openSec={sheet ? sheet.tab : null} onPick={sec => setSheet({ tab: sec })} onAdd={addBlock} />
+      <TbGrid days={[d]} hourPx={46} h0={h0} h1={h1} labelEvery={1} canDrag={false} scrollKey={ctx.scrollKey}
+        onOpen={it => setSheet({ tab: 'item', ref: { kind: it.kind, id: it.id } })} onToggle={ctx.toggleDone} onPlace={ctx.place} />
+      {sheet && (
+        <TbSheet tabs={sheet.tab === 'item' ? null : tabs} tab={sheet.tab} onTab={t => setSheet({ tab: t })} onClose={close} title="Time block">
+          {sheet.tab === 'habits' && ctx.renderHabits(d)}
+          {sheet.tab === 'goals' && ctx.renderGoals(d)}
+          {sheet.tab === 'notime' && ctx.renderNoTime(d)}
+          {sheet.tab === 'item' && ctx.renderItem(sheet.ref, d.key)}
+        </TbSheet>
+      )}
+    </div>
+  );
+}
+
 function TimeSelect({ value, onChange }) {
   const hours = Array.from({length:24},(_,i)=>String(i).padStart(2,'0'));
   const mins = ['00','05','10','15','20','25','30','35','40','45','50','55'];
@@ -11111,7 +11679,7 @@ function App() {
     _lastCalSyncMs = Date.now();
     try {
       const result = await pullNewFromCalendar(currentWeekData);
-      if (!result || (result.added === 0 && result.updated === 0)) return;
+      if (!result || (result.added === 0 && result.updated === 0 && !(result.durFixed > 0))) return;
       applyCalendarResult(currentWeekData, result.newWeekData);
       console.log(`Auto calendar sync: ${result.added} added, ${result.updated} updated`);
     } catch (e) {
@@ -11266,7 +11834,7 @@ function App() {
       const result = await pullNewFromCalendar(weekData);
       if (!result) {
         alert('Calendar sync failed: could not reach Google Calendar.\n\nMake sure:\n1. Google Calendar API is enabled in Cloud Console\n2. You signed in and approved Calendar access on the consent screen\n3. Try signing out and back in');
-      } else if (result.added > 0 || result.updated > 0) {
+      } else if (result.added > 0 || result.updated > 0 || result.durFixed > 0) {
         applyCalendarResult(weekData, result.newWeekData);   // only the changed weeks; the sync engine uploads them
         const parts = [];
         if (result.added > 0) {
@@ -11455,7 +12023,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.15.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.16.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
