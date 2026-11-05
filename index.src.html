@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.13.0 -->
+<!-- LP Planner v5.14.0 -->
+<!-- v5.14.0 — Goals: a milestone only shows its "Complete automatically from my weight / training or habits" rows once you turn one on. Until then they are two small dashed chips ("⚖ Auto from weight", "↻ Auto from training or habits") on the "Add a task" line, so a hand-managed milestone has no extra lines. Turning a link off (uncheck, or Remove auto-check) collapses it back to a chip and keeps the milestone's done state. No data change. -->
 <!-- v5.13.0 — Goals: a milestone's auto-check rule can read the Habit Tracker instead of the Fitness log (rule.source 'habits': Days completed, or Total of the Qty field; same since-start / single-week windows). One source per rule. -->
 <!-- v5.12.1 — Milestone auto-check rule editor now has a Hide/Show rule button, so it can be collapsed without unchecking (and clearing) the rule. -->
 <!-- v5.12.0 — Goals: the ↻ auto-check buttons (tasks) and the "Complete automatically from my training" row (milestones) now show only on goals that have Habits & training → Edit → Auto-check → ↻ Fitness log switched on. Anything that already has a rule stays visible. -->
@@ -10362,6 +10363,23 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   }
   const msRule = m.rule ? glMsRule(m, goal, fctx, today) : null;
   const setMsRule = patch => onChange(mm => ({ ...mm, rule: { ...(mm.rule || glNewRule()), ...patch }, ruleHold: false }));
+  // v5.14.0 — which auto-complete links this goal offers, and how to switch each on/off for just this milestone.
+  // A milestone with neither link set is a plain manual one and shows no extra rows (only the chips on the add-task line).
+  const wtOffered = !!((goal && (goal.linkedMetrics || []).includes('weight')) || m.metric);
+  const trOffered = !!((goal && goal.autoTraining) || m.rule);
+  function enableWeight() {
+    const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
+    const cur = mctx ? smoothWeight(mctx.metrics, asOf, goal && goal.startDate) : { n: 0, avg: null };
+    // Default the value to the chart's weight target (one source of truth); direction from where you started
+    const tgt = mctx ? mNum(mctx.weightTarget) : null;
+    const b = mctx && goal ? weightBaseline(mctx.metrics, goal.startDate, asOf) : null;
+    const ref = b ? b.value : cur.avg;
+    const op = ref !== null && tgt !== null && ref < tgt ? '>=' : '<=';
+    onChange(mm => ({ ...mm, metric: { id: 'weight', op, value: tgt !== null ? String(tgt) : '' }, metricHold: false }));
+  }
+  // Dropping a link keeps the milestone's done state; the auto flag goes only when no other link is left to own it
+  const dropRule = mm => { const { rule, ruleHold, ...rest } = mm; if (!rest.metric) delete rest.autoDone; return rest; };
+  const dropWeight = mm => { const { metric, metricHold, ...rest } = mm; if (!rest.rule) delete rest.autoDone; return rest; };
   function addTask(title, afterId) {
     const t = { id: glId('gt'), title: title || '', scheduledDate: null, done: false, completedAt: null };
     onChange(mm => {
@@ -10404,19 +10422,14 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
         <div>
           {/* v4.8.0 — complete this milestone from my weight. v5.7.0: only offered when the goal links Weight
               (Links → Measurements) or this milestone already uses it */}
-          {((goal && (goal.linkedMetrics || []).includes('weight')) || m.metric) && (() => {
+          {m.metric && (() => {
             const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
             const c = m.metric;
             const cur = mctx ? smoothWeight(mctx.metrics, asOf, goal && goal.startDate) : { n: 0, avg: null };
             const setMetric = patch => onChange(mm => ({ ...mm, metric: { ...mm.metric, ...patch }, metricHold: false }));
             function enable(on) {
-              if (!on) { onChange(mm => { const { metric, metricHold, autoDone, ...rest } = mm; return rest; }); return; }
-              // Default the value to the chart's weight target (one source of truth); direction from where you started
-              const tgt = mctx ? mNum(mctx.weightTarget) : null;
-              const b = mctx && goal ? weightBaseline(mctx.metrics, goal.startDate, asOf) : null;
-              const ref = b ? b.value : cur.avg;
-              const op = ref !== null && tgt !== null && ref < tgt ? '>=' : '<=';
-              onChange(mm => ({ ...mm, metric: { id: 'weight', op, value: tgt !== null ? String(tgt) : '' }, metricHold: false }));
+              if (!on) { onChange(dropWeight); return; }
+              enableWeight();
             }
             return (
               <div className="gl-task" style={{ flexWrap: 'wrap', rowGap: 6 }}>
@@ -10448,13 +10461,13 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
           })()}
           {/* v5.11.0 — complete this milestone from my training (Fitness log). v5.12.0: offered when the goal has the
               "Auto-check → Fitness log" switch on (Habits & training → Edit), or when this milestone already has a rule */}
-          {((goal && goal.autoTraining) || m.rule) && (
+          {m.rule && (
             <div className="gl-task" style={{ flexWrap: 'wrap', rowGap: 6 }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink)', minHeight: 32, cursor: 'pointer' }}>
                 <input type="checkbox" checked={!!m.rule} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }}
                   onChange={e => {
                     if (e.target.checked) onChange(mm => ({ ...mm, rule: glNewRule(), ruleHold: false }));
-                    else onChange(mm => { const { rule, ruleHold, ...rest } = mm; return rest; });
+                    else { setMsRuleShut(false); onChange(dropRule); }
                   }} />
                 ↻ Complete automatically from my training or habits
               </label>
@@ -10464,7 +10477,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
               )}
               {m.rule && !msRuleShut && <GlRuleEditor rule={m.rule} scope="ms" status={msRule} held={!!m.ruleHold} done={!!m.done} auto={!!m.autoDone}
                 fctx={fctx} onPatch={setMsRule}
-                onRemove={() => onChange(mm => { const { rule, ruleHold, ...rest } = mm; return rest; })} />}
+                onRemove={() => { setMsRuleShut(false); onChange(dropRule); }} />}
             </div>
           )}
           {tasks.map(t => { const tst = t.rule ? glTaskRule(t, fctx) : null; return (
@@ -10495,11 +10508,19 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
                 fctx={fctx} onPatch={p => setTaskRule(t.id, p)} onRemove={() => removeTaskRule(t.id)} />}
             </div>
           ); })}
-          <div className="gl-task">
+          <div className="gl-task" style={{ flexWrap: 'wrap', rowGap: 4 }}>
             <span style={{ width: 18, textAlign: 'center', color: 'var(--ink-faint)' }}>+</span>
-            <input className="gl-inline" style={{ flex: 1, fontSize: 14 }} placeholder="Add a task — press Enter" value={newTask}
+            <input className="gl-inline" style={{ flex: '1 1 160px', fontSize: 14 }} placeholder="Add a task — press Enter" value={newTask}
               onChange={e => setNewTask(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && newTask.trim()) { e.preventDefault(); addTask(newTask.trim()); setNewTask(''); } }} />
+            {/* v5.14.0 — turn on an auto-complete link for just this milestone; the rows above appear once it is on */}
+            {((wtOffered && !m.metric) || (trOffered && !m.rule)) && (
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginLeft: 'auto' }}>
+                {wtOffered && !m.metric && <button type="button" className="gl-sched" title="Complete this milestone automatically from my weight" onClick={enableWeight}>⚖ Auto from weight</button>}
+                {trOffered && !m.rule && <button type="button" className="gl-sched" title="Complete this milestone automatically from my training or habits"
+                  onClick={() => { setMsRuleShut(false); onChange(mm => ({ ...mm, rule: glNewRule(), ruleHold: false })); }}>↻ Auto from training or habits</button>}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -11418,7 +11439,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.13.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.14.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
