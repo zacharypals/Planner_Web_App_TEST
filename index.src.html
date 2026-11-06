@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.22.0 -->
+<!-- LP Planner v5.23.0 -->
+<!-- v5.23.0 — Goals: the Hide rule / Show rule button on a milestone's "Completes automatically" section now remembers its state per milestone on this device, so a section you collapse stays collapsed when you come back. Still starts open for a milestone you have never collapsed, and opens again when you add or remove a rule. No data change. -->
 <!-- v5.22.0 — Week > Time blocks now shows 6am to midnight by default (was 7am to 8pm; still stretches for anything outside it). Fitness > Charts > Trends: the picker has a new "By subcategory" group that adds up every exercise tagged with that subcategory (Volume, Sets, Total reps for strength; Miles, Duration, Pace, Sessions for cardio; Sets, Duration, Sessions for a mix), with the member exercises listed under the picker. Single exercises work as before. No data change. -->
 <!-- v5.21.2 — Fitness: the Min and Sec boxes on cardio sets are wider (32px to 44px) so two-digit numbers show fully; header labels widened to match. -->
 <!-- v5.21.1 — Fitness > Charts: the Recent PRs card moved to the bottom of the tab, under Compare. -->
@@ -11352,13 +11353,24 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
   );
 }
 
+// v5.23.0 — which milestones have their auto-check rule collapsed, remembered on this device: { [milestoneId]: true }
+function glRuleShutMap() { try { return JSON.parse(lsGet('msRuleShut') || '{}') || {}; } catch { return {}; } }
+function glRuleShutGet(id) { return !!id && !!glRuleShutMap()[id]; }
+function glRuleShutSet(id, shut) {
+  if (!id) return;
+  const mp = glRuleShutMap();
+  if (shut) mp[id] = true; else delete mp[id];
+  lsSet('msRuleShut', JSON.stringify(mp));
+}
 // One milestone in the goal editor: header row plus (when open) its tasks.
 function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete, onGripDown, dragging }) {
   const today = glToday();
   const [newTask, setNewTask] = useState('');
   const [focusId, setFocusId] = useState(null);
   const [picker, setPicker] = useState(null);   // task id whose schedule picker is open
-  const [msRuleShut, setMsRuleShut] = useState(false);   // v5.12.1 — milestone rule editor collapsed (rule kept)
+  // v5.12.1 — milestone rule editor collapsed (rule kept). v5.23.0: remembered per milestone on this device (localStorage 'msRuleShut'), so it stays as you left it
+  const [msRuleShut, setMsRuleShutRaw] = useState(() => glRuleShutGet(m.id));
+  const setMsRuleShut = v => setMsRuleShutRaw(prev => { const next = typeof v === 'function' ? v(prev) : v; glRuleShutSet(m.id, next); return next; });
   const [ruleOpen, setRuleOpen] = useState(null);   // task id whose auto-check rule editor is open (v5.11.0)
   const tasks = m.tasks || [];
   const late = glMsOverdue(m, today);
@@ -12443,7 +12455,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.22.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.23.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
