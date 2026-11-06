@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.23.0 -->
+<!-- LP Planner v5.24.0 -->
+<!-- v5.24.0 — Saving can no longer fail because the browser is full. The unsent-changes queue is now also kept in IndexedDB (hundreds of MB) as well as localStorage (~5 MB, shared by every app on this site); when localStorage is full the app drops its rebuildable cache copies to make room and parks them in IndexedDB; the red toast now only appears if neither place worked, and says so honestly; closing the tab with changes held only in memory asks first; uploads start sooner (0.8 s). Also fixes (1) a full browser could make Pages queue the deletion of every page, and (2) opening offline with no saved copy is refused instead of risking a mass delete. The old Drive-era planner's leftover copy in shared storage is parked in IndexedDB and cleared. New 'This device's storage' section in ☁ Data shows usage and has a Free up space button. -->
 <!-- v5.23.0 — Goals: the Hide rule / Show rule button on a milestone's "Completes automatically" section now remembers its state per milestone on this device, so a section you collapse stays collapsed when you come back. Still starts open for a milestone you have never collapsed, and opens again when you add or remove a rule. No data change. -->
 <!-- v5.22.0 — Week > Time blocks now shows 6am to midnight by default (was 7am to 8pm; still stretches for anything outside it). Fitness > Charts > Trends: the picker has a new "By subcategory" group that adds up every exercise tagged with that subcategory (Volume, Sets, Total reps for strength; Miles, Duration, Pace, Sessions for cardio; Sets, Duration, Sessions for a mix), with the member exercises listed under the picker. Single exercises work as before. No data change. -->
 <!-- v5.21.2 — Fitness: the Min and Sec boxes on cardio sets are wider (32px to 44px) so two-digit numbers show fully; header labels widened to match. -->
@@ -3908,6 +3909,127 @@ function lsGet(k) { try { return localStorage.getItem(lsKey(k)); } catch { retur
 function lsSet(k, v) { try { localStorage.setItem(lsKey(k), v); return true; } catch (e) { console.warn('localStorage write failed', k, e && e.name); return false; } }
 function lsDel(k) { try { localStorage.removeItem(lsKey(k)); } catch {} }
 
+// ── v5.24.0: never lose a save because the browser is full ──
+// localStorage holds only ~5 MB and that quota is shared by EVERY app on zacharypals.github.io
+// (including the old Drive-era planner's leftover copy). So nothing that must not be lost lives
+// only there. The unsent-changes queue is also kept in IndexedDB (hundreds of MB), and when
+// localStorage is full we drop cache copies (rebuildable from the server) to make room.
+const Idb = {
+  _db: null, _opening: null, _latest: {}, _busy: {},
+  open() {
+    if (this._db) return Promise.resolve(this._db);
+    if (this._opening) return this._opening;
+    const p = new Promise(res => {
+      let done = false;
+      const fin = (db) => { if (!done) { done = true; res(db); } };
+      try {
+        if (typeof indexedDB === 'undefined' || !indexedDB) { fin(null); return; }
+        const rq = indexedDB.open('lp_' + APP_CONFIG.STORAGE_PREFIX, 1);
+        rq.onupgradeneeded = () => { try { rq.result.createObjectStore('kv'); } catch {} };
+        rq.onsuccess = () => {
+          const db = rq.result;
+          db.onclose = () => { this._db = null; this._opening = null; };
+          db.onversionchange = () => { try { db.close(); } catch {} this._db = null; this._opening = null; };
+          this._db = db; fin(db);
+        };
+        rq.onerror = () => fin(null);
+        rq.onblocked = () => fin(null);
+        setTimeout(() => fin(null), 4000);   // never hang the app waiting on IndexedDB
+      } catch { fin(null); }
+    });
+    this._opening = p;
+    p.then(db => { if (!db && this._opening === p) this._opening = null; });   // try again next time
+    return p;
+  },
+  async tx(mode, fn) {
+    const db = await this.open();
+    if (!db) return { ok: false };
+    return new Promise(res => {
+      try {
+        const t = db.transaction('kv', mode);
+        let out;
+        const rq = fn(t.objectStore('kv'));
+        if (rq) rq.onsuccess = () => { out = rq.result; };
+        t.oncomplete = () => res({ ok: true, v: out });
+        t.onerror = () => res({ ok: false });
+        t.onabort = () => res({ ok: false });
+      } catch { res({ ok: false }); }
+    });
+  },
+  get(k) { return this.tx('readonly', st => st.get(k)); },          // → { ok, v }
+  set(k, v) { return this.tx('readwrite', st => st.put(v, k)); },   // → { ok }
+  del(k) { return this.tx('readwrite', st => st.delete(k)); },
+  clear() { return this.tx('readwrite', st => st.clear()); },
+  // Latest-wins writer: if a write for k is running, only the newest value is written next.
+  // Resolves true once a write that included this value (or a newer one) is committed.
+  setLatest(k, v) {
+    return new Promise(res => {
+      const prev = this._latest[k];
+      this._latest[k] = { v, waiters: [...(prev ? prev.waiters : []), res] };
+      if (this._busy[k]) return;
+      this._busy[k] = true;
+      (async () => {
+        while (this._latest[k]) {
+          const cur = this._latest[k]; delete this._latest[k];
+          const r = await this.set(k, cur.v);
+          cur.waiters.forEach(w => w(r.ok));
+        }
+        this._busy[k] = false;
+      })();
+    });
+  },
+};
+
+const _lsCacheOff = new Set();   // full localStorage keys whose cache copy isn't kept this session (no room) — IndexedDB holds it
+const _lsMirrored = new Set();
+// Never dropped to make room: sign-in and the sync bookkeeping.
+const LS_PROTECTED = ['session', 'email', 'profile', 'gtoken', 'gtoken_exp', 'oauth_state', 'sync_meta', 'sync_outbox', 'sync_outbox2'];
+// The Drive-era planner (before the server move) kept its own full copy of your data under these
+// un-prefixed names in the same shared storage. Nothing reads them any more.
+const LEGACY_LS_KEYS = ['weekData', 'habitGoals', 'habitCompletions', 'habitMetrics', 'habitQty', 'habitNotes', 'monthlyGoals',
+  'navColor', 'calHeaderColor', 'pagesData', 'foldersData', 'weightTarget', 'calsTarget', 'peopleDirectory', 'fitnessLog',
+  'fitnessExercises', 'fitnessGoals', 'countdowns', 'plannerToken', 'plannerTokenExp', 'plannerAuthEmail', '_lp_savedAt'];
+
+// Write something that must not fail. If the browser is full, drop cache copies — biggest first —
+// until it fits. The cache is only an instant-start copy: the server has the data, and the latest
+// text of anything dropped is parked in IndexedDB first.
+function lsSetRoom(k, v) {
+  if (lsSet(k, v)) return true;
+  const pre = APP_CONFIG.STORAGE_PREFIX;
+  const keep = new Set(LS_PROTECTED.map(x => pre + x));
+  const cacheKeys = new Set(Object.keys(Sync.reg).map(lsKey));
+  const sized = [];
+  try {
+    for (let n = 0; n < localStorage.length; n++) {
+      const key = localStorage.key(n);
+      if (key && cacheKeys.has(key) && !keep.has(key)) { let t = ''; try { t = localStorage.getItem(key) || ''; } catch {} sized.push({ key, t }); }
+    }
+  } catch {}
+  sized.sort((a, b) => b.t.length - a.t.length);
+  for (const { key, t } of sized) {
+    _lsMirrored.add(key);
+    Idb.setLatest('cache:' + key, t);
+    try { localStorage.removeItem(key); } catch {}
+    _lsCacheOff.add(key);
+    if (lsSet(k, v)) { Sync.pressure = true; return true; }
+  }
+  return false;
+}
+// Keep the instant-start copy of a collection. If it doesn't fit, the copy lives in IndexedDB instead.
+function lsCacheWrite(key, value) {
+  let json;
+  try { json = JSON.stringify(value); } catch { return; }
+  if (!_lsCacheOff.has(key)) {
+    try { localStorage.setItem(key, json); if (_lsMirrored.delete(key)) Idb.del('cache:' + key); return; }
+    catch {}
+    try { localStorage.removeItem(key); } catch {}   // never leave a stale copy behind
+    _lsCacheOff.add(key);
+    Sync.pressure = true;
+  }
+  _lsMirrored.add(key);
+  Idb.setLatest('cache:' + key, json);
+}
+
 // ── Session (issued by planner-api) and profile ──
 function getSession() { return lsGet('session'); }
 function setSession(t) { lsSet('session', t); }
@@ -4208,6 +4330,11 @@ const Sync = {
   retryTimer: null,
   onStatus: null,     // App: ({kind:'saving'|'saved'|'merged'|'error'|'idle', message})
   onAuthLost: null,   // App: session expired / revoked
+  latest: {},         // coll → newest value React rendered (fallback when the localStorage cache is off)
+  obSeq: 0,           // sequence number of the newest saved copy of the outbox
+  obLsOk: true,       // newest outbox copy fit in localStorage
+  obIdbOk: undefined, // newest outbox copy is committed in IndexedDB (undefined = not answered yet)
+  pressure: false,    // localStorage ran out of room at some point this session
 
   register(coll, init, set) { if (!this.reg[coll]) this.reg[coll] = { init, set }; else this.reg[coll].set = set; },
   status(kind, message) { this.onStatus?.({ kind, message }); },
@@ -4217,14 +4344,90 @@ const Sync = {
   persist() {
     const vers = {};
     for (const c in this.base) { vers[c] = {}; for (const i in this.base[c]) { const b = this.base[c][i]; vers[c][i] = [b.v, b.del ? 'x' : b.h]; } }
-    lsSet('sync_meta', JSON.stringify({ email: this.email, cursor: this.cursor, vers }));
-    if (!this.importing) lsSet('sync_outbox', JSON.stringify(this.outbox));
+    const meta = JSON.stringify({ email: this.email, cursor: this.cursor, vers, t: Date.now() });
+    lsSetRoom('sync_meta', meta);
+    Idb.setLatest('meta', meta);
+    this.saveOutbox();
   },
-  persistOutbox() {
+  persistOutbox() { this.saveOutbox(); },
+  // The unsent-changes queue is kept in TWO places: IndexedDB (roomy) and localStorage (synchronous, so it
+  // survives a page close). Each copy carries a sequence number; on start the newest wins.
+  saveOutbox() {
     if (this.importing) return;   // an import is re-runnable; don't fill browser storage with a full copy
-    if (!lsSet('sync_outbox', JSON.stringify(this.outbox))) {
-      this.status('error', "This browser's storage is full — changes will upload while the app stays open");
+    const seq = ++this.obSeq;
+    const full = JSON.stringify({ s: seq, o: this.outbox });
+    let lsOk = lsSetRoom('sync_outbox2', full);
+    if (!lsOk) {   // still too big: keep only the new text (merge then falls back to "this device wins")
+      const slim = {};
+      for (const c in this.outbox) { slim[c] = {}; for (const i in this.outbox[c]) { const { bj, ...rest } = this.outbox[c][i]; slim[c][i] = rest; } }
+      lsOk = lsSetRoom('sync_outbox2', JSON.stringify({ s: seq, o: slim }));
     }
+    this.obLsOk = lsOk;
+    if (lsOk) lsDel('sync_outbox');       // older format; the new key is newer
+    else lsDel('sync_outbox2');           // never leave an out-of-date snapshot that could be mistaken for current
+    Idb.setLatest('outbox', full).then(ok => {
+      if (seq !== this.obSeq) return;     // a newer copy is already on its way
+      this.obIdbOk = ok;
+      this.settleDurable();
+    });
+    this.settleDurable();
+  },
+  // Are the unsent changes safe on this device? Only if one of the two copies was committed.
+  isDurable() { return !this.pendingCount() || this.obLsOk || this.obIdbOk === true; },
+  settleDurable() {
+    if (!this.obLsOk && this.obIdbOk === undefined) return;   // IndexedDB hasn't answered yet
+    if (!this.isDurable()) {
+      // Neither copy could be saved: the changes exist only in memory. Say so, and upload right now.
+      this.status('error', "This device is out of storage, so unsent changes can't be kept here — keep this app open until it says ✓ Saved");
+      this.flush();
+    }
+  },
+  // Move every cache copy out of localStorage into IndexedDB (nothing is lost; the app just starts a bit slower offline).
+  async freeLocalCache() {
+    let freed = 0;
+    for (const coll of Object.keys(this.reg)) {
+      const key = lsKey(coll);
+      let t = null; try { t = localStorage.getItem(key); } catch {}
+      if (t == null) continue;
+      const w = await Idb.set('cache:' + key, t);
+      if (!w.ok) return { error: "This browser won't let the app use its backup storage, so nothing was removed." };
+      try { localStorage.removeItem(key); freed += t.length * 2; } catch {}
+      _lsCacheOff.add(key); _lsMirrored.add(key);
+    }
+    this.saveOutbox();
+    return { freed };
+  },
+  // Plain-language numbers for the Data panel.
+  async localReport() {
+    let total = 0; const rows = [];
+    try {
+      for (let n = 0; n < localStorage.length; n++) {
+        const k = localStorage.key(n); if (!k) continue;
+        const len = (k.length + (localStorage.getItem(k) || '').length) * 2;
+        total += len; rows.push({ k, len });
+      }
+    } catch {}
+    rows.sort((a, b) => b.len - a.len);
+    const idb = await Idb.get('outbox');
+    let persisted = null; try { persisted = navigator.storage && navigator.storage.persisted ? await navigator.storage.persisted() : null; } catch {}
+    return { total, rows: rows.slice(0, 5), pending: this.pendingCount(), idbOk: idb.ok, lsOk: this.obLsOk, pressure: this.pressure,
+      off: [..._lsCacheOff].length, persisted };
+  },
+  // The old Drive-era planner's leftover copy: park it in IndexedDB (verified), then clear it from localStorage.
+  async archiveLegacy() {
+    try {
+      const items = {}; let bytes = 0;
+      for (const k of LEGACY_LS_KEYS) { const v = localStorage.getItem(k); if (v != null) { items[k] = v; bytes += v.length; } }
+      if (!bytes) return;
+      const prev = await Idb.get('legacy_archive');
+      if (!prev.ok) return;           // can't park it safely → leave it alone
+      let merged = items;
+      if (prev.v) { try { merged = { ...JSON.parse(prev.v).items, ...items }; } catch {} }
+      const w = await Idb.set('legacy_archive', JSON.stringify({ at: Date.now(), items: merged }));
+      if (!w.ok) return;
+      for (const k of Object.keys(items)) localStorage.removeItem(k);
+      console.info('Archived old planner copy from localStorage:', Math.round(bytes * 2 / 1024), 'KB');
+    } catch {}
   },
 
   setBase(c, i, v, j, del) {
@@ -4294,12 +4497,12 @@ const Sync = {
     if (!this.ready) return;
     for (const coll of Object.keys(this.reg)) {
       const s = lsGet(coll);
-      if (s == null) continue;
-      try { this.capture(coll, JSON.parse(s)); } catch {}
+      if (s != null) { try { this.capture(coll, JSON.parse(s)); } catch {} }
+      else if (this.latest[coll] !== undefined && _lsCacheOff.has(lsKey(coll))) this.capture(coll, this.latest[coll]);   // cache is off (no room): use what's on screen
     }
   },
 
-  scheduleFlush(delay = 1200) {
+  scheduleFlush(delay = 800) {
     clearTimeout(this.flushTimer);
     this.status('saving');
     this.flushTimer = setTimeout(() => this.flush(), delay);
@@ -4421,8 +4624,22 @@ const Sync = {
     this.email = email;
     let meta = null;
     try { meta = JSON.parse(lsGet('sync_meta') || 'null'); } catch {}
+    try {   // the IndexedDB copy may be newer if localStorage was full
+      const m2 = await Idb.get('meta');
+      const j = m2.ok && m2.v ? JSON.parse(m2.v) : null;
+      if (j && (!meta || (j.t || 0) > (meta.t || 0))) meta = j;
+    } catch {}
     if (meta && meta.email !== email) { this.wipeLocal(); meta = null; }
-    try { this.outbox = meta ? (JSON.parse(lsGet('sync_outbox') || '{}') || {}) : {}; } catch { this.outbox = {}; }
+    this.outbox = {};
+    if (meta) {   // newest saved copy of the unsent changes wins (IndexedDB, localStorage, or the pre-v5.24 key)
+      const snaps = [];
+      const take = (txt) => { try { const o = JSON.parse(txt); if (o && typeof o.s === 'number' && o.o && typeof o.o === 'object') snaps.push(o); else if (o && typeof o === 'object' && !('s' in o)) snaps.push({ s: 0, o }); } catch {} };
+      const a = lsGet('sync_outbox2'); if (a) take(a);
+      const legacy = lsGet('sync_outbox'); if (legacy) take(legacy);
+      try { const b = await Idb.get('outbox'); if (b.ok && b.v) take(b.v); } catch {}
+      snaps.sort((x, y) => y.s - x.s);
+      if (snaps.length) { this.outbox = snaps[0].o; this.obSeq = snaps[0].s; }
+    }
 
     let data;
     try {
@@ -4436,7 +4653,27 @@ const Sync = {
         (this.base[c] || (this.base[c] = {}))[i] = h === 'x' ? { v, j: null, h: 'x', del: true } : { v, j: null, h };
       }
       this.cursor = meta.cursor || 0;
-      for (const coll of Object.keys(this.reg)) { const s = lsGet(coll); this.seen[coll] = {}; try { if (s != null) this.seenFrom(coll, JSON.parse(s)); } catch {} }
+      // Work from our saved copy — localStorage first, then the IndexedDB copy kept when localStorage was full.
+      // If a collection that has data on the server has NO copy here, going ahead would make the next edit
+      // look like "delete everything else", so refuse to open offline instead.
+      const copies = {};
+      for (const coll of Object.keys(this.reg)) {
+        let txt = lsGet(coll), fromIdb = false;
+        if (txt == null) { const m = await Idb.get('cache:' + lsKey(coll)); if (m.ok && m.v != null) { txt = m.v; fromIdb = true; } }
+        let val; try { if (txt != null) val = JSON.parse(txt); } catch { val = undefined; }
+        if (val === undefined && Object.values(this.base[coll] || {}).some(b => b && !b.del)) {
+          this.base = {}; this.outbox = {}; this.cursor = 0;
+          throw new ApiError(0, 'no_local_copy', "You're offline and this device doesn't have a complete saved copy of your planner. Connect to the internet and open it again.");
+        }
+        copies[coll] = { val, fromIdb };
+      }
+      for (const coll of Object.keys(this.reg)) {
+        this.seen[coll] = {};
+        const { val, fromIdb } = copies[coll];
+        if (val === undefined) continue;
+        if (fromIdb) this.reg[coll].set(val);
+        this.seenFrom(coll, val);
+      }
       this.ready = true; this.offline = true;
       this.status('error', e.message);
       return { offline: true };
@@ -4474,6 +4711,8 @@ const Sync = {
     }
     this.ready = true; this.offline = false;
     this.persist();
+    this.archiveLegacy();     // frees space the old Drive-era copy was taking
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch {}   // ask the browser not to evict our data
     if (this.pendingCount()) this.scheduleFlush(500); else this.status('idle');
     return { offline: false, empty: !(data.docs || []).length, values: Object.fromEntries(Object.keys(this.reg).map(c => [c, server[c] ? syncJoin(c, server[c]) : this.reg[c].init])) };
   },
@@ -4574,7 +4813,8 @@ const Sync = {
 
   // Forget everything stored on this device for this app (sign-out / different account).
   wipeLocal() {
-    for (const k of ['sync_meta', 'sync_outbox']) lsDel(k);
+    for (const k of ['sync_meta', 'sync_outbox', 'sync_outbox2']) lsDel(k);
+    Idb.clear(); _lsCacheOff.clear(); _lsMirrored.clear();
     try {
       const pre = APP_CONFIG.STORAGE_PREFIX;
       const keep = new Set(['session', 'email', 'profile', 'gtoken', 'gtoken_exp', 'oauth_state'].map(k => pre + k));
@@ -4595,6 +4835,7 @@ const Sync = {
 function useSynced(key, init) {
   const [val, set] = useStorage(lsKey(key), init);
   Sync.register(key, init, set);
+  Sync.latest[key] = val;
   useEffect(() => { Sync.capture(key, val); }, [val]);
   return [val, set];
 }
@@ -4853,8 +5094,7 @@ function useStorage(key, init) {
   const set = useCallback(v => {
     setVal(prev => {
       const next = typeof v === 'function' ? v(prev) : v;
-      try { localStorage.setItem(key, JSON.stringify(next)); }
-      catch { try { localStorage.removeItem(key); } catch {} }   // never leave a stale copy behind
+      lsCacheWrite(key, next);   // localStorage if it fits, otherwise IndexedDB (never silently dropped)
       return next;
     });
   }, [key]);
@@ -10428,6 +10668,54 @@ function fmtWhen(ms) {
   return d.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
+// v5.24.0 — how full this device's browser storage is, and a one-tap way to free it.
+function LocalStoragePanel({ box, h, small }) {
+  const [info, setInfo] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  async function refresh() { try { setInfo(await Sync.localReport()); } catch {} }
+  useEffect(() => { refresh(); }, []);
+  async function free() {
+    setBusy(true); setNote('');
+    const r = await Sync.freeLocalCache();
+    setNote(r.error ? r.error : (r.freed ? `Freed about ${(r.freed / 1048576).toFixed(1)} MB.` : 'Nothing to free — the app copy already lives in the safe store.'));
+    await refresh(); setBusy(false);
+  }
+  const mb = (n) => (n / 1048576).toFixed(1) + ' MB';
+  const friendly = (k) => {
+    const pre = APP_CONFIG.STORAGE_PREFIX;
+    if (k.startsWith(pre)) return k.slice(pre.length);
+    if (LEGACY_LS_KEYS.includes(k)) return k + ' (old planner copy)';
+    return k;
+  };
+  const nearFull = info && info.total > 3.8 * 1048576;
+  return (
+    <>
+      <div style={h}>This device’s storage</div>
+      <div style={box}>
+        {!info ? 'Checking…' : (
+          <>
+            <div style={{ fontWeight: 600, color: nearFull ? 'var(--red)' : 'var(--accent)' }}>
+              Browser storage: {mb(info.total)} used (the limit is usually about 5 MB){nearFull ? ' — getting full' : ''}
+            </div>
+            <div style={{ ...small, marginTop: 6 }}>
+              Unsent changes: {info.pending}. {info.idbOk ? 'Safe store ✓ — unsent changes are also kept in a second, much larger place on this device, so a full browser can’t lose a save.' : 'Safe store unavailable in this browser — keep the app open until it says ✓ Saved.'}
+              {info.persisted === true ? ' The browser has agreed not to clear this app’s data.' : ''}
+            </div>
+            {info.rows.length > 0 && (
+              <div style={{ ...small, marginTop: 6 }}>
+                Largest: {info.rows.slice(0, 4).map(r => `${friendly(r.k)} ${(r.len / 1024 < 1024 ? Math.round(r.len / 1024) + ' KB' : mb(r.len))}`).join(' · ')}
+              </div>
+            )}
+            <button className="modal-btn secondary" style={{ marginTop: 10 }} disabled={busy} onClick={free}>{busy ? 'Working…' : 'Free up space'}</button>
+            {note && <div style={{ ...small, marginTop: 6 }}>{note}</div>}
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
 function DataPanel({ me, refreshMe, suggestImport, onClose }) {
   const [files, setFiles] = useState(null);
   const [busy, setBusy] = useState('');
@@ -10497,6 +10785,8 @@ function DataPanel({ me, refreshMe, suggestImport, onClose }) {
             <div style={{ marginTop: 8 }}><button className="modal-btn primary" onClick={startSignIn}>Reconnect Google</button></div>
           </div>
         )}
+
+        <LocalStoragePanel box={box} h={h} small={small} />
 
         <div style={h}>Nightly backup to Google Drive</div>
         <div style={box}>
@@ -12225,7 +12515,13 @@ function App() {
       else { Sync.pull(); refreshGoogleSoon(); }
     }
     function onOnline() { Sync.flush({ manual: true }); Sync.pull(); }
+    // If changes exist only in memory (nowhere durable on this device), make closing the tab ask first.
+    function guardUnload(e) {
+      flushNow();
+      if (!Sync.isDurable()) { e.preventDefault(); e.returnValue = ''; return ''; }
+    }
     window.addEventListener('pagehide', flushNow);
+    window.addEventListener('beforeunload', guardUnload);
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('online', onOnline);
     const poll = setInterval(() => {
@@ -12235,6 +12531,7 @@ function App() {
     }, 30000);
     return () => {
       window.removeEventListener('pagehide', flushNow);
+      window.removeEventListener('beforeunload', guardUnload);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('online', onOnline);
       clearInterval(poll);
@@ -12353,7 +12650,9 @@ function App() {
               <span style={{fontSize:11,opacity:0.7,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{errDetail}</span>
             )}
             <span style={{fontSize:11,opacity:0.6}}>
-              {authError ? 'Sign in again to upload them.' : 'Your changes are saved on this device and will upload automatically — or tap Retry.'}
+              {authError ? 'Sign in again to upload them.'
+                : /storage/i.test(errDetail) ? 'Keep this app open — your changes are uploading now. Tap Retry if this doesn’t clear.'
+                : 'Your changes are saved on this device and will upload automatically — or tap Retry.'}
             </span>
           </div>
           <button
@@ -12455,7 +12754,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.23.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.24.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -14929,6 +15228,8 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   // Always-current ref to selectedId so flush fn closure never goes stale
   const selectedIdRef = useRef(selectedId);
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
+  const pagesRef = useRef(pagesData);   // v5.24.0: always the pages currently on screen
+  pagesRef.current = pagesData;
   const [wordCount, setWordCount] = useState(0);
   const [showNewMenu, setShowNewMenu] = useState(null); // null=closed, 'top'=top-level, folderId=folder menu
   const [expandedFolders, setExpandedFolders] = useState({});
@@ -14954,12 +15255,12 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       const html = getBodyHtml();
       if (!id || html == null) return;
       const now = new Date().toISOString();
-      // Write directly to local storage synchronously so the hide/close upload picks it up
+      // v5.24.0: build from the pages on screen, never from the localStorage copy — when that copy is missing
+      // (browser full) the old code started from an empty list and could queue the deletion of every page.
       try {
-        const stored = lsGet('pagesData');
-        const pages = stored ? JSON.parse(stored) : [];
-        const updated = pages.map(d => d.id === id ? {...d, body: html, lastModified: now} : d);
-        lsSet('pagesData', JSON.stringify(updated));
+        const updated = (pagesRef.current || []).map(d => d.id === id ? {...d, body: html, lastModified: now} : d);
+        if (lsGet('pagesData') != null) lsSet('pagesData', JSON.stringify(updated));   // keep the fast-start copy current, only if it exists
+        Sync.capture('pagesData', updated);
       } catch {}
       // Also update React state so the sync engine sees the change
       setPagesData(p => p.map(d => d.id === id ? {...d, body: html, lastModified: now} : d));
@@ -14975,9 +15276,9 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     if (!id || html == null) return;
     const now = new Date().toISOString();
     try {
-      const stored = lsGet('pagesData');
-      const pages = stored ? JSON.parse(stored) : [];
-      lsSet('pagesData', JSON.stringify(pages.map(d => d.id === id ? {...d, body: html, lastModified: now} : d)));
+      const updated = (pagesRef.current || []).map(d => d.id === id ? {...d, body: html, lastModified: now} : d);
+      if (lsGet('pagesData') != null) lsSet('pagesData', JSON.stringify(updated));
+      Sync.capture('pagesData', updated);
     } catch {}
     setPagesData(p => p.map(d => d.id === id ? {...d, body: html, lastModified: now} : d));
   }
