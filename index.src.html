@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.21.2 -->
+<!-- LP Planner v5.22.0 -->
+<!-- v5.22.0 — Week > Time blocks now shows 6am to midnight by default (was 7am to 8pm; still stretches for anything outside it). Fitness > Charts > Trends: the picker has a new "By subcategory" group that adds up every exercise tagged with that subcategory (Volume, Sets, Total reps for strength; Miles, Duration, Pace, Sessions for cardio; Sets, Duration, Sessions for a mix), with the member exercises listed under the picker. Single exercises work as before. No data change. -->
 <!-- v5.21.2 — Fitness: the Min and Sec boxes on cardio sets are wider (32px to 44px) so two-digit numbers show fully; header labels widened to match. -->
 <!-- v5.21.1 — Fitness > Charts: the Recent PRs card moved to the bottom of the tab, under Compare. -->
 <!-- v5.21.0 — Fitness > Charts: Recent PRs trimmed. One row per exercise (its latest PR, with every kind it set that day joined as Weight PR + Reps PR), only the last 30 days and at most 8 rows, with a Show older (n) button for the rest. Each row shows how long ago it was (today, 3d ago, 2w ago, 3mo ago) instead of a date. The PRs tile's "PRs this week" list is also one row per exercise; the tile count still counts every PR set. -->
@@ -9219,9 +9220,9 @@ function tbLayout(items) {
   flush();
   return res;
 }
-// Visible hour range: 7am–8pm, stretched to fit anything outside it
+// Visible hour range: 6am–midnight, stretched to fit anything outside it (v5.22.0: was 7am–8pm)
 function tbRangeOf(models) {
-  let lo = 7 * 60, hi = 20 * 60;
+  let lo = 6 * 60, hi = 24 * 60;
   models.forEach(m => m.items.forEach(i => { lo = Math.min(lo, i.start); hi = Math.max(hi, i.start + i.dur); }));
   return { h0: Math.max(0, Math.floor(lo / 60)), h1: Math.min(24, Math.ceil(hi / 60)) };
 }
@@ -12442,7 +12443,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.21.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.22.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -13100,11 +13101,22 @@ function FitnessCharts({ fitnessLog, fitnessExercises, goals, habitGoals, habitC
     Object.keys(fitnessLog || {}).forEach(dk => flDayExs(fitnessLog[dk]).forEach(ex => { if ((ex.sets || []).some(s => s && s.done)) ids.add(ex.exerciseId); }));
     return exs.filter(e => ids.has(e.id)).sort((a, b) => a.name.localeCompare(b.name));
   }, [fitnessLog, exs]);
-  const pickId = logged.some(e => e.id === exId) ? exId : fcLastExercise(fitnessLog, logged);
+  // v5.22.0: the picker can also report a whole subcategory (value 'sub:<key>'), adding up every exercise tagged with it
+  const loggedSubs = React.useMemo(() => ruleSubs(logged), [logged]);
+  const subPick = exId.startsWith('sub:') && loggedSubs.some(s => 'sub:' + ruleSubKey(s) === exId) ? exId : '';
+  const subIds = React.useMemo(() => subPick ? new Set(exs.filter(e => 'sub:' + ruleSubKey(e.subcategory) === subPick).map(e => e.id)) : null, [subPick, exs]);
+  const subExs = subIds ? exs.filter(e => subIds.has(e.id)) : [];
+  const subLabel = subPick ? (loggedSubs.find(s => 'sub:' + ruleSubKey(s) === subPick) || '') : '';
+  const pickId = subPick ? '' : (logged.some(e => e.id === exId) ? exId : fcLastExercise(fitnessLog, logged));
   const pickEx = exs.find(e => e.id === pickId);
-  const isCardio = !!pickEx && pickEx.category === 'Cardio';
-  const weekly = React.useMemo(() => fcWeekly(fitnessLog, id => id === pickId, weeks), [fitnessLog, pickId, weeks]);
-  const avail = fcAvail(weekly, isCardio);
+  const subCardio = subExs.filter(e => e.category === 'Cardio').length;
+  const isCardio = subPick ? (subExs.length > 0 && subCardio === subExs.length) : (!!pickEx && pickEx.category === 'Cardio');
+  const subMixed = !!subPick && subCardio > 0 && subCardio < subExs.length;
+  const weekly = React.useMemo(() => fcWeekly(fitnessLog, subIds ? (id => subIds.has(id)) : (id => id === pickId), weeks), [fitnessLog, pickId, subIds, weeks]);
+  // A subcategory adds things up (no Top weight / Est. 1RM, which only make sense for one lift); a mix of cardio and strength shares Sets, Duration and Sessions
+  const avail = subMixed
+    ? ['sets', 'mins', 'ses'].filter(k => weekly.some(b => { const v = FC_METRICS[k].get(b); return v !== null && v > 0; }))
+    : (subPick ? fcAvail(weekly, isCardio).filter(k => k !== 'top' && k !== 'orm') : fcAvail(weekly, isCardio));
   const mk = avail.includes(metricKey) ? metricKey : avail[0];
   const M = mk ? FC_METRICS[mk] : null;
   // goals
@@ -13155,14 +13167,22 @@ function FitnessCharts({ fitnessLog, fitnessExercises, goals, habitGoals, habitC
           <FcChips items={[{ k: 8, label: '8w' }, { k: 12, label: '12w' }, { k: 26, label: '26w' }]} value={range} onPick={setRange} />
         </div>
         {logged.length === 0 ? <div className="fc-empty">Finish a few sets and your trends show up here.</div> : (<>
-          <select className="fc-select" value={pickId} onChange={e => setExId(e.target.value)}>
-            {logged.map(e => <option key={e.id} value={e.id}>{e.name}{e.subcategory ? ` · ${e.subcategory}` : ''}</option>)}
+          <select className="fc-select" value={subPick || pickId} onChange={e => { setExId(e.target.value); setMetricKey(''); }}>
+            {loggedSubs.length > 0 && (
+              <optgroup label="By subcategory (all exercises added up)">
+                {loggedSubs.map(s => <option key={s} value={'sub:' + ruleSubKey(s)}>{s}</option>)}
+              </optgroup>
+            )}
+            <optgroup label="Single exercise">
+              {logged.map(e => <option key={e.id} value={e.id}>{e.name}{e.subcategory ? ` · ${e.subcategory}` : ''}</option>)}
+            </optgroup>
           </select>
+          {subPick && <div className="fc-sub-note" style={{ marginTop: 4 }}>{subLabel}: {subExs.map(e => e.name).join(', ')}</div>}
           {M ? (<>
             <FcChips items={avail.map(k => ({ k, label: FC_METRICS[k].label }))} value={mk} onPick={setMetricKey} />
             <FcChart labels={wlabels} series={[{ name: M.label, color: isCardio ? 'var(--teal)' : 'var(--accent)', values: weekly.map(M.get) }]} kind={M.kind} fmtVal={M.fmt} axFmt={M.ax} rev={M.rev} />
             {M.rev && <div className="fc-sub-note">Faster is higher.</div>}
-          </>) : <div className="fc-empty">Nothing logged for this exercise in the last {range} weeks.</div>}
+          </>) : <div className="fc-empty">Nothing logged for this {subPick ? 'subcategory' : 'exercise'} in the last {range} weeks.</div>}
         </>)}
       </section>
 
