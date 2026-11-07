@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.25.0 -->
+<!-- LP Planner v5.25.1 -->
+<!-- v5.25.1 — Goals: deleting a milestone now always asks for confirmation, including milestones with no tasks. -->
 <!-- v5.25.0 — Goals: new ⧉ Clone button on each milestone copies it and all its tasks (rules, checklists, dates kept; progress reset; tasks unscheduled) right below the original, under the same goal. -->
 <!-- v5.24.0 — Saving can no longer fail because the browser is full. The unsent-changes queue is now also kept in IndexedDB (hundreds of MB) as well as localStorage (~5 MB, shared by every app on this site); when localStorage is full the app drops its rebuildable cache copies to make room and parks them in IndexedDB; the red toast now only appears if neither place worked, and says so honestly; closing the tab with changes held only in memory asks first; uploads start sooner (0.8 s). Also fixes (1) a full browser could make Pages queue the deletion of every page, and (2) opening offline with no saved copy is refused instead of risking a mass delete. The old Drive-era planner's leftover copy in shared storage is parked in IndexedDB and cleared. New 'This device's storage' section in ☁ Data shows usage and has a Free up space button. -->
 <!-- v5.23.0 — Goals: the Hide rule / Show rule button on a milestone's "Completes automatically" section now remembers its state per milestone on this device, so a section you collapse stays collapsed when you come back. Still starts open for a milestone you have never collapsed, and opens again when you add or remove a rule. No data change. -->
@@ -11742,7 +11743,8 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
         <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)', minWidth: 34, textAlign: 'right' }}>{tasks.filter(t => t.done).length}/{tasks.length}</span>
         {onClone && <button className="gl-x" aria-label="Clone milestone" title="Clone this milestone and its tasks" onClick={onClone}>⧉</button>}
         <button className="gl-x" aria-label="Delete milestone" onClick={() => {
-          if (tasks.length && !window.confirm(`Delete "${m.title || 'this milestone'}" and its ${tasks.length} task${tasks.length === 1 ? '' : 's'}?`)) return;
+          // v5.25.1 — always confirm, even for a milestone with no tasks
+          if (!window.confirm(tasks.length ? `Delete "${m.title || 'this milestone'}" and its ${tasks.length} task${tasks.length === 1 ? '' : 's'}?` : `Delete "${m.title || 'this milestone'}"?`)) return;
           onDelete();
         }}>✕</button>
         </div>
@@ -12782,7 +12784,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.25.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.25.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
