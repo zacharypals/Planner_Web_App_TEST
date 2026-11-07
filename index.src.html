@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.24.0 -->
+<!-- LP Planner v5.25.0 -->
+<!-- v5.25.0 — Goals: new ⧉ Clone button on each milestone copies it and all its tasks (rules, checklists, dates kept; progress reset; tasks unscheduled) right below the original, under the same goal. -->
 <!-- v5.24.0 — Saving can no longer fail because the browser is full. The unsent-changes queue is now also kept in IndexedDB (hundreds of MB) as well as localStorage (~5 MB, shared by every app on this site); when localStorage is full the app drops its rebuildable cache copies to make room and parks them in IndexedDB; the red toast now only appears if neither place worked, and says so honestly; closing the tab with changes held only in memory asks first; uploads start sooner (0.8 s). Also fixes (1) a full browser could make Pages queue the deletion of every page, and (2) opening offline with no saved copy is refused instead of risking a mass delete. The old Drive-era planner's leftover copy in shared storage is parked in IndexedDB and cleared. New 'This device's storage' section in ☁ Data shows usage and has a Free up space button. -->
 <!-- v5.23.0 — Goals: the Hide rule / Show rule button on a milestone's "Completes automatically" section now remembers its state per milestone on this device, so a section you collapse stays collapsed when you come back. Still starts open for a milestone you have never collapsed, and opens again when you add or remove a rule. No data change. -->
 <!-- v5.22.0 — Week > Time blocks now shows 6am to midnight by default (was 7am to 8pm; still stretches for anything outside it). Fitness > Charts > Trends: the picker has a new "By subcategory" group that adds up every exercise tagged with that subcategory (Volume, Sets, Total reps for strength; Miles, Duration, Pace, Sessions for cardio; Sets, Duration, Sessions for a mix), with the member exercises listed under the picker. Single exercises work as before. No data change. -->
@@ -10971,6 +10972,19 @@ function glNewMilestone(g) {
   return { id: glId('ms'), title: '', startDate: start, dueDate: due, done: false, completedAt: null, tasks: [] };
 }
 
+// v5.25.0 — copy of a milestone with all its tasks, for the same goal. New ids everywhere; progress is reset
+// (not done, no completion stamps, no rule pauses) and tasks are unscheduled so nothing shows up twice in the week view.
+// Dates, rules, weight link, checklists and every other field are kept (deep-copied).
+function glCloneMilestone(m) {
+  const copy = JSON.parse(JSON.stringify(m));
+  const { completedAt, autoDone, ruleHold, metricHold, ...rest } = copy;
+  return { ...rest, id: glId('ms'), title: (m.title || 'Milestone') + ' (copy)', done: false, completedAt: null,
+    tasks: (copy.tasks || []).map(t => {
+      const { completedAt: _c, autoDone: _a, ruleHold: _h, ...tr } = t;
+      return { ...tr, id: glId('gt'), done: false, completedAt: null, scheduledDate: null };
+    }) };
+}
+
 function GlHealthPill({ h }) { return <span className={`gl-health ${h.key}`}>{h.label}</span>; }
 
 // ── Linked habits & training (v4.7.0) ──
@@ -11653,7 +11667,7 @@ function glRuleShutSet(id, shut) {
   lsSet('msRuleShut', JSON.stringify(mp));
 }
 // One milestone in the goal editor: header row plus (when open) its tasks.
-function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete, onGripDown, dragging }) {
+function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete, onClone, onGripDown, dragging }) {
   const today = glToday();
   const [newTask, setNewTask] = useState('');
   const [focusId, setFocusId] = useState(null);
@@ -11726,6 +11740,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
           <input type="date" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, borderColor: late ? 'var(--red)' : undefined }} aria-label="Milestone due date"
             value={m.dueDate || ''} onChange={e => onChange(mm => ({ ...mm, dueDate: e.target.value || null }))} />
         <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)', minWidth: 34, textAlign: 'right' }}>{tasks.filter(t => t.done).length}/{tasks.length}</span>
+        {onClone && <button className="gl-x" aria-label="Clone milestone" title="Clone this milestone and its tasks" onClick={onClone}>⧉</button>}
         <button className="gl-x" aria-label="Delete milestone" onClick={() => {
           if (tasks.length && !window.confirm(`Delete "${m.title || 'this milestone'}" and its ${tasks.length} task${tasks.length === 1 ? '' : 's'}?`)) return;
           onDelete();
@@ -11882,6 +11897,18 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, hab
     onChange(g => ({ ...g, milestones: [...(g.milestones || []), m] }));
     setOpenMs(o => ({ ...o, [m.id]: true }));
   }
+  function cloneMs(mid) {   // v5.25.0 — duplicate right below the original, opened so you can rename it
+    const src = (goal.milestones || []).find(x => x.id === mid);
+    if (!src) return;
+    const copy = glCloneMilestone(src);
+    onChange(g => {
+      const list = [...(g.milestones || [])];
+      const i = list.findIndex(x => x.id === mid);
+      list.splice(i < 0 ? list.length : i + 1, 0, copy);
+      return { ...g, milestones: list };
+    });
+    setOpenMs(o => ({ ...o, [copy.id]: true }));
+  }
   const healthText = h.key === 'done' ? 'Goal complete.'
     : h.key === 'parked' ? 'Parked — not counted against your active goals.'
     : h.key === 'upcoming' ? `Starts ${glShort(goal.startDate)}.`
@@ -11924,6 +11951,7 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, hab
                       onGripDown={ms.length > 1 ? (e => beginMsDrag(e, m.id)) : null}
                       onToggleOpen={() => setOpenMs(o => ({ ...o, [m.id]: !o[m.id] }))}
                       onChange={fn => setMs(m.id, fn)}
+                      onClone={() => cloneMs(m.id)}
                       onDelete={() => onChange(g => ({ ...g, milestones: (g.milestones || []).filter(x => x.id !== m.id) }))} />
                   </div>
                 </React.Fragment>
@@ -12754,7 +12782,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.24.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.25.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
