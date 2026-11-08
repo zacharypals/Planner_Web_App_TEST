@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.29.0 -->
+<!-- LP Planner v5.30.0 -->
+<!-- v5.30.0 — Goals: new Targets sub-tab. Yearly / monthly / weekly reading targets (books and/or pages) with progress and pace, plus a Reading log (title, author, pages, pages read so far, finish date defaulting to today and editable, summary / takeaways). Fitness goals are listed read-only with a link to the Fitness tab. New synced keys targets and targetLog (generic: entries carry a kind so other target types can reuse them). -->
 <!-- v5.29.0 — Goals timeline: goals now start collapsed (milestones and tasks hidden). Added "Expand all" and "Collapse all" buttons to the Timeline header. -->
 <!-- v5.28.1 — Habits: the "Link exercises" list in an expanded habit now starts collapsed. Open it with the header arrow; open habits are remembered per habit on this device (earlier collapse settings from v5.27.0 are not carried over). -->
 <!-- v5.28.0 — Habits (desktop sidebar): habit rows redesigned so names can be read. The color dot becomes a left color stripe, the name wraps onto up to as many lines as it needs, and the count and streak sit on a second line under it ("9 this month · streak"). The delete ✕ moved into the expanded panel as a Delete habit button (still undoable), and the color picker moved there too (a Color row at the top). -->
@@ -12178,7 +12179,249 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, hab
   );
 }
 
-function GoalsView({ goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
+// ═══ TARGETS (v5.30.0) ═══
+// Recurring weekly / monthly / yearly targets backed by a generic log. Progress is never stored on the target:
+// it is computed from the log for the current period. Only kind 'reading' has a UI so far; entries carry a `kind`
+// so other types (general counters) can reuse the same store.
+//   targets:   [{id, kind, period:'week'|'month'|'year', books, pages}]
+//   targetLog: [{id, kind, title, author, total, updates:[{date,pages}], finishedDate|null, notes}]
+function tgUid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function tgRange(period, ref) {
+  const d = parseLocal(ref) || new Date();
+  let s, e;
+  if (period === 'week') { s = getWeekStart(d); e = addDays(s, 6); }
+  else if (period === 'month') { s = new Date(d.getFullYear(), d.getMonth(), 1); e = new Date(d.getFullYear(), d.getMonth() + 1, 0); }
+  else { s = new Date(d.getFullYear(), 0, 1); e = new Date(d.getFullYear(), 11, 31); }
+  return { s: fmtLocal(s), e: fmtLocal(e), sd: s, ed: e };
+}
+function tgRead(x) { return (x.updates || []).reduce((a, u) => a + (Number(u.pages) || 0), 0); }
+function tgStats(target, log, ref) {
+  const r = tgRange(target.period, ref);
+  let books = 0, pages = 0;
+  (log || []).filter(x => x.kind === target.kind).forEach(x => {
+    if (x.finishedDate && x.finishedDate >= r.s && x.finishedDate <= r.e) books++;
+    (x.updates || []).forEach(u => { if (u.date >= r.s && u.date <= r.e) pages += Number(u.pages) || 0; });
+  });
+  const daysLeft = Math.max(1, Math.round((r.ed - (parseLocal(ref) || new Date())) / 86400000) + 1);
+  return { r, books, pages, daysLeft };
+}
+function tgPeriodLabel(period, r) {
+  if (period === 'year') return String(r.sd.getFullYear());
+  if (period === 'month') return MONTHS[r.sd.getMonth()] + ' ' + r.sd.getFullYear();
+  return 'Week of ' + MONTHS[r.sd.getMonth()].slice(0, 3) + ' ' + r.sd.getDate();
+}
+function tgPace(target, st) {
+  const out = [];
+  const wk = st.daysLeft / 7;
+  const remP = Math.max(0, (target.pages || 0) - st.pages);
+  const remB = Math.max(0, (target.books || 0) - st.books);
+  if (target.pages) {
+    if (!remP) out.push('Pages target met');
+    else if (target.period === 'week' || st.daysLeft < 7) out.push(`${remP.toLocaleString()} pages in ${st.daysLeft} day${st.daysLeft === 1 ? '' : 's'}`);
+    else out.push(`${Math.ceil(remP / wk).toLocaleString()} pages/week to finish on time`);
+  }
+  if (target.books) {
+    if (!remB) out.push('Books target met');
+    else if (target.period === 'year' && st.daysLeft >= 31) out.push(`${(remB / (st.daysLeft / 30.44)).toFixed(1)} books/month`);
+    else out.push(`${remB} book${remB === 1 ? '' : 's'} to go`);
+  }
+  return out.join(' · ');
+}
+
+function TargetsView({ targets, setTargets, targetLog, setTargetLog, fitnessGoals, fitnessExercises, onGoFitness }) {
+  const today = glToday();
+  const T = Array.isArray(targets) ? targets : [];
+  const L = Array.isArray(targetLog) ? targetLog : [];
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState({ period: 'year', books: '', pages: '' });
+  const [bookForm, setBookForm] = useState(null);
+  const [openId, setOpenId] = useState(null);
+  const [pageIn, setPageIn] = useState({});
+  const [finishId, setFinishId] = useState(null);
+  const [finishDate, setFinishDate] = useState(today);
+  const accent = 'var(--accent)';
+  const books = L.filter(x => x.kind === 'reading');
+  const reading = books.filter(x => !x.finishedDate);
+  const finished = books.filter(x => x.finishedDate).sort((a, b) => b.finishedDate.localeCompare(a.finishedDate));
+  const patchBook = (id, fn) => setTargetLog(l => (Array.isArray(l) ? l : []).map(x => x.id === id ? fn(x) : x));
+
+  function addTarget() {
+    const b = parseInt(draft.books, 10) || 0, p = parseInt(draft.pages, 10) || 0;
+    if (!b && !p) return;
+    setTargets(t => [...(Array.isArray(t) ? t : []), { id: tgUid(), kind: 'reading', period: draft.period, books: b, pages: p }]);
+    setDraft({ period: 'year', books: '', pages: '' }); setAdding(false);
+  }
+  function addBook() {
+    if (!bookForm || !(bookForm.title || '').trim()) return;
+    const read = parseInt(bookForm.read, 10) || 0;
+    setTargetLog(l => [...(Array.isArray(l) ? l : []), { id: tgUid(), kind: 'reading', title: bookForm.title.trim(), author: (bookForm.author || '').trim(),
+      total: parseInt(bookForm.total, 10) || 0, updates: read > 0 ? [{ date: today, pages: read }] : [], finishedDate: null, notes: '' }]);
+    setBookForm(null);
+  }
+  function logPages(x) {
+    const n = parseInt(pageIn[x.id], 10);
+    if (!n || n < 1) return;
+    patchBook(x.id, b => ({ ...b, updates: [...(b.updates || []), { date: today, pages: n }] }));
+    setPageIn(p => ({ ...p, [x.id]: '' }));
+  }
+  function finishBook(x) {
+    const rem = Math.max(0, (x.total || 0) - tgRead(x));
+    patchBook(x.id, b => ({ ...b, finishedDate: finishDate || today, updates: rem > 0 ? [...(b.updates || []), { date: finishDate || today, pages: rem }] : (b.updates || []) }));
+    setFinishId(null);
+  }
+  function delBook(x) { if (window.confirm(`Delete "${x.title}" from your reading log?`)) { setTargetLog(l => l.filter(b => b.id !== x.id)); setOpenId(null); } }
+
+  const lab = { fontSize: 12, color: 'var(--ink-light)' };
+  function bookEditor(x) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 0 4px' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input className="gl-input" style={{ flex: 2, minWidth: 140 }} placeholder="Title" value={x.title} onChange={e => patchBook(x.id, b => ({ ...b, title: e.target.value }))} />
+          <input className="gl-input" style={{ flex: 1, minWidth: 110 }} placeholder="Author" value={x.author || ''} onChange={e => patchBook(x.id, b => ({ ...b, author: e.target.value }))} />
+          <input className="gl-input" style={{ width: 90 }} type="number" min="0" placeholder="Pages" value={x.total || ''} onChange={e => patchBook(x.id, b => ({ ...b, total: parseInt(e.target.value, 10) || 0 }))} />
+          {x.finishedDate && <label style={{ ...lab, display: 'flex', alignItems: 'center', gap: 6 }}>Finished
+            <input className="gl-input" type="date" value={x.finishedDate} onChange={e => e.target.value && patchBook(x.id, b => ({ ...b, finishedDate: e.target.value }))} /></label>}
+        </div>
+        <textarea className="gl-input" rows={3} placeholder="Summary / takeaways" value={x.notes || ''} onChange={e => patchBook(x.id, b => ({ ...b, notes: e.target.value }))} style={{ resize: 'vertical' }} />
+        <div style={{ display: 'flex', gap: 8 }}>
+          {x.finishedDate && <button className="gl-btn" onClick={() => patchBook(x.id, b => ({ ...b, finishedDate: null }))}>Reopen</button>}
+          <button className="gl-btn danger" onClick={() => delBook(x)}>Delete</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="gl-wrap">
+      <main className="gl-main">
+        <section className="gl-card" style={{ padding: '14px 16px', flexShrink: 0, flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span className="gl-h2" style={{ fontSize: 20 }}>Reading targets</span>
+            <button className="gl-btn primary" onClick={() => setAdding(a => !a)}>{adding ? 'Cancel' : '+ New target'}</button>
+          </div>
+          {adding && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12, padding: 10, background: 'var(--cream)', borderRadius: 10 }}>
+              <select className="gl-input" value={draft.period} onChange={e => setDraft(d => ({ ...d, period: e.target.value }))}>
+                <option value="year">Yearly</option><option value="month">Monthly</option><option value="week">Weekly</option>
+              </select>
+              <input className="gl-input" style={{ width: 90 }} type="number" min="0" placeholder="Books" value={draft.books} onChange={e => setDraft(d => ({ ...d, books: e.target.value }))} />
+              <input className="gl-input" style={{ width: 100 }} type="number" min="0" placeholder="Pages" value={draft.pages} onChange={e => setDraft(d => ({ ...d, pages: e.target.value }))} />
+              <button className="gl-btn primary" onClick={addTarget}>Add</button>
+            </div>
+          )}
+          {!T.length && !adding && <div style={{ fontSize: 13, color: 'var(--ink-light)' }}>No targets yet. Add a yearly target such as 24 books or 8,000 pages.</div>}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            {T.filter(t => t.kind === 'reading').map(t => {
+              const st = tgStats(t, L, today);
+              const pb = t.books ? Math.min(1, st.books / t.books) : 0, pp = t.pages ? Math.min(1, st.pages / t.pages) : 0;
+              return (
+                <div key={t.id} style={{ flex: '1 1 260px', maxWidth: 380, border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: 'var(--paper)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>{({ year: 'Yearly', month: 'Monthly', week: 'Weekly' })[t.period]} reading</span>
+                    <span className="gl-mono" style={lab}>{tgPeriodLabel(t.period, st.r)}</span>
+                  </div>
+                  {t.books > 0 && <><div style={{ ...lab, marginTop: 8 }}>Books: <b style={{ color: 'var(--ink)' }}>{st.books}</b> of {t.books}</div>
+                    <div className="gl-bar" style={{ margin: '4px 0', background: glTint('#2d6b4a', 0.15) }}><div style={{ width: Math.round(pb * 100) + '%', background: accent }} /></div></>}
+                  {t.pages > 0 && <><div style={{ ...lab, marginTop: 8 }}>Pages: <b style={{ color: 'var(--ink)' }}>{st.pages.toLocaleString()}</b> of {t.pages.toLocaleString()}</div>
+                    <div className="gl-bar" style={{ margin: '4px 0', background: glTint('#c4960e', 0.18) }}><div style={{ width: Math.round(pp * 100) + '%', background: 'var(--gold)' }} /></div></>}
+                  <div style={{ ...lab, marginTop: 6 }}>{tgPace(t, st)}</div>
+                  <button className="gl-btn ghost" style={{ padding: '2px 0', marginTop: 4, fontSize: 12 }}
+                    onClick={() => window.confirm('Remove this target? Your reading log is kept.') && setTargets(ts => ts.filter(x => x.id !== t.id))}>Remove target</button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="gl-card" style={{ padding: '14px 16px', flexShrink: 0, flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <span className="gl-h2" style={{ fontSize: 20 }}>Reading log</span>
+            <button className="gl-btn primary" onClick={() => setBookForm(bookForm ? null : { title: '', author: '', total: '', read: '' })}>{bookForm ? 'Cancel' : '+ Add book'}</button>
+          </div>
+          {bookForm && (
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, padding: 10, background: 'var(--cream)', borderRadius: 10 }}>
+              <input className="gl-input" style={{ flex: 2, minWidth: 150 }} placeholder="Title" autoFocus value={bookForm.title} onChange={e => setBookForm(f => ({ ...f, title: e.target.value }))} />
+              <input className="gl-input" style={{ flex: 1, minWidth: 110 }} placeholder="Author (optional)" value={bookForm.author} onChange={e => setBookForm(f => ({ ...f, author: e.target.value }))} />
+              <input className="gl-input" style={{ width: 90 }} type="number" min="0" placeholder="Pages" value={bookForm.total} onChange={e => setBookForm(f => ({ ...f, total: e.target.value }))} />
+              <input className="gl-input" style={{ width: 110 }} type="number" min="0" placeholder="Read so far" value={bookForm.read} onChange={e => setBookForm(f => ({ ...f, read: e.target.value }))} />
+              <button className="gl-btn primary" onClick={addBook}>Add</button>
+            </div>
+          )}
+          {!books.length && !bookForm && <div style={{ fontSize: 13, color: 'var(--ink-light)' }}>No books logged yet.</div>}
+          {reading.length > 0 && <div className="gl-label" style={{ margin: '4px 0' }}>Reading now</div>}
+          {reading.map(x => {
+            const rd = tgRead(x), p = x.total ? Math.min(1, rd / x.total) : 0;
+            return (
+              <div key={x.id} style={{ borderTop: '1px solid var(--border)', padding: '10px 0' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
+                  <span style={{ fontWeight: 600, fontSize: 14, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
+                  <span className="gl-mono" style={lab}>{rd}{x.total ? ` / ${x.total}` : ''} pp</span>
+                </div>
+                {x.total > 0 && <div className="gl-bar" style={{ margin: '6px 0', background: glTint('#2d6b4a', 0.15) }}><div style={{ width: Math.round(p * 100) + '%', background: accent }} /></div>}
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <input className="gl-input" style={{ width: 90 }} type="number" min="1" placeholder="+ pages" value={pageIn[x.id] || ''}
+                    onChange={e => setPageIn(s => ({ ...s, [x.id]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && logPages(x)} />
+                  <button className="gl-btn" onClick={() => logPages(x)}>Log pages</button>
+                  {finishId === x.id ? (
+                    <>
+                      <input className="gl-input" type="date" value={finishDate} onChange={e => setFinishDate(e.target.value)} />
+                      <button className="gl-btn primary" onClick={() => finishBook(x)}>Confirm finished</button>
+                      <button className="gl-btn ghost" onClick={() => setFinishId(null)}>Cancel</button>
+                    </>
+                  ) : <button className="gl-btn" onClick={() => { setFinishId(x.id); setFinishDate(today); }}>Mark finished</button>}
+                </div>
+                {openId === x.id && bookEditor(x)}
+              </div>
+            );
+          })}
+          {finished.length > 0 && <div className="gl-label" style={{ margin: '10px 0 4px' }}>Finished · {finished.length}</div>}
+          {finished.map(x => (
+            <div key={x.id} style={{ borderTop: '1px solid var(--border)', padding: '8px 0' }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
+                <span style={{ color: 'var(--accent)' }}>✓</span>
+                <span style={{ fontWeight: 600, fontSize: 14, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
+                <span className="gl-mono" style={lab}>{x.total ? x.total + ' pp · ' : ''}{glShort(x.finishedDate)}</span>
+              </div>
+              {x.notes && openId !== x.id && <div style={{ ...lab, marginTop: 4, whiteSpace: 'pre-wrap', maxHeight: 40, overflow: 'hidden' }}>{x.notes}</div>}
+              {openId === x.id && bookEditor(x)}
+            </div>
+          ))}
+        </section>
+
+        <section className="gl-card" style={{ padding: '14px 16px', flexShrink: 0, flexDirection: 'column' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span className="gl-h2" style={{ fontSize: 20 }}>Fitness goals</span>
+            {onGoFitness && <button className="gl-btn" onClick={onGoFitness}>Open Fitness tab</button>}
+          </div>
+          {!(fitnessGoals || []).length && <div style={{ fontSize: 13, color: 'var(--ink-light)' }}>No fitness goals yet. Set them in the Fitness tab.</div>}
+          {(fitnessGoals || []).map(g => {
+            const ex = (fitnessExercises || []).find(e => e.id === g.exerciseId);
+            return <div key={g.id} style={{ borderTop: '1px solid var(--border)', padding: '7px 0', fontSize: 13, display: 'flex', justifyContent: 'space-between' }}>
+              <span>{ex ? ex.name : 'Exercise'}</span><span style={lab}>{g.period} · {g.target} {g.unit}</span></div>;
+          })}
+        </section>
+      </main>
+    </div>
+  );
+}
+
+// Goals tab shell: Goals (timeline) | Targets sub-tabs (v5.30.0)
+function GoalsView(props) {
+  const [sub, setSubRaw] = useState(() => lsGet('glSubTab') === 'targets' ? 'targets' : 'goals');
+  const setSub = v => { lsSet('glSubTab', v); setSubRaw(v); };
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <div className="gl-seg" role="tablist" aria-label="Goals sections" style={{ alignSelf: 'flex-start', margin: '12px 16px 0' }}>
+        <button role="tab" aria-selected={sub === 'goals'} className={sub === 'goals' ? 'on' : ''} onClick={() => setSub('goals')}>Goals</button>
+        <button role="tab" aria-selected={sub === 'targets'} className={sub === 'targets' ? 'on' : ''} onClick={() => setSub('targets')}>Targets</button>
+      </div>
+      {sub === 'goals' ? <GoalsMain {...props} /> : <TargetsView targets={props.targets} setTargets={props.setTargets} targetLog={props.targetLog} setTargetLog={props.setTargetLog}
+        fitnessGoals={props.fitnessGoals} fitnessExercises={props.fitnessExercises} onGoFitness={props.onGoFitness} />}
+    </div>
+  );
+}
+
+function GoalsMain({ goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const [statusTab, setStatusTab] = useState('active');
   const [sideCollapsed, setSideCollapsedRaw] = useState(() => lsGet('glSideCollapsed') === '1'); // desktop only; per device
@@ -12419,6 +12662,8 @@ function App() {
   const [fitnessExercises, setFitnessExercises] = useSynced('fitnessExercises', []); // [{id, name, category}] library
   const [fitnessCompare, setFitnessCompare] = useSynced('fitnessCompare', []); // v5.19.0 saved Fitness > Charts comparisons [{id,name,metric,untagged,groups:[{id,name,subs,exerciseIds}]}]
   const [fitnessGoals, setFitnessGoals] = useSynced('fitnessGoals', []); // [{id, exerciseId, period, target, unit}]
+  const [targets, setTargets] = useSynced('targets', []); // v5.30.0 [{id,kind,period,books,pages}] — see TARGETS section
+  const [targetLog, setTargetLog] = useSynced('targetLog', []); // v5.30.0 [{id,kind,title,author,total,updates:[{date,pages}],finishedDate,notes}]
   const [countdowns, setCountdowns] = useSynced('countdowns', []); // [{id, title, startDate, endDate, color}]
   const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
   // Weight / calorie readings and their targets, bundled for the goal views (v4.8.0)
@@ -12891,7 +13136,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.29.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.30.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -12993,6 +13238,8 @@ function App() {
         selectedId={selectedGoalId} setSelectedId={setSelectedGoalId}
         habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
         habitCompletions={habitCompletions} fitnessLog={fitnessLog}
+        targets={targets} setTargets={setTargets} targetLog={targetLog} setTargetLog={setTargetLog}
+        fitnessGoals={fitnessGoals} onGoFitness={()=>setPage('fitness')}
         onOpenPage={(id)=>{ setSelectedPagesId(id); setPage('pages'); }} />}
       </div>
 
