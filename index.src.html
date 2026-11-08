@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.28.0 -->
+<!-- LP Planner v5.28.1 -->
+<!-- v5.28.1 — Habits: the "Link exercises" list in an expanded habit now starts collapsed. Open it with the header arrow; open habits are remembered per habit on this device (earlier collapse settings from v5.27.0 are not carried over). -->
 <!-- v5.28.0 — Habits (desktop sidebar): habit rows redesigned so names can be read. The color dot becomes a left color stripe, the name wraps onto up to as many lines as it needs, and the count and streak sit on a second line under it ("9 this month · streak"). The delete ✕ moved into the expanded panel as a Delete habit button (still undoable), and the color picker moved there too (a Color row at the top). -->
 <!-- v5.27.0 — Fitness goal tiles (week, month and year) now show what it takes to finish: the amount left, the days left (today counts), and the per-day amount needed (plus a per-week figure when more than two weeks remain; sessions show per week). Habits: the "Link exercises" list inside an expanded habit can be collapsed with its header arrow; the state is remembered per habit on this device and the header shows how many exercises are linked. -->
 <!-- v5.26.0 — Habits > Metrics: the weight chart no longer drops real readings. The aggressive outlier filter (which discarded any weight far from the middle of a narrow range, and everything different when several readings matched) now only applies to Cal / Pts. Weight uses a loose typo check (under 50, or more than 40% from the median) and lists any hidden readings under the chart. The weight Y-axis now always fits every plotted reading plus the target. New 7d / 30d / 90d / All range buttons beside the date pickers (default view is still the last 21 days). -->
@@ -8123,14 +8124,14 @@ function HabitStreakChip({ goal, streak, completions }) {
 }
 
 // v5.27.0 — "Link exercises" list inside a habit's expanded section. The header arrow collapses it;
-// the state is remembered per habit on this device (localStorage 'habitExLinksShut'). Default is open.
-function habitExShutMap() { try { return JSON.parse(lsGet('habitExLinksShut') || '{}') || {}; } catch { return {}; } }
+// the habits you've opened are remembered on this device (localStorage 'habitExLinksOpen'). Default is collapsed (v5.28.1).
+function habitExOpenMap() { try { return JSON.parse(lsGet('habitExLinksOpen') || '{}') || {}; } catch { return {}; } }
 function HabitExerciseLinks({ goal, exercises, onChange }) {
-  const [shut, setShutRaw] = useState(() => !!habitExShutMap()[goal.id]);
+  const [shut, setShutRaw] = useState(() => !habitExOpenMap()[goal.id]);
   const setShut = v => setShutRaw(prev => {
     const next = typeof v === 'function' ? v(prev) : v;
-    const mp = habitExShutMap(); if (next) mp[goal.id] = true; else delete mp[goal.id];
-    lsSet('habitExLinksShut', JSON.stringify(mp));
+    const mp = habitExOpenMap(); if (next) delete mp[goal.id]; else mp[goal.id] = true;
+    lsSet('habitExLinksOpen', JSON.stringify(mp));
     return next;
   });
   const ids = goal.linkedExerciseIds || (goal.linkedExerciseId ? [goal.linkedExerciseId] : []);
@@ -12881,7 +12882,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.28.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.28.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
