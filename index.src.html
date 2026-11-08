@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.28.1 -->
+<!-- LP Planner v5.29.0 -->
+<!-- v5.29.0 — Goals timeline: goals now start collapsed (milestones and tasks hidden). Added "Expand all" and "Collapse all" buttons to the Timeline header. -->
 <!-- v5.28.1 — Habits: the "Link exercises" list in an expanded habit now starts collapsed. Open it with the header arrow; open habits are remembered per habit on this device (earlier collapse settings from v5.27.0 are not carried over). -->
 <!-- v5.28.0 — Habits (desktop sidebar): habit rows redesigned so names can be read. The color dot becomes a left color stripe, the name wraps onto up to as many lines as it needs, and the count and streak sit on a second line under it ("9 this month · streak"). The delete ✕ moved into the expanded panel as a Delete habit button (still undoable), and the color picker moved there too (a Color row at the top). -->
 <!-- v5.27.0 — Fitness goal tiles (week, month and year) now show what it takes to finish: the amount left, the days left (today counts), and the per-day amount needed (plus a per-week figure when more than two weeks remain; sessions show per week). Habits: the "Link exercises" list inside an expanded habit can be collapsed with its header arrow; the state is remembered per habit on this device and the header shows how many exercises are linked. -->
@@ -11388,7 +11389,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   const [zoom, setZoom] = useState(() => sessionStorage.getItem('lp_glZoom') || 'month');
   const [offset, setOffset] = useState(0);
   const [show, setShow] = useState('active');   // 'active' | 'all' | <goalId>
-  const [collapsed, setCollapsed] = useState({});
+  const [opened, setOpened] = useState({});   // v5.29.0 — goal ids whose milestones are showing (collapsed by default)
   const [msOpen, setMsOpen] = useState({});   // v5.15.0 — milestone ids whose tasks are showing (collapsed by default)
   const range = glRange(zoom, offset);
   const total = range.end - range.start;
@@ -11479,7 +11480,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   const rows = [];
   shown.forEach(g => {
     rows.push({ type: 'goal', g });
-    if (!collapsed[g.id]) (g.milestones || []).forEach(m => {
+    if (opened[g.id]) (g.milestones || []).forEach(m => {
       rows.push({ type: 'ms', g, m });
       if (msOpen[m.id]) (m.tasks || []).forEach(t => rows.push({ type: 'task', g, m, t }));
     });
@@ -11490,6 +11491,12 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
     ? `${MONTHS[range.start.getMonth()].slice(0, 3)} ${range.start.getDate()} – ${MONTHS[endCol.start.getMonth()].slice(0, 3)} ${endCol.start.getDate()}, ${endCol.start.getFullYear()}`
     : `${MONTHS[range.start.getMonth()].slice(0, 3)} ${range.start.getFullYear()} – ${MONTHS[endCol.start.getMonth()].slice(0, 3)} ${endCol.start.getFullYear()}`;
   function setZ(z) { sessionStorage.setItem('lp_glZoom', z); setZoom(z); setOffset(0); }
+  function expandAll() {   // v5.29.0
+    const o = {}, mo = {};
+    shown.forEach(g => { o[g.id] = true; (g.milestones || []).forEach(m => { mo[m.id] = true; }); });
+    setOpened(o); setMsOpen(mo);
+  }
+  function collapseAll() { setOpened({}); setMsOpen({}); }
 
   return (
     <section className="gl-card gl-desktop-only" style={{ overflow: 'hidden', flexShrink: 0 }}>
@@ -11506,6 +11513,8 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
               {goals.map(g => <option key={g.id} value={g.id}>{g.title || 'Untitled goal'}</option>)}
             </select>
           </label>
+          <button className="gl-btn" onClick={expandAll}>Expand all</button>
+          <button className="gl-btn" onClick={collapseAll}>Collapse all</button>
           <button className="gl-btn" aria-label="Earlier" onClick={() => setOffset(o => o - 1)}>‹</button>
           <button className="gl-btn" onClick={() => setOffset(0)}>Today</button>
           <button className="gl-btn" aria-label="Later" onClick={() => setOffset(o => o + 1)}>›</button>
@@ -11534,8 +11543,8 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
               </div>
             ) : r.type === 'goal' ? (
               <div key={r.g.id} className="gl-tl-row goal gl-tl-lab" style={{ background: glTint(r.g.color, 0.05) }}>
-                <button className="gl-caret" aria-label={collapsed[r.g.id] ? 'Expand' : 'Collapse'}
-                  onClick={() => setCollapsed(c => ({ ...c, [r.g.id]: !c[r.g.id] }))}>{collapsed[r.g.id] ? '▸' : '▾'}</button>
+                <button className="gl-caret" aria-label={opened[r.g.id] ? 'Collapse' : 'Expand'}
+                  onClick={() => setOpened(c => ({ ...c, [r.g.id]: !c[r.g.id] }))}>{opened[r.g.id] ? '▾' : '▸'}</button>
                 <span className="gl-dot" style={{ background: r.g.color }} />
                 <span className="t" style={{ fontWeight: 600, cursor: 'pointer', fontSize: 14 }} onClick={() => onOpenGoal(r.g.id)}>{r.g.title || 'Untitled goal'}</span>
                 <span className="gl-mono" style={{ fontSize: 11, color: 'var(--ink-light)' }}>{Math.round(glProgress(r.g) * 100)}%</span>
@@ -12882,7 +12891,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.28.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.29.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
