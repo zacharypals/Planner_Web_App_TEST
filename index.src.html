@@ -1,5 +1,7 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.26.0 -->
+<!-- LP Planner v5.28.0 -->
+<!-- v5.28.0 — Habits (desktop sidebar): habit rows redesigned so names can be read. The color dot becomes a left color stripe, the name wraps onto up to as many lines as it needs, and the count and streak sit on a second line under it ("9 this month · streak"). The delete ✕ moved into the expanded panel as a Delete habit button (still undoable), and the color picker moved there too (a Color row at the top). -->
+<!-- v5.27.0 — Fitness goal tiles (week, month and year) now show what it takes to finish: the amount left, the days left (today counts), and the per-day amount needed (plus a per-week figure when more than two weeks remain; sessions show per week). Habits: the "Link exercises" list inside an expanded habit can be collapsed with its header arrow; the state is remembered per habit on this device and the header shows how many exercises are linked. -->
 <!-- v5.26.0 — Habits > Metrics: the weight chart no longer drops real readings. The aggressive outlier filter (which discarded any weight far from the middle of a narrow range, and everything different when several readings matched) now only applies to Cal / Pts. Weight uses a loose typo check (under 50, or more than 40% from the median) and lists any hidden readings under the chart. The weight Y-axis now always fits every plotted reading plus the target. New 7d / 30d / 90d / All range buttons beside the date pickers (default view is still the last 21 days). -->
 <!-- v5.25.1 — Goals: deleting a milestone now always asks for confirmation, including milestones with no tasks. -->
 <!-- v5.25.0 — Goals: new ⧉ Clone button on each milestone copies it and all its tasks (rules, checklists, dates kept; progress reset; tasks unscheduled) right below the original, under the same goal. -->
@@ -1065,6 +1067,8 @@
     font-family: 'DM Sans', sans-serif; outline: none; color: var(--ink);
     min-width: 0;
   }
+  .goal-name-area { display: block; width: 100%; resize: none; overflow: hidden; padding: 0; line-height: 1.3; }
+  .goal-meta { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-light); margin-top: 2px; }
   .goal-count {
     font-family: 'DM Mono', monospace; font-size: 11px; color: var(--ink-light);
     background: var(--cream); padding: 2px 6px; border-radius: 10px; flex-shrink: 0;
@@ -8085,6 +8089,27 @@ function TaskCard({ task, onUpdate, onBlurSync, onBlurEdit, onDelete, onDeleteFu
   );
 }
 
+// v5.28.0 — habit name in the sidebar: a textarea that grows to fit so a long name wraps instead of being cut off.
+function HabitNameField({ value, onChange }) {
+  const ref = useRef(null);
+  const size = () => { const el = ref.current; if (el) { el.style.height = 'auto'; el.style.height = el.scrollHeight + 'px'; } };
+  useEffect(size, [value]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    let w = el.clientWidth;
+    const ro = new ResizeObserver(() => { if (el.clientWidth !== w) { w = el.clientWidth; size(); } });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <textarea ref={ref} rows={1} className="goal-name-input goal-name-area" value={value}
+      onChange={e => onChange(e.target.value.replace(/\n/g, ' '))}
+      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); e.target.blur(); } }}
+      onClick={e => e.stopPropagation()} />
+  );
+}
+
 // Streak badge: 🔥N (days) or 🔥Nw plus "2/3" this-week progress for × per week habits
 function HabitStreakChip({ goal, streak, completions }) {
   const wp = habitWeekProgress(goal, completions, new Date());
@@ -8094,6 +8119,51 @@ function HabitStreakChip({ goal, streak, completions }) {
       {wp && <span title="Done this week" style={{marginRight:4}}>{wp.done}/{wp.n}</span>}
       <span title={weekly ? 'Current streak (weeks)' : 'Current streak'} style={{color:'var(--gold)'}}>🔥{streak}{weekly ? 'w' : ''}</span>
     </>
+  );
+}
+
+// v5.27.0 — "Link exercises" list inside a habit's expanded section. The header arrow collapses it;
+// the state is remembered per habit on this device (localStorage 'habitExLinksShut'). Default is open.
+function habitExShutMap() { try { return JSON.parse(lsGet('habitExLinksShut') || '{}') || {}; } catch { return {}; } }
+function HabitExerciseLinks({ goal, exercises, onChange }) {
+  const [shut, setShutRaw] = useState(() => !!habitExShutMap()[goal.id]);
+  const setShut = v => setShutRaw(prev => {
+    const next = typeof v === 'function' ? v(prev) : v;
+    const mp = habitExShutMap(); if (next) mp[goal.id] = true; else delete mp[goal.id];
+    lsSet('habitExLinksShut', JSON.stringify(mp));
+    return next;
+  });
+  const ids = goal.linkedExerciseIds || (goal.linkedExerciseId ? [goal.linkedExerciseId] : []);
+  const linkedCount = ids.filter(id => exercises.some(e => e.id === id)).length;
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:3}}>
+      <button type="button" aria-expanded={!shut} aria-label={shut ? 'Show linked exercises' : 'Hide linked exercises'}
+        onClick={e=>{e.stopPropagation();setShut(v=>!v);}}
+        style={{display:'flex',alignItems:'center',gap:5,background:'none',border:'none',padding:'6px 0',minHeight:32,cursor:'pointer',
+          textAlign:'left',fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>
+        <span>{shut ? '▸' : '▾'}</span>
+        <span>Link exercises (any qualifies){linkedCount > 0 ? ` · ${linkedCount} linked` : ''}</span>
+      </button>
+      {!shut && (
+        <div style={{display:'flex',flexDirection:'column',gap:2,maxHeight:80,overflowY:'auto',
+          border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'var(--surface)'}}>
+          {exercises.map(e => (
+            <label key={e.id} style={{display:'flex',alignItems:'center',gap:5,cursor:'pointer',
+              fontSize:11,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}
+              onClick={ev=>ev.stopPropagation()}>
+              <input type="checkbox" checked={ids.includes(e.id)}
+                onChange={ev=>{
+                  ev.stopPropagation();
+                  const next = ev.target.checked ? [...ids, e.id] : ids.filter(x=>x!==e.id);
+                  onChange({linkedExerciseIds: next, linkedExerciseId: undefined});
+                }}
+                style={{margin:0,cursor:'pointer'}}/>
+              {e.name}
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -8517,35 +8587,38 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
             onDragOver={e=>{ e.preventDefault(); e.stopPropagation(); setDragOverGoalId(goal.id); }}
             onDrop={e=>{ e.preventDefault(); e.stopPropagation(); if(dragGoalId && dragGoalId!==goal.id) reorderGoals(dragGoalId, goal.id); setDragGoalId(null); setDragOverGoalId(null); }}
           >
-            {/* Main row */}
-            <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px 8px',cursor:'pointer'}}
+            {/* Main row (v5.28.0: color stripe, name wraps, count + streak on a second line) */}
+            <div style={{display:'flex',alignItems:'stretch',gap:8,padding:'6px 8px 6px 0',cursor:'pointer'}}
               onClick={()=>setFilterGoal(filterGoal===goal.id?null:goal.id)}
               title={filterGoal===goal.id?'Click to show all goals':'Click to filter by this goal'}>
-              <ColorPicker value={goal.color} onChange={c=>{updateGoal(goal.id,{color:c});}} />
+              <div aria-hidden="true" style={{width:4,flexShrink:0,alignSelf:'stretch',background:goal.color,borderRadius:2,marginLeft:4}} />
               <div className={`goal-check ${isCompleted(goal.id,selectedDayKey)?'checked':''}`}
-                style={{color:hcText(goal.color)}}
+                style={{color:hcText(goal.color),marginTop:1}}
                 onClick={e=>{e.stopPropagation();toggleCompletion(goal.id,selectedDayKey);}} />
-              <input className="goal-name-input" value={goal.name}
-                onChange={e=>updateGoal(goal.id,{name:e.target.value})}
-                onClick={e=>e.stopPropagation()} />
-              <span className="goal-count" style={{flexShrink:0}}>
-                {countInView(goal.id)}
-                <span style={{margin:'0 3px',opacity:0.6}}>·</span>
-                <HabitStreakChip goal={goal} streak={calcStreak(goal.id)} completions={completions} />
-              </span>
+              <div style={{flex:1,minWidth:0}}>
+                <HabitNameField value={goal.name} onChange={v=>updateGoal(goal.id,{name:v})} />
+                <div className="goal-meta">
+                  {countInView(goal.id)} {({daily:'today',weekly:'this week',monthly:'this month',yearly:'this year'})[view]||''}
+                  <span style={{margin:'0 4px',opacity:0.6}}>·</span>
+                  <HabitStreakChip goal={goal} streak={calcStreak(goal.id)} completions={completions} />
+                </div>
+              </div>
               <button
-                style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 2px',flexShrink:0}}
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:11,color:'var(--ink-faint)',padding:'0 4px',flexShrink:0,alignSelf:'flex-start',minHeight:24}}
                 onClick={e=>{e.stopPropagation();setExpandedGoals(ex=>({...ex,[goal.id]:!ex[goal.id]}));}}
-                title="Qty & notes">
+                title="Color, qty, notes and more">
                 {isExpanded ? '▲' : '▼'}
               </button>
-              <button className="delete-item-btn" style={{opacity:0}} onClick={e=>{e.stopPropagation();deleteGoal(goal.id);}}
-                onMouseEnter={e=>e.target.style.opacity=1} onMouseLeave={e=>e.target.style.opacity=0}>✕</button>
             </div>
             {/* Expanded section */}
             {isExpanded && (
               <div style={{padding:'4px 8px 8px 8px',display:'flex',flexDirection:'column',gap:6,borderTop:'1px solid var(--border)'}}
                 onClick={e=>e.stopPropagation()}>
+                {/* Color (moved here from the row in v5.28.0) */}
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Color:</span>
+                  <ColorPicker value={goal.color} onChange={c=>{updateGoal(goal.id,{color:c});}} />
+                </div>
                 {/* Schedule */}
                 <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
                   <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0}}>Weekly view:</span>
@@ -8559,32 +8632,9 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                 </div>
                 {/* How often (every day / certain days / × a week) + rest day */}
                 <HabitFreqEditor goal={goal} dayKey={selectedDayKey} onChange={patch=>updateGoal(goal.id, patch)} />
-                {/* Link to fitness exercise */}
+                {/* Link to fitness exercise (collapsible, v5.27.0) */}
                 {fitnessExercises && fitnessExercises.length > 0 && (
-                  <div style={{display:'flex',flexDirection:'column',gap:3}}>
-                    <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Link exercises (any qualifies):</span>
-                    <div style={{display:'flex',flexDirection:'column',gap:2,maxHeight:80,overflowY:'auto',
-                      border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'var(--surface)'}}>
-                      {fitnessExercises.map(e => {
-                        const ids = goal.linkedExerciseIds || (goal.linkedExerciseId ? [goal.linkedExerciseId] : []);
-                        const checked = ids.includes(e.id);
-                        return (
-                          <label key={e.id} style={{display:'flex',alignItems:'center',gap:5,cursor:'pointer',
-                            fontSize:11,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}
-                            onClick={ev=>ev.stopPropagation()}>
-                            <input type="checkbox" checked={checked}
-                              onChange={ev=>{
-                                const cur = goal.linkedExerciseIds || (goal.linkedExerciseId ? [goal.linkedExerciseId] : []);
-                                const next = ev.target.checked ? [...cur, e.id] : cur.filter(x=>x!==e.id);
-                                updateGoal(goal.id, {linkedExerciseIds: next, linkedExerciseId: undefined});
-                              }}
-                              style={{margin:0,cursor:'pointer'}}/>
-                            {e.name}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <HabitExerciseLinks goal={goal} exercises={fitnessExercises} onChange={patch=>updateGoal(goal.id, patch)} />
                 )}
                 {/* Multi-entry toggle */}
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
@@ -8615,6 +8665,14 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                     onChange={e=>setGoalNote(goal.id, e.target.value)}
                     onClick={e=>e.stopPropagation()}
                   />
+                </div>
+                {/* Delete (moved here from the row in v5.28.0; undo is offered afterwards) */}
+                <div style={{display:'flex',justifyContent:'flex-end',paddingTop:4}}>
+                  <button onClick={e=>{e.stopPropagation();deleteGoal(goal.id);}}
+                    style={{background:'none',border:'1px solid #fca5a5',borderRadius:4,cursor:'pointer',fontSize:11,color:'#ef4444',
+                            padding:'4px 10px',minHeight:28,fontFamily:"'DM Sans',sans-serif",fontWeight:600}}>
+                    Delete habit
+                  </button>
                 </div>
               </div>
             )}
@@ -9104,31 +9162,7 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                     <HabitFreqEditor goal={g} dayKey={fmt(date)} onChange={patch=>onRename(g.id, patch)} />
                   )}
                   {onRename && fitnessExercises && fitnessExercises.length > 0 && (
-                    <div style={{display:'flex',flexDirection:'column',gap:3}}>
-                      <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>Link exercises (any qualifies):</span>
-                      <div style={{display:'flex',flexDirection:'column',gap:2,maxHeight:80,overflowY:'auto',
-                        border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'var(--surface)'}}>
-                        {fitnessExercises.map(e => {
-                          const ids = g.linkedExerciseIds || (g.linkedExerciseId ? [g.linkedExerciseId] : []);
-                          const checked = ids.includes(e.id);
-                          return (
-                            <label key={e.id} style={{display:'flex',alignItems:'center',gap:5,cursor:'pointer',
-                              fontSize:11,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}
-                              onClick={ev=>ev.stopPropagation()}>
-                              <input type="checkbox" checked={checked}
-                                onChange={ev=>{
-                                  ev.stopPropagation();
-                                  const cur = g.linkedExerciseIds || (g.linkedExerciseId ? [g.linkedExerciseId] : []);
-                                  const next = ev.target.checked ? [...cur, e.id] : cur.filter(x=>x!==e.id);
-                                  onRename(g.id, {linkedExerciseIds: next, linkedExerciseId: undefined});
-                                }}
-                                style={{margin:0,cursor:'pointer'}}/>
-                              {e.name}
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </div>
+                    <HabitExerciseLinks goal={g} exercises={fitnessExercises} onChange={patch=>onRename(g.id, patch)} />
                   )}
                   {getQty && (
                     <>
@@ -12847,7 +12881,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.26.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.28.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -13990,7 +14024,43 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     const targetPace=Math.round((elapsedDays/totalDays)*goal.target*10)/10;
     const expectedAtPace=elapsedDays>0?Math.round((actual/elapsedDays*totalDays)*10)/10:0;
     const aheadBehind=actual-targetPace;
-    return {actual,periodPct,targetPace,expectedAtPace,aheadBehind,startDk,endDk};
+    // v5.27.0 — what it takes to finish. Today counts as a day to do the work (it may not be logged yet).
+    const todayDk=fmt(today);
+    const fromDk=todayDk>startDk?todayDk:startDk;
+    const daysLeft=endDk>=fromDk?Math.round((new Date(endDk+'T00:00:00')-new Date(fromDk+'T00:00:00'))/86400000)+1:0;
+    const remaining=Math.max(0,Math.round((goal.target-actual)*10)/10);
+    return {actual,periodPct,targetPace,expectedAtPace,aheadBehind,startDk,endDk,remaining,daysLeft};
+  }
+
+  // v5.27.0 — per-day (or per-week) amount needed to finish the goal in time.
+  const NEED_UNIT={reps:'reps',sets:'sets',volume:'vol',distance:'mi',sessions:'sessions'};
+  function goalNeed(goal, p) {
+    const {remaining,daysLeft}=p;
+    const whole=goal.unit==='reps'||goal.unit==='sets'||goal.unit==='sessions';
+    const up=n=>whole?Math.ceil(n-1e-9):Math.ceil(n*10-1e-9)/10;
+    const n1=n=>n.toLocaleString(undefined,{maximumFractionDigits:1});
+    const label=NEED_UNIT[goal.unit]||goal.unit;
+    if (remaining<=0) return {done:true};
+    if (daysLeft<=0) return {over:true,short:n1(remaining)+' '+label};
+    const perDay=remaining/daysLeft, perWeek=perDay*7;
+    if (goal.unit==='sessions') {
+      // a session is a day with a workout, so more than one a day is impossible
+      // under a week left, "21/wk" is misleading — say how many in how many days instead
+      if (daysLeft<7) return {main:n1(remaining)+' sessions in '+daysLeft+'d',brief:true,impossible:remaining>daysLeft};
+      return {main:n1(Math.ceil(perWeek*10-1e-9)/10)+' sessions/wk',week:null,left:n1(remaining)+' '+label,daysLeft,impossible:remaining>daysLeft};
+    }
+    return {main:n1(up(perDay))+' '+label+'/day',week:daysLeft>14?n1(up(perWeek))+'/wk':null,left:n1(remaining)+' '+label,daysLeft,impossible:false};
+  }
+  function renderNeed(need) {
+    if (!need||need.done) return null;
+    if (need.over) return <span style={{color:'var(--red)'}}>period ended · {need.short} short</span>;
+    return (
+      <span style={{color:'var(--ink-light)'}}>
+        need: <b style={{color:need.impossible?'var(--red)':'var(--ink)'}}>{need.main}</b>
+        {need.week&&<> (~{need.week})</>}
+        {!need.brief&&<>{' '}· {need.left} left, {need.daysLeft}d to go</>}{need.impossible&&' ⚠'}
+      </span>
+    );
   }
 
   // ── Stats helpers ────────────────────────────────────────────────────────
@@ -14031,8 +14101,9 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
 
   // ── Goal progress bar renderer (shared across views) ────────────────────
   function renderGoalBar(goal, refDate, showDelete) {
-    const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal,refDate);
+    const {actual,periodPct,targetPace,expectedAtPace,aheadBehind,remaining,daysLeft}=goalProgressFull(goal,refDate);
     const pct=Math.min(100,(actual/goal.target)*100),done=pct>=100,ahead=aheadBehind>=0;
+    const need=goalNeed(goal,{remaining,daysLeft});
     return (
       <div key={goal.id} style={{
         padding:'10px 12px', marginBottom:8,
@@ -14065,6 +14136,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             On pace for: <b style={{color:'var(--ink)'}}>{goal.unit==='sessions'?Math.round(expectedAtPace):expectedAtPace.toLocaleString()}</b> / {goal.target.toLocaleString()}
           </span>
         </div>
+        {renderNeed(need)&&<div style={{marginTop:3,fontSize:10,fontFamily:"'DM Mono',monospace"}}>{renderNeed(need)}</div>}
       </div>
     );
   }
@@ -14295,8 +14367,9 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                 <div key={name} style={{marginBottom:10}}>
                   <div style={{fontSize:10,fontFamily:"'DM Sans',sans-serif",fontWeight:700,color:'var(--ink)',marginBottom:4,paddingBottom:2,borderBottom:'1px solid var(--border)'}}>{name}</div>
                   {groups[name].map(goal=>{
-                    const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal, selectedDate);
+                    const {actual,periodPct,targetPace,expectedAtPace,aheadBehind,remaining,daysLeft}=goalProgressFull(goal, selectedDate);
                     const pct=Math.min(100,(actual/goal.target)*100),done=pct>=100,ahead=aheadBehind>=0;
+                    const need=goalNeed(goal,{remaining,daysLeft});
                     return (
                       <div key={goal.id} style={{marginBottom:6,padding:'6px 8px',background:'var(--surface)',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)',boxShadow:'0 1px 2px var(--shadow)'}}>
                         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:4}}>
@@ -14322,6 +14395,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                             <span style={{color:'var(--ink-light)'}}>should be: <b style={{color:ahead?'var(--accent)':'var(--red)'}}>{targetPace.toLocaleString()}</b></span>
                             <span>on pace for: <b style={{color:'var(--ink)'}}>{expectedAtPace.toLocaleString()}</b></span>
                           </div>
+                          {renderNeed(need)&&<div style={{marginTop:1}}>{renderNeed(need)}</div>}
                         </div>
                       </div>
                     );
@@ -14554,8 +14628,9 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                 </div>
               )}
               {yGoals.map(goal=>{
-                const {actual,periodPct,targetPace,expectedAtPace,aheadBehind}=goalProgressFull(goal,selectedDate);
+                const {actual,periodPct,targetPace,expectedAtPace,aheadBehind,remaining,daysLeft}=goalProgressFull(goal,selectedDate);
                 const pct=Math.min(100,(actual/goal.target)*100),done=pct>=100,ahead=aheadBehind>=0;
+                const need=goalNeed(goal,{remaining,daysLeft});
                 // Build monthly breakdown
                 const monthlyData=Array.from({length:12},(_,mi)=>{
                   const mStart=fmt(new Date(viewYear,mi,1)),mEnd=fmt(new Date(viewYear,mi+1,0));
@@ -14599,10 +14674,11 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                       <div style={{position:'absolute',top:0,left:0,height:'100%',width:`${periodPct}%`,background:'rgba(0,0,0,0.08)',borderRadius:5,zIndex:0}}/>
                       <div className={`fitness-goal-bar-fill ${done?'done':''}`} style={{width:`${Math.min(100,pct)}%`,height:'100%',borderRadius:5,position:'relative',zIndex:1}}/>
                     </div>
-                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:16,fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
+                    <div style={{display:'flex',justifyContent:'space-between',marginBottom:renderNeed(need)?4:16,fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
                       <span>Should be at: <b style={{color:ahead?'var(--accent)':'var(--red)'}}>{targetPace.toLocaleString()}</b></span>
                       <span>On pace for: <b style={{color:'var(--ink)'}}>{expectedAtPace.toLocaleString()}</b></span>
                     </div>
+                    {renderNeed(need)&&<div style={{marginBottom:16,fontSize:10,fontFamily:"'DM Mono',monospace"}}>{renderNeed(need)}</div>}
                     {/* Monthly bar chart */}
                     <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.05em'}}>Monthly breakdown</div>
                     <div style={{display:'flex',gap:3,alignItems:'flex-end',height:60}}>
