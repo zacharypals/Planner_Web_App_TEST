@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.37.0 -->
+<!-- LP Planner v5.37.1 -->
+<!-- v5.37.1 — Expanded task contents (Details, Time, Repeat, + List, Move to, etc.) now left-align with the tile's header (8px) instead of being indented 30px under the title. -->
 <!-- v5.37.0 — Pages tree: folder hues. Each top-level folder gets a color from the task-palette families; its subfolders inherit it and get stronger the deeper they nest, files are white cards, and a rule runs down each folder's contents. Folder icon is now a tappable color picker. Replaces the per-depth green/blue/amber tints; emoji icons replaced by SVG; dates/counts/chevrons raised to readable contrast. Design write-up: claude/pages-tree-color-options.md (option B). -->
 <!-- v5.36.1 — Fitness goals: fixed deleted / ended goals coming back. Auto-roll was cloning the latest earlier version whenever a period had no active one, which undid Delete and End. It now only rolls forward a version that has no end date. -->
 <!-- v5.36.0 — Fitness: goals can cover a whole subcategory. In Fitness › Goals › New goal, the exercise list now has a "Whole subcategory" group (e.g. Run (all)). Progress adds up every library exercise tagged with that subcategory (miles, reps, sets, volume or sessions), on a weekly / monthly / yearly period, with the same pace line, versions, auto-roll and week / month / year tiles as single-exercise goals. -->
@@ -802,7 +803,7 @@
   }
   .task-mobile-delete-btn:active { background: #c0392b; }
   .task-details {
-    padding: 0 10px 10px 30px; border-top: 1px solid rgba(0,0,0,0.04);
+    padding: 0 10px 10px 8px; border-top: 1px solid rgba(0,0,0,0.04);
   }
   .task-details-input {
     width: 100%; border: none; background: transparent; font-size: 11.5px;
@@ -13372,7 +13373,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.37.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.37.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
