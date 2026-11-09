@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.36.1 -->
+<!-- LP Planner v5.37.0 -->
+<!-- v5.37.0 — Pages tree: folder hues. Each top-level folder gets a color from the task-palette families; its subfolders inherit it and get stronger the deeper they nest, files are white cards, and a rule runs down each folder's contents. Folder icon is now a tappable color picker. Replaces the per-depth green/blue/amber tints; emoji icons replaced by SVG; dates/counts/chevrons raised to readable contrast. Design write-up: claude/pages-tree-color-options.md (option B). -->
 <!-- v5.36.1 — Fitness goals: fixed deleted / ended goals coming back. Auto-roll was cloning the latest earlier version whenever a period had no active one, which undid Delete and End. It now only rolls forward a version that has no end date. -->
 <!-- v5.36.0 — Fitness: goals can cover a whole subcategory. In Fitness › Goals › New goal, the exercise list now has a "Whole subcategory" group (e.g. Run (all)). Progress adds up every library exercise tagged with that subcategory (miles, reps, sets, volume or sessions), on a weekly / monthly / yearly period, with the same pace line, versions, auto-roll and week / month / year tiles as single-exercise goals. -->
 <!-- v5.35.1 — Project detail: the back link now reads "‹ All projects". -->
@@ -1822,7 +1823,7 @@
     color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .pages-list-item-date {
-    font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-faint); margin-top: 2px;
+    font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-light); margin-top: 2px;
   }
   .pages-list-item-taskcount {
     font-family: 'DM Sans', sans-serif; font-size: 10px; font-weight: 600;
@@ -1849,7 +1850,7 @@
   .pages-folder-row.folder-hover-target { background: var(--accent-light); outline: 2px solid var(--accent); outline-offset:-2px; border-radius:8px; }
   .pages-folder-toggle {
     background: none; border: none; cursor: pointer; padding: 0 3px;
-    font-size: 10px; color: var(--ink-faint); flex-shrink: 0; line-height: 1;
+    font-size: 10px; color: inherit; opacity: 0.75; flex-shrink: 0; line-height: 1;
   }
   .pages-folder-name {
     font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600;
@@ -1883,6 +1884,39 @@
   }
   .pages-list-item:hover .pages-doc-delete-btn { opacity: 0.6; }
   .pages-doc-delete-btn:hover { opacity: 1 !important; color: #ef4444; }
+
+  /* v5.37.0 — Pages tree "folder hues" (option B in claude/pages-tree-color-options.md).
+     --h is the top-level folder's hue (set inline on .pages-fb.fd0, inherited by everything inside it).
+     Level = how strong the folder row is (top level strongest, then lighter); type = folder rows are tinted,
+     files are white cards; which-folder = the hue + the rule down the folder's contents. */
+  .pages-fb { --hr: color-mix(in oklab, var(--h) var(--fhue-mixp), var(--fhue-mix)); }
+  .pages-fb.fd0 { background: color-mix(in oklab, var(--h) 24%, var(--paper)); border: 1px solid color-mix(in oklab, var(--h) 70%, var(--paper)); border-radius: 12px; margin: 6px 0; }
+  .pages-fb.fd0 > .pages-folder-row { background: var(--h); border-radius: 11px 11px 0 0; margin: 0; min-height: 36px; }
+  .pages-fb.fd0.closed > .pages-folder-row { border-radius: 11px; }
+  .pages-fb.fd1, .pages-fb.fd2 { margin: 2px 0; }
+  .pages-fb.fd1 > .pages-folder-row { background: color-mix(in oklab, var(--h) 55%, var(--paper)); }
+  .pages-fb.fd2 > .pages-folder-row { background: color-mix(in oklab, var(--h) 32%, var(--paper)); }
+  .pages-fc { position: relative; padding: 4px 6px 6px 16px; }
+  .pages-fc::before { content: ""; position: absolute; left: 7px; top: 4px; bottom: 6px; width: 3px; border-radius: 2px; background: var(--hr); }
+  .pages-fb .pages-folder-row.swipe-reveal { background: #fef2f2; }
+  [data-theme="dark"] .pages-fb .pages-folder-row.swipe-reveal { background: #381f1b; }
+  .pages-fb > .pages-folder-row.folder-hover-target { background: var(--accent-light); }
+  .pages-fb .pages-folder-add-btn { color: var(--ink); opacity: 0.75; }
+  .pages-fb .pages-folder-add-btn:hover { opacity: 1; }
+  .pages-folder-count { font-family: 'DM Mono', monospace; font-size: 10px; margin-left: 4px; flex-shrink: 0; color: color-mix(in oklab, var(--ink) 78%, transparent); }
+  .pages-ic { width: 16px; height: 16px; flex-shrink: 0; }
+  .pages-folder-ic { color: var(--hr); }
+  .pages-doc-ic { color: var(--ink-light); margin-top: 1px; margin-right: 7px; }
+  .pages-folder-ic-btn { background: none; border: none; padding: 0; margin: 0 4px 0 0; display: flex; cursor: pointer; border-radius: 4px; flex-shrink: 0; }
+  .pages-folder-ic-btn.static { cursor: default; }
+  .pages-list-item.pages-doc { background: var(--doc-card); border: 1px solid var(--doc-card-border); margin: 3px 0; }
+  .pages-fb .pages-list-item.pages-doc { border-color: color-mix(in oklab, var(--h) 50%, var(--paper)); }
+  .pages-list-item.pages-doc:hover { background: var(--cream); }
+  .pages-list-item.pages-doc.active { border-color: var(--accent); background: var(--doc-card); box-shadow: inset 3px 0 0 var(--accent), 0 1px 5px var(--shadow-lg); }
+  .pages-list-item.pages-doc.active .pages-list-item-title { font-weight: 700; }
+  .pages-hue-pop { position: absolute; z-index: 100; top: 100%; left: 0; margin-top: 4px; padding: 8px; background: var(--paper); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.18); display: grid; grid-template-columns: repeat(4, 28px); gap: 6px; }
+  .pages-hue-sw { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
+  .pages-hue-sw.on { border-color: var(--ink); }
 
   /* ── Main editor area ── */
   .pages-main {
@@ -2140,6 +2174,10 @@
   :root {
     --card-border: 1px solid var(--border);
     --card-shadow: 0 1px 3px rgba(35,30,51,0.07);
+    /* v5.37.0 Pages tree folder hues (task-palette families: periwinkle, apricot, sea glass, rose, violet, sage, butter, dusty mauve) */
+    --fhue-0: #b5d4fc; --fhue-1: #f8d4a4; --fhue-2: #a6ded2; --fhue-3: #f9c1bf; --fhue-4: #d3c1eb; --fhue-5: #bcdfc2; --fhue-6: #f2e2a2; --fhue-7: #efc2da;
+    --fhue-mix: #1a1530; --fhue-mixp: 58%;
+    --doc-card: #ffffff; --doc-card-border: #dcd7ea;
   }
 
   /* ── Top bar: soft translucent tabs, ghost buttons ── */
@@ -2455,6 +2493,10 @@
     --tc-0: #1f542e; --tc-1: #6d323f; --tc-2: #5e4f07; --tc-3: #1f4a73; --tc-4: #4e3c6f; --tc-5: #683c0b; --tc-6: #005648; --tc-7: #5e3661; --tc-8: #3a5018; --tc-9: #6e3429; --tc-10: #005168; --tc-11: #515413; --tc-12: #673352; --tc-13: #684a09; --tc-14: #00555a; --tc-15: #6c371d; --tc-16: #384475; --tc-17: #6e3236; --tc-18: #5a4f12; --tc-19: #3e5520; --tc-20: #66402c; --tc-21: #005660;
     --ec-0: #582d42; --ec-1: #43345c; --ec-2: #223e61; --ec-3: #0b4834; --ec-4: #544310; --ec-5: #593215; --ec-6: #00474e; --ec-7: #4f2f51; --ec-8: #31441a; --ec-9: #5c2c31; --ec-10: #333962; --ec-11: #4e4612; --ec-12: #5b301c; --ec-13: #004845; --ec-14: #5a2c3c; --ec-15: #234725;
     --prio-bg: #4a2228;
+    /* v5.37.0 folder hues, dark: deep versions of the same families (dark-matched palette) */
+    --fhue-0: #274973; --fhue-1: #734c02; --fhue-2: #005549; --fhue-3: #6d3435; --fhue-4: #4e3965; --fhue-5: #2c5435; --fhue-6: #5a4f12; --fhue-7: #643651;
+    --fhue-mix: #ffffff; --fhue-mixp: 62%;
+    --doc-card: #1d1b25; --doc-card-border: #3d3856;
   }
   /* v4.5.0: task / event colors come from --tc-N / --ec-N (see taskBg/eventBg); custom colors keep a light dim */
   [data-theme="dark"] .task-ck { background: rgba(0,0,0,0.20); }
@@ -13330,7 +13372,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.36.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.37.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -15841,6 +15883,34 @@ function PagesQuill({ docId, html, apiRef, onInput, onFmt, onText, onGone }) {
   return <div ref={hostRef} className="pages-body" />;
 }
 
+// v5.37.0: Pages tree folder hues. Hue slot i maps to --fhue-i (light and dark values live in CSS).
+const FOLDER_HUE_NAMES = ['Periwinkle', 'Apricot', 'Sea glass', 'Rose', 'Violet', 'Sage', 'Butter', 'Dusty mauve'];
+function folderHueCounts(folders) {
+  const c = FOLDER_HUE_NAMES.map(() => 0);
+  (folders || []).forEach(f => { if (!f.parentFolderId && Number.isInteger(f.colorIndex)) c[f.colorIndex % c.length]++; });
+  return c;
+}
+function leastUsedFolderHue(counts) { // first unused hue; once all are used, the least-used (lowest slot on ties)
+  let best = 0;
+  for (let i = 1; i < counts.length; i++) if (counts[i] < counts[best]) best = i;
+  return best;
+}
+function PagesFolderIcon({ className }) {
+  return (
+    <svg className={'pages-ic ' + (className || '')} viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M1.5 4.2c0-.8.6-1.4 1.4-1.4h3.1l1.5 1.6h5.6c.8 0 1.4.6 1.4 1.4v6.2c0 .8-.6 1.4-1.4 1.4H2.9c-.8 0-1.4-.6-1.4-1.4V4.2z" fill="currentColor" />
+    </svg>
+  );
+}
+function PagesDocIcon({ className }) {
+  return (
+    <svg className={'pages-ic ' + (className || '')} viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4 1.8h5.2L13 5.6v7.8c0 .6-.4 1-1 1H4c-.6 0-1-.4-1-1V2.8c0-.6.4-1 1-1z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M9 1.8v3.8h4" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekData, setWeekData, selectedId, setSelectedId }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileView, setMobileView] = useState(() => selectedId ? 'editor' : 'list');
@@ -15866,6 +15936,21 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   const [swipeDeleteId, setSwipeDeleteId] = useState(null); // folder id being swiped to delete
   const swipeTouchStart = useRef(null); // {x, y} of touch start
   const longPressTimer = useRef(null); // timer for long-press rename
+  const [huePickerId, setHuePickerId] = useState(null); // top-level folder id whose hue picker is open
+  // v5.37.0: every top-level folder stores a hue. Folders made before this version get one here, picked the same
+  // deterministic way on every device (by order, then id) so two devices never disagree.
+  useEffect(() => {
+    if (!foldersData.some(f => !f.parentFolderId && !Number.isInteger(f.colorIndex))) return;
+    setFoldersData(fs => {
+      const counts = folderHueCounts(fs);
+      const picks = {};
+      fs.filter(f => !f.parentFolderId && !Number.isInteger(f.colorIndex))
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || String(a.id).localeCompare(String(b.id)))
+        .forEach(f => { const i = leastUsedFolderHue(counts); picks[f.id] = i; counts[i]++; });
+      if (!Object.keys(picks).length) return fs;
+      return fs.map(f => picks[f.id] !== undefined ? { ...f, colorIndex: picks[f.id] } : f);
+    });
+  }, [foldersData]); // eslint-disable-line
   const [dragOverId, setDragOverId] = useState(null);
   const [folderHoverTarget, setFolderHoverTarget] = useState(null);
   const folderHoverTimer = useRef(null);
@@ -15919,7 +16004,8 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     const id = 'folder_' + Date.now();
     const siblings = foldersData.filter(f => (f.parentFolderId || null) === (parentFolderId || null));
     const maxOrder = siblings.reduce((m, f) => Math.max(m, f.order ?? 0), -1);
-    setFoldersData(f => [...f, { id, name: 'New Folder', parentFolderId: parentFolderId || null, order: maxOrder + 1 }]);
+    const colorIndex = parentFolderId ? undefined : leastUsedFolderHue(folderHueCounts(foldersData)); // subfolders inherit their top folder's hue
+    setFoldersData(f => [...f, { id, name: 'New Folder', parentFolderId: parentFolderId || null, order: maxOrder + 1, ...(colorIndex !== undefined ? { colorIndex } : {}) }]);
     setExpandedFolders(e => ({...e, [id]: true, ...(parentFolderId ? {[parentFolderId]: true} : {})}));
     setEditingFolderId(id);
     setEditingFolderName('New Folder');
@@ -16239,18 +16325,10 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
     depth = depth || 0;
     const isAct = selectedId === doc.id;
     const isOver = dragOverId === doc.id;
-    const indentPx = depth > 0 ? 10 + depth * 14 : 10;
-    // Subtle depth tint: each level adds a touch of warm beige
-    // Each depth level gets a distinct pale hue (matches folder row tints below)
-    const depthBg = depth === 0 ? 'transparent'
-      : depth === 1 ? 'rgba(45,90,61,0.13)'    // pale green
-      : depth === 2 ? 'rgba(37,113,163,0.13)'  // pale blue
-      : depth === 3 ? 'rgba(180,100,0,0.07)'   // pale amber
-      : 'rgba(125,60,152,0.07)';               // pale purple
+    // v5.37.0: files are white cards; the folder's hue and guide rule (CSS, from the enclosing .pages-fb) show where they live
     return (
       <div key={doc.id}
-        className={`pages-list-item ${isAct ? 'active' : ''} ${isOver ? 'drag-over' : ''}`}
-        style={{ paddingLeft: indentPx, borderLeft: depth > 0 ? '2px solid var(--border)' : '3px solid transparent', background: isAct ? undefined : depthBg }}
+        className={`pages-list-item pages-doc ${isAct ? 'active' : ''} ${isOver ? 'drag-over' : ''}`}
         onClick={() => { setSelectedId(doc.id); setMobileView('editor'); }}
         draggable
         onDragStart={e => handleDragStartPages(e, 'doc', doc.id)}
@@ -16258,7 +16336,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
         onDragOver={e => handleDragOverPages(e, 'doc', doc.id)}
         onDrop={e => handleDropPages(e, 'doc', doc.id)}
       >
-        <span style={{fontSize:12, marginRight:5, opacity:0.85, flexShrink:0}}>📄</span>
+        <PagesDocIcon className="pages-doc-ic" />
         <div style={{flex:1, minWidth:0}}>
           <div className="pages-list-item-title">{doc.title || 'Untitled'}</div>
           <div className="pages-list-item-date">{fmtDocDate(doc.lastModified || doc.createdAt)}</div>
@@ -16290,20 +16368,18 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     const isEditingName = editingFolderId === folder.id;
     const isFolderMenuOpen = showNewMenu === folder.id;
-    const indentPx = depth * 14;
+    // v5.37.0: top-level folders carry a hue slot (--fhue-N); subfolders and files inherit it from the enclosing .pages-fb.fd0
+    const hue = depth === 0
+      ? (Number.isInteger(folder.colorIndex) ? folder.colorIndex % FOLDER_HUE_NAMES.length : Math.max(0, sortedFolders.findIndex(f => f.id === folder.id)) % FOLDER_HUE_NAMES.length)
+      : null;
+    const folderIcon = <PagesFolderIcon className="pages-folder-ic" />;
 
     return (
-      <div key={folder.id}>
+      <div key={folder.id}
+        className={`pages-fb fd${Math.min(depth, 2)} ${isExpanded ? '' : 'closed'}`}
+        style={depth === 0 ? { '--h': `var(--fhue-${hue})` } : undefined}>
         <div
           className={`pages-folder-row ${isOver ? 'drag-over' : ''} ${isHoverTarget ? 'folder-hover-target' : ''} ${swipeDeleteId === folder.id ? 'swipe-reveal' : ''}`}
-          style={{
-            paddingLeft: 6 + indentPx,
-            background: depth === 0 ? 'var(--cream)'
-              : depth === 1 ? 'rgba(45,90,61,0.20)'    // pale green
-              : depth === 2 ? 'rgba(37,113,163,0.20)'  // pale blue
-              : depth === 3 ? 'rgba(180,100,0,0.12)'   // pale amber
-              : 'rgba(125,60,152,0.12)',                // pale purple
-          }}
           draggable
           onDragStart={e => { e.stopPropagation(); handleDragStartPages(e, 'folder', folder.id); }}
           onDragEnd={handleDragEndPages}
@@ -16335,7 +16411,28 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
             onClick={e => { e.stopPropagation(); setExpandedFolders(ex => ({...ex, [folder.id]: !isExpanded})); }}>
             {isExpanded ? '▾' : '▸'}
           </button>
-          <span style={{fontSize:13, marginRight:4, flexShrink:0}}>📁</span>
+          {depth === 0 ? (
+            <div style={{position:'relative', display:'flex', flexShrink:0}}>
+              <button className="pages-folder-ic-btn" title="Folder color" aria-label={`Folder color: ${FOLDER_HUE_NAMES[hue]}`}
+                onClick={e => { e.stopPropagation(); setHuePickerId(id => id === folder.id ? null : folder.id); }}>
+                {folderIcon}
+              </button>
+              {huePickerId === folder.id && (
+                <>
+                  <div style={{position:'fixed',inset:0,zIndex:99}} onClick={e => { e.stopPropagation(); setHuePickerId(null); }} />
+                  <div className="pages-hue-pop" onClick={e => e.stopPropagation()}>
+                    {FOLDER_HUE_NAMES.map((name, i) => (
+                      <button key={i} className={`pages-hue-sw ${i === hue ? 'on' : ''}`} style={{'--sw': `var(--fhue-${i})`}}
+                        title={name} aria-label={name}
+                        onClick={e => { e.stopPropagation(); updateFolder(folder.id, { colorIndex: i }); setHuePickerId(null); }} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          ) : (
+            <span className="pages-folder-ic-btn static" title="Color follows the top-level folder">{folderIcon}</span>
+          )}
           {isEditingName ? (
             <input
               className="pages-folder-name-input"
@@ -16356,7 +16453,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
               {folder.name}
             </span>
           )}
-          <span style={{fontSize:10, color:'var(--ink-faint)', marginLeft:4, fontFamily:"'DM Mono',monospace", flexShrink:0}}>({docsInFolder.length + childFolders.length})</span>
+          <span className="pages-folder-count">({docsInFolder.length + childFolders.length})</span>
           <div style={{marginLeft:'auto', display:'flex', gap:2, flexShrink:0, position:'relative'}}>
             <button className="pages-folder-add-btn" title="New item in folder"
               onClick={e => { e.stopPropagation(); setShowNewMenu(isFolderMenuOpen ? null : folder.id); }}>+</button>
@@ -16389,8 +16486,12 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
             </div>
           )}
         </div>
-        {isExpanded && childFolders.map(child => renderFolderRow(child, depth + 1))}
-        {isExpanded && docsInFolder.map(doc => renderDocRow(doc, depth + 1))}
+        {isExpanded && (childFolders.length > 0 || docsInFolder.length > 0) && (
+          <div className="pages-fc">
+            {childFolders.map(child => renderFolderRow(child, depth + 1))}
+            {docsInFolder.map(doc => renderDocRow(doc, depth + 1))}
+          </div>
+        )}
       </div>
     );
   }
@@ -16437,7 +16538,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
               style={{paddingLeft:10}}
               onClick={() => { setSelectedId(doc.id); setMobileView('editor'); }}
             >
-              <span style={{fontSize:12, marginRight:5, opacity:0.85, flexShrink:0}}>📄</span>
+              <PagesDocIcon className="pages-doc-ic" />
               <div style={{flex:1, minWidth:0}}>
                 <div className="pages-list-item-title">{doc.title || 'Untitled'}</div>
                 <div className="pages-list-item-date">{fmtDocDate(doc.lastModified || doc.createdAt)}</div>
@@ -16495,7 +16596,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                   style={{paddingLeft:10}}
                   onClick={() => { setSelectedId(doc.id); setMobileView('editor'); }}
                 >
-                  <span style={{fontSize:12, marginRight:5, opacity:0.85, flexShrink:0}}>📄</span>
+                  <PagesDocIcon className="pages-doc-ic" />
                   <div style={{flex:1, minWidth:0}}>
                     <div className="pages-list-item-title">{doc.title || 'Untitled'}</div>
                     <div className="pages-list-item-date">{fmtDocDate(doc.lastModified || doc.createdAt)}</div>
