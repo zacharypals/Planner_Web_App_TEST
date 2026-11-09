@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.34.0 -->
+<!-- LP Planner v5.35.0 -->
+<!-- v5.35.0 — Goals tab: every goal now has a scope — Yearly (with a ‹ 2026 › switcher to look back or plan ahead), Time-bound (start and end dates, only counts progress inside them) or Open (no deadline). Filter chips Active / Completed / All: Active hides done and ended goals; another year always shows everything. Weekly / monthly goals are gone from the form (older ones are converted on read to time-bound). Projects can be linked to a Reading log book (Linked card): marking the project done marks the book finished, and goals update from the log. -->
 <!-- v5.34.0 — Goals tab restructure. Weekly / Monthly tabs are back to how they were before v5.30.0 (no target rows, no ◎ convert). Fitness goals are left to the Fitness tab (the read-only list is gone from the Goals tab). Renames inside the tab: the timeline sub-tab is now "Projects" and the former Targets sub-tab is now "Goals" (the top-level tab is still Goals). Goal tiles can be edited after creation (title, kind, period, repeat, book link, measure and amount). Goal kinds are General and Reading only. -->
 <!-- v5.33.0 — Targets have a type. Type a goal in Weekly or Monthly Goals as usual, then tap its ◎ to turn it into a target: General (check box), Reading (optionally linked to one book in the Reading log; pages or finish-the-book), or Fitness (exercise + amount + unit; creates a real goal in the Fitness tab). "◎ + target" under each list creates one directly. All kinds show in Goals › Targets. Old typed goals are untouched until you tap ◎. -->
 <!-- v5.32.0 — Targets now live inside the existing Weekly Goals and Monthly Goals lists instead of a separate sidebar block (v5.31.0 block removed). A weekly / monthly target shows as a row (◎) with a check box that ticks itself when the target is met (or by hand), progress text, and a tap-to-open panel with pace and quick +pages / finish for the book in progress. "◎ + target" under each list creates the same record that Goals › Targets shows; targets can repeat every period or be one-time. Yearly targets stay in Goals › Targets. -->
@@ -11964,7 +11965,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   );
 }
 
-function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
+function GlDetail({ books, goal, onChange, onDelete, onBack, pagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const linkWeekStart = getWeekStart(new Date());
   const [openMs, setOpenMs] = useState(() => { const n = glNextMilestone(goal); return n ? { [n.id]: true } : {}; });
@@ -12126,6 +12127,16 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, hab
               </select>
               {goal.notesPageId && pages.some(p => p.id === goal.notesPageId) && <button className="gl-btn" onClick={() => onOpenPage(goal.notesPageId)}>Open</button>}
             </div>
+            {((books || []).length > 0 || goal.bookId) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <select className="gl-input" value={goal.bookId || ''} aria-label="Linked reading log book"
+                  onChange={e => { const v = e.target.value || null; onChange(g => ({ ...g, bookId: v })); }}>
+                  <option value="">No reading log book</option>
+                  {(books || []).filter(b => !b.finishedDate || b.id === goal.bookId).map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
+                </select>
+                {goal.bookId && <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>When this project is marked done, the book is marked finished in your reading log.</span>}
+              </div>
+            )}
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
               <input type="checkbox" checked={!!goal.showCountdown} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }}
                 onChange={e => { const v = e.target.checked; onChange(g => ({ ...g, showCountdown: v })); }} />
@@ -12190,93 +12201,105 @@ function GlDetail({ goal, onChange, onDelete, onBack, pagesData, onOpenPage, hab
 //   targets:   [{id, kind, period:'week'|'month'|'year', books, pages}]
 //   targetLog: [{id, kind, title, author, total, updates:[{date,pages}], finishedDate|null, notes}]
 function tgUid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
-function tgRange(period, ref) {
-  const d = parseLocal(ref) || new Date();
-  let s, e;
-  if (period === 'week') { s = getWeekStart(d); e = addDays(s, 6); }
-  else if (period === 'month') { s = new Date(d.getFullYear(), d.getMonth(), 1); e = new Date(d.getFullYear(), d.getMonth() + 1, 0); }
-  else { s = new Date(d.getFullYear(), 0, 1); e = new Date(d.getFullYear(), 11, 31); }
-  return { s: fmtLocal(s), e: fmtLocal(e), sd: s, ed: e };
+// Goal scope (v5.35.0): 'year' (a calendar year, year: 2026) | 'range' (startDate..endDate) | 'open' (no dates, counts everything).
+// Records from v5.30–v5.34 used period/startKey/repeat; tgNorm maps them on read without rewriting saved data.
+function tgNorm(t) {
+  if (t.scope) return t;
+  if (t.period === 'week' || t.period === 'month') {
+    const d = parseLocal(t.startKey) || new Date();
+    const s0 = t.period === 'week' ? getWeekStart(d) : new Date(d.getFullYear(), d.getMonth(), 1);
+    const e0 = t.period === 'week' ? addDays(s0, 6) : new Date(d.getFullYear(), d.getMonth() + 1, 0);
+    return { ...t, scope: 'range', startDate: fmtLocal(s0), endDate: fmtLocal(e0) };
+  }
+  const d = parseLocal(t.startKey) || new Date();
+  return { ...t, scope: 'year', year: d.getFullYear() };
+}
+function tgSpan(t) {
+  if (t.scope === 'year') return { s: `${t.year}-01-01`, e: `${t.year}-12-31` };
+  if (t.scope === 'range') return { s: t.startDate || '0000-01-01', e: t.endDate || '9999-12-31' };
+  return { s: '0000-01-01', e: '9999-12-31' };
 }
 function tgRead(x) { return (x.updates || []).reduce((a, u) => a + (Number(u.pages) || 0), 0); }
-function tgStats(target, log, ref) {
-  const r = tgRange(target.period, ref);
+function tgStats(t, log, todayStr) {
+  const sp = tgSpan(t);
   let books = 0, pages = 0;
-  (log || []).filter(x => x.kind === 'reading' && (!target.logId || x.id === target.logId)).forEach(x => {
-    if (x.finishedDate && x.finishedDate >= r.s && x.finishedDate <= r.e) books++;
-    (x.updates || []).forEach(u => { if (u.date >= r.s && u.date <= r.e) pages += Number(u.pages) || 0; });
+  (log || []).filter(x => x.kind === 'reading' && (!t.logId || x.id === t.logId)).forEach(x => {
+    if (x.finishedDate && x.finishedDate >= sp.s && x.finishedDate <= sp.e) books++;
+    (x.updates || []).forEach(u => { if (u.date >= sp.s && u.date <= sp.e) pages += Number(u.pages) || 0; });
   });
-  const daysLeft = Math.max(1, Math.round((r.ed - (parseLocal(ref) || new Date())) / 86400000) + 1);
-  return { r, books, pages, daysLeft };
+  const hasEnd = t.scope !== 'open';
+  const ended = hasEnd && todayStr > sp.e;
+  const notStarted = hasEnd && todayStr < sp.s;
+  let daysLeft = 0;
+  if (hasEnd && !ended) { const from = todayStr > sp.s ? todayStr : sp.s; daysLeft = Math.round((parseLocal(sp.e) - parseLocal(from)) / 86400000) + 1; }
+  return { sp, books, pages, daysLeft, ended, notStarted, hasEnd };
 }
-function tgPeriodLabel(period, r) {
-  if (period === 'year') return String(r.sd.getFullYear());
-  if (period === 'month') return MONTHS[r.sd.getMonth()] + ' ' + r.sd.getFullYear();
-  return 'Week of ' + MONTHS[r.sd.getMonth()].slice(0, 3) + ' ' + r.sd.getDate();
+function tgScopeLabel(t) {
+  if (t.scope === 'year') return String(t.year);
+  if (t.scope === 'range') { const e = parseLocal(t.endDate); return `${glShort(t.startDate)} – ${glShort(t.endDate)}${e ? ', ' + e.getFullYear() : ''}`; }
+  return 'Open';
 }
-function tgPace(target, st) {
+function tgPace(t, st) {
+  if (!st.hasEnd || st.ended) return '';
   const out = [];
-  const wk = st.daysLeft / 7;
-  const remP = Math.max(0, (target.pages || 0) - st.pages);
-  const remB = Math.max(0, (target.books || 0) - st.books);
-  if (target.pages) {
-    if (!remP) out.push('Pages target met');
-    else if (target.period === 'week' || st.daysLeft < 7) out.push(`${remP.toLocaleString()} pages in ${st.daysLeft} day${st.daysLeft === 1 ? '' : 's'}`);
-    else out.push(`${Math.ceil(remP / wk).toLocaleString()} pages/week to finish on time`);
+  const remP = Math.max(0, (t.pages || 0) - st.pages);
+  const remB = Math.max(0, (t.books || 0) - st.books);
+  if (t.pages) {
+    if (!remP) out.push('Pages goal met');
+    else if (st.daysLeft < 7) out.push(`${remP.toLocaleString()} pages in ${st.daysLeft} day${st.daysLeft === 1 ? '' : 's'}`);
+    else out.push(`${Math.ceil(remP / (st.daysLeft / 7)).toLocaleString()} pages/week to finish on time`);
   }
-  if (target.books) {
-    if (!remB) out.push('Books target met');
-    else if (target.period === 'year' && st.daysLeft >= 31) out.push(`${(remB / (st.daysLeft / 30.44)).toFixed(1)} books/month`);
+  if (t.books) {
+    if (!remB) out.push('Books goal met');
+    else if (st.daysLeft >= 31) out.push(`${(remB / (st.daysLeft / 30.44)).toFixed(1)} books/month`);
     else out.push(`${remB} book${remB === 1 ? '' : 's'} to go`);
   }
   return out.join(' · ');
 }
-
-// ── Goal kinds: 'general' (a check box per period) | 'reading' ({logId?, mode:'pages'|'books'|'finish', books, pages}) ──
-// One place that answers "how is this target doing in the period containing ref"
-function tgProgress(t, L, ref) {
-  const r = tgRange(t.period, ref);
+// One place that answers "how is this goal doing today". status: 'done' | 'ended' | 'active'
+function tgProgress(t, L, todayStr) {
+  const st = tgStats(t, L, todayStr);
+  let met = false, label = '';
   if (t.kind === 'reading') {
-    const st = tgStats(t, L, ref);
+    met = tgMet(t, st);
     const bk = t.logId ? (L || []).find(x => x.id === t.logId) : null;
-    const label = t.mode === 'finish' ? (bk ? `${tgRead(bk)}${bk.total ? '/' + bk.total : ''} pp${st.books ? ' · finished' : ''}` : 'book not found')
+    label = t.mode === 'finish' ? (bk ? `${tgRead(bk)}${bk.total ? '/' + bk.total : ''} pp${st.books ? ' · finished' : ''}` : 'book not found')
       : [t.books ? `${st.books}/${t.books} books` : '', t.pages ? `${st.pages.toLocaleString()}/${t.pages.toLocaleString()} pp` : ''].filter(Boolean).join(' · ');
-    return { r, st, met: tgMet(t, st), label };
   }
-  return { r, met: false, label: '' };
+  const done = met || !!t.completed;
+  return { st, met, label, done, status: done ? 'done' : st.ended ? 'ended' : 'active' };
 }
 const TG_KIND_ICON = { general: '◎', reading: '📖' };
 
-function TgNewForm({ period, pickPeriod, refDate, existing, targetLog, setTargets, onDone }) {
-  const ex = existing || null;
+function TgNewForm({ existing, defaultYear, targetLog, setTargets, onDone }) {
+  const ex = existing ? tgNorm(existing) : null;
+  const yr = defaultYear || new Date().getFullYear();
   const [f, setF] = useState({
     title: ex ? (ex.title || '') : '', kind: ex ? (ex.kind === 'reading' ? 'reading' : 'general') : 'general',
-    period: ex ? ex.period : (period || 'year'), repeat: ex ? ex.repeat !== false : true,
+    scope: ex ? ex.scope : 'year', year: String(ex && ex.year ? ex.year : yr),
+    startDate: ex && ex.startDate ? ex.startDate : glToday(), endDate: ex && ex.endDate ? ex.endDate : fmtLocal(addDays(new Date(), 30)),
     logId: ex ? (ex.logId || '') : '', measure: ex ? (ex.mode === 'books' ? 'books' : ex.mode === 'finish' ? 'finish' : 'pages') : 'pages',
     amount: ex ? String((ex.mode === 'books' ? ex.books : ex.pages) || '') : '' });
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
   const books = (Array.isArray(targetLog) ? targetLog : []).filter(x => x.kind === 'reading' && (!x.finishedDate || x.id === f.logId));
   const inp = { fontSize: 13, padding: '5px 8px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--paper)', color: 'var(--ink)', minWidth: 0 };
   const small = { fontSize: 12, color: 'var(--ink-light)' };
+  const measureVal = f.logId ? (f.measure === 'finish' ? 'finish' : 'pages') : (f.measure === 'books' ? 'books' : 'pages');
   function save() {
     const title = f.title.trim();
     if (!title) return;
-    const p = pickPeriod ? f.period : period;
-    let rec = { kind: f.kind, title, period: p, repeat: f.repeat };
+    let rec = { kind: f.kind, title, scope: f.scope, year: null, startDate: null, endDate: null };
+    if (f.scope === 'year') { const y = parseInt(f.year, 10); if (!y) return; rec.year = y; }
+    if (f.scope === 'range') { if (!f.startDate || !f.endDate || f.endDate < f.startDate) return; rec.startDate = f.startDate; rec.endDate = f.endDate; }
     if (f.kind === 'reading') {
       const n = parseInt(f.amount, 10) || 0;
-      const mode = f.logId ? (f.measure === 'finish' ? 'finish' : 'pages') : (f.measure === 'books' ? 'books' : 'pages');
-      if (mode !== 'finish' && !n) return;
-      rec = { ...rec, logId: f.logId || '', mode, books: mode === 'books' ? n : 0, pages: mode === 'pages' ? n : 0 };
+      if (measureVal !== 'finish' && !n) return;
+      rec = { ...rec, logId: f.logId || '', mode: measureVal, books: measureVal === 'books' ? n : 0, pages: measureVal === 'pages' ? n : 0 };
     } else rec = { ...rec, logId: '', mode: '', books: 0, pages: 0 };
-    if (ex) {
-      setTargets(ts => ts.map(x => x.id === ex.id ? { ...x, ...rec, startKey: (p !== ex.period || !x.startKey) ? tgRange(p, fmtLocal(refDate)).s : x.startKey } : x));
-    } else {
-      setTargets(ts => [...(Array.isArray(ts) ? ts : []), { id: tgUid(), ...rec, startKey: tgRange(p, fmtLocal(refDate)).s }]);
-    }
+    if (ex) setTargets(ts => ts.map(x => x.id === ex.id ? { ...x, ...rec, period: undefined, startKey: undefined, repeat: undefined } : x));
+    else setTargets(ts => [...(Array.isArray(ts) ? ts : []), { id: tgUid(), ...rec }]);
     onDone(true);
   }
-  const measureVal = f.logId ? (f.measure === 'finish' ? 'finish' : 'pages') : (f.measure === 'books' ? 'books' : 'pages');
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
       <input style={inp} placeholder="Goal title…" autoFocus value={f.title} onChange={e => set('title', e.target.value)} onKeyDown={e => e.key === 'Enter' && save()} />
@@ -12284,9 +12307,15 @@ function TgNewForm({ period, pickPeriod, refDate, existing, targetLog, setTarget
         <select style={inp} value={f.kind} onChange={e => set('kind', e.target.value)}>
           <option value="general">General (check box)</option><option value="reading">Reading</option>
         </select>
-        {pickPeriod && <select style={inp} value={f.period} onChange={e => set('period', e.target.value)}>
-          <option value="week">Weekly</option><option value="month">Monthly</option><option value="year">Yearly</option></select>}
-        <label style={{ ...small, display: 'flex', alignItems: 'center', gap: 4 }}><input type="checkbox" checked={f.repeat} onChange={e => set('repeat', e.target.checked)} />Repeats each {f.period}</label>
+        <select style={inp} value={f.scope} onChange={e => set('scope', e.target.value)}>
+          <option value="year">Yearly</option><option value="range">Time-bound</option><option value="open">Open (no deadline)</option>
+        </select>
+        {f.scope === 'year' && <input style={{ ...inp, width: 80 }} type="number" min="2000" max="2100" value={f.year} onChange={e => set('year', e.target.value)} />}
+        {f.scope === 'range' && <>
+          <input style={inp} type="date" value={f.startDate} onChange={e => set('startDate', e.target.value)} />
+          <span style={small}>to</span>
+          <input style={inp} type="date" value={f.endDate} onChange={e => set('endDate', e.target.value)} />
+        </>}
       </div>
       {f.kind === 'reading' && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -12322,10 +12351,13 @@ function tgMet(t, st) {
 }
 function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // the "Goals" sub-tab (called Targets until v5.34.0)
   const today = glToday();
-  const T = Array.isArray(targets) ? targets : [];
+  const T = (Array.isArray(targets) ? targets : []).map(tgNorm);
   const L = Array.isArray(targetLog) ? targetLog : [];
+  const curYear = new Date().getFullYear();
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
+  const [year, setYear] = useState(curYear);
+  const [filter, setFilter] = useState('active');
   const [bookForm, setBookForm] = useState(null);
   const [openId, setOpenId] = useState(null);
   const [pageIn, setPageIn] = useState({});
@@ -12358,6 +12390,42 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
   function delBook(x) { if (window.confirm(`Delete "${x.title}" from your reading log?`)) { setTargetLog(l => l.filter(b => b.id !== x.id)); setOpenId(null); } }
 
   const lab = { fontSize: 12, color: 'var(--ink-light)' };
+
+  // Active hides done and ended goals; Completed shows done ones; All shows everything. Another year always shows all.
+  const status = t => tgProgress(t, L, today).status;
+  const visible = (t, yearly) => filter === 'all' || (yearly && year !== curYear) || (filter === 'completed' ? status(t) === 'done' : status(t) === 'active');
+  function tile(t) {
+    if (editId === t.id) return (
+      <div key={t.id} style={{ flex: '1 1 320px', maxWidth: 460, border: '2px solid var(--accent)', borderRadius: 12, padding: 12, background: 'var(--paper)' }}>
+        <TgNewForm existing={t} defaultYear={year} targetLog={targetLog} setTargets={setTargets} onDone={() => setEditId(null)} />
+      </div>);
+    const pr = tgProgress(t, L, today);
+    const st = pr.st;
+    const pb = t.books ? Math.min(1, st.books / t.books) : 0, pp = t.pages ? Math.min(1, st.pages / t.pages) : 0;
+    const tag = pr.status === 'done' ? '✓ Done' : pr.status === 'ended' ? 'Ended' : st.notStarted ? `Starts ${glShort(st.sp.s)}` : '';
+    return (
+      <div key={t.id} style={{ flex: '1 1 260px', maxWidth: 380, border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: 'var(--paper)', opacity: pr.status === 'active' ? 1 : 0.75 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+          <span style={{ fontWeight: 600, fontSize: 14, textDecoration: pr.status === 'done' ? 'line-through' : 'none' }}>{TG_KIND_ICON[t.kind] || '◎'} {tgTitle(t)}</span>
+          <span className="gl-mono" style={lab}>{t.scope === 'year' ? '' : tgScopeLabel(t)}</span>
+        </div>
+        {tag && <div style={{ ...lab, marginTop: 2, fontWeight: 600, color: pr.status === 'done' ? 'var(--accent)' : 'var(--ink-light)' }}>{tag}</div>}
+        {t.kind === 'general' && <label style={{ ...lab, display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+          <input type="checkbox" checked={!!t.completed} onChange={() => setTargets(ts => ts.map(x => x.id === t.id ? { ...tgNorm(x), completed: !t.completed } : x))} />Done</label>}
+        {t.kind === 'reading' && t.mode === 'finish' && <div style={{ ...lab, marginTop: 8 }}>{pr.label}</div>}
+        {t.kind === 'reading' && t.books > 0 && <><div style={{ ...lab, marginTop: 8 }}>Books: <b style={{ color: 'var(--ink)' }}>{st.books}</b> of {t.books}</div>
+          <div className="gl-bar" style={{ margin: '4px 0', background: glTint('#2d6b4a', 0.15) }}><div style={{ width: Math.round(pb * 100) + '%', background: accent }} /></div></>}
+        {t.kind === 'reading' && t.pages > 0 && <><div style={{ ...lab, marginTop: 8 }}>Pages{t.logId ? ' (one book)' : ''}: <b style={{ color: 'var(--ink)' }}>{st.pages.toLocaleString()}</b> of {t.pages.toLocaleString()}</div>
+          <div className="gl-bar" style={{ margin: '4px 0', background: glTint('#c4960e', 0.18) }}><div style={{ width: Math.round(pp * 100) + '%', background: 'var(--gold)' }} /></div></>}
+        {t.kind === 'reading' && t.mode !== 'finish' && <div style={{ ...lab, marginTop: 6 }}>{tgPace(t, st)}</div>}
+        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+          <button className="gl-btn ghost" style={{ padding: '2px 0', fontSize: 12 }} onClick={() => setEditId(t.id)}>Edit</button>
+          <button className="gl-btn ghost" style={{ padding: '2px 0', fontSize: 12 }}
+            onClick={() => window.confirm('Remove this goal? Your reading log is kept.') && setTargets(ts => ts.filter(x => x.id !== t.id))}>Remove</button>
+        </div>
+      </div>
+    );
+  }
   function bookEditor(x) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 0 4px' }}>
@@ -12381,52 +12449,50 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
     <div className="gl-wrap">
       <main className="gl-main">
         <section className="gl-card" style={{ padding: '14px 16px', flexShrink: 0, flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
             <span className="gl-h2" style={{ fontSize: 20 }}>Goals</span>
-            <button className="gl-btn primary" onClick={() => setAdding(a => !a)}>{adding ? 'Cancel' : '+ New goal'}</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div role="group" aria-label="Show" style={{ display: 'flex', gap: 6 }}>
+                {[['active', 'Active'], ['completed', 'Completed'], ['all', 'All']].map(([k, lbl]) => (
+                  <button key={k} className={`gl-chip ${filter === k ? 'on' : ''}`} aria-pressed={filter === k} onClick={() => setFilter(k)}>{lbl}</button>
+                ))}
+              </div>
+              <button className="gl-btn primary" onClick={() => setAdding(a => !a)}>{adding ? 'Cancel' : '+ New goal'}</button>
+            </div>
           </div>
           {adding && (
             <div style={{ marginBottom: 12, padding: 10, background: 'var(--cream)', borderRadius: 10 }}>
-              <TgNewForm period="year" pickPeriod refDate={new Date()} targetLog={targetLog} setTargets={setTargets} onDone={() => setAdding(false)} />
+              <TgNewForm defaultYear={year} targetLog={targetLog} setTargets={setTargets} onDone={() => setAdding(false)} />
             </div>
           )}
-          {!T.length && !adding && <div style={{ fontSize: 13, color: 'var(--ink-light)' }}>No goals yet. Add one, such as "Read 24 books this year".</div>}
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            {T.map(t => {
-              const ref = (t.repeat === false && t.startKey) ? t.startKey : today;
-              const pr = tgProgress(t, L, ref);
-              const st = pr.st;
-              const inP = pr.r.s <= today && today <= pr.r.e;
-              const manual = !!(t.done || {})[pr.r.s];
-              const checked = pr.met || manual;
-              const pb = st && t.books ? Math.min(1, st.books / t.books) : 0, pp = st && t.pages ? Math.min(1, st.pages / t.pages) : 0;
-              if (editId === t.id) return (
-                <div key={t.id} style={{ flex: '1 1 320px', maxWidth: 460, border: '2px solid var(--accent)', borderRadius: 12, padding: 12, background: 'var(--paper)' }}>
-                  <TgNewForm pickPeriod existing={t} refDate={new Date()} targetLog={targetLog} setTargets={setTargets} onDone={() => setEditId(null)} />
-                </div>);
-              return (
-                <div key={t.id} style={{ flex: '1 1 260px', maxWidth: 380, border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: 'var(--paper)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-                    <span style={{ fontWeight: 600, fontSize: 14, textDecoration: checked ? 'line-through' : 'none' }}>{TG_KIND_ICON[t.kind] || '◎'} {tgTitle(t)}</span>
-                    <span className="gl-mono" style={lab}>{({ year: 'Yearly', month: 'Monthly', week: 'Weekly' })[t.period]} · {tgPeriodLabel(t.period, pr.r)}</span>
-                  </div>
-                  {t.kind === 'general' && <label style={{ ...lab, display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                    <input type="checkbox" checked={manual} onChange={() => setTargets(ts => ts.map(x => x.id === t.id ? { ...x, done: { ...(x.done || {}), [pr.r.s]: !manual } } : x))} />Done this {t.period}</label>}
-                                    {t.kind === 'reading' && t.mode === 'finish' && <div style={{ ...lab, marginTop: 8 }}>{pr.label}</div>}
-                  {t.kind === 'reading' && t.books > 0 && <><div style={{ ...lab, marginTop: 8 }}>Books: <b style={{ color: 'var(--ink)' }}>{st.books}</b> of {t.books}</div>
-                    <div className="gl-bar" style={{ margin: '4px 0', background: glTint('#2d6b4a', 0.15) }}><div style={{ width: Math.round(pb * 100) + '%', background: accent }} /></div></>}
-                  {t.kind === 'reading' && t.pages > 0 && <><div style={{ ...lab, marginTop: 8 }}>Pages{t.logId ? ' (one book)' : ''}: <b style={{ color: 'var(--ink)' }}>{st.pages.toLocaleString()}</b> of {t.pages.toLocaleString()}</div>
-                    <div className="gl-bar" style={{ margin: '4px 0', background: glTint('#c4960e', 0.18) }}><div style={{ width: Math.round(pp * 100) + '%', background: 'var(--gold)' }} /></div></>}
-                  <div style={{ ...lab, marginTop: 6 }}>{inP && t.kind === 'reading' && t.mode !== 'finish' ? tgPace(t, tgStats(t, L, today)) : ''}{t.repeat === false ? ' · one time' : ''}</div>
-                  <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                    <button className="gl-btn ghost" style={{ padding: '2px 0', fontSize: 12 }} onClick={() => setEditId(t.id)}>Edit</button>
-                    <button className="gl-btn ghost" style={{ padding: '2px 0', fontSize: 12 }}
-                      onClick={() => window.confirm('Remove this goal? Your reading log is kept.') && setTargets(ts => ts.filter(x => x.id !== t.id))}>Remove</button>
-                  </div>
+          {!T.length && !adding && <div style={{ fontSize: 13, color: 'var(--ink-light)' }}>No goals yet. Add one, such as "Read 24 books in 2026".</div>}
+          {[
+            { key: 'year', title: null, list: T.filter(t => t.scope === 'year' && t.year === year) },
+            { key: 'range', title: 'Time-bound', list: T.filter(t => t.scope === 'range') },
+            { key: 'open', title: 'Open', list: T.filter(t => t.scope === 'open') },
+          ].map(grp => {
+            const shown = grp.list.filter(t => visible(t, grp.key === 'year'));
+            const hidden = grp.list.length - shown.length;
+            return (
+              <div key={grp.key} style={{ marginBottom: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 8px' }}>
+                  {grp.key === 'year' ? (
+                    <>
+                      <button className="gl-btn" aria-label="Previous year" onClick={() => setYear(y => y - 1)}>‹</button>
+                      <span className="gl-label" style={{ fontSize: 14 }}>{year} · Yearly</span>
+                      <button className="gl-btn" aria-label="Next year" onClick={() => setYear(y => y + 1)}>›</button>
+                      {year !== curYear && <button className="gl-btn ghost" onClick={() => setYear(curYear)}>This year</button>}
+                    </>
+                  ) : <span className="gl-label" style={{ fontSize: 14 }}>{grp.title}</span>}
+                  {hidden > 0 && <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>{hidden} hidden by filter</span>}
                 </div>
-              );
-            })}
-          </div>
+                {!shown.length && <div style={{ fontSize: 13, color: 'var(--ink-faint)' }}>{grp.list.length ? 'Nothing to show with this filter.' : grp.key === 'year' ? `No goals for ${year} yet.` : 'None.'}</div>}
+                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  {shown.map(t => tile(t))}
+                </div>
+              </div>
+            );
+          })}
         </section>
 
         <section className="gl-card" style={{ padding: '14px 16px', flexShrink: 0, flexDirection: 'column' }}>
@@ -12504,7 +12570,7 @@ function GoalsView(props) {
   );
 }
 
-function GoalsMain({ goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
+function GoalsMain({ targetLog, goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const [statusTab, setStatusTab] = useState('active');
   const [sideCollapsed, setSideCollapsedRaw] = useState(() => lsGet('glSideCollapsed') === '1'); // desktop only; per device
@@ -12617,7 +12683,7 @@ function GoalsMain({ goals, setGoals, pagesData, countdowns, setCountdowns, sele
 
       <main className="gl-main">
         {sel ? (
-          <GlDetail key={sel.id} goal={sel} pagesData={pagesData} onOpenPage={onOpenPage}
+          <GlDetail key={sel.id} books={(Array.isArray(targetLog) ? targetLog : []).filter(x => x.kind === 'reading')} goal={sel} pagesData={pagesData} onOpenPage={onOpenPage}
             habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
             habitCompletions={habitCompletions} fitnessLog={fitnessLog}
             onChange={fn => changeGoal(sel.id, fn)}
@@ -12749,6 +12815,33 @@ function App() {
   const [targetLog, setTargetLog] = useSynced('targetLog', []); // v5.30.0 [{id,kind,title,author,total,updates:[{date,pages}],finishedDate,notes}]
   const [countdowns, setCountdowns] = useSynced('countdowns', []); // [{id, title, startDate, endDate, color}]
   const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
+  // v5.35.0 — a Project linked to a reading-log book finishes that book when the project is marked done.
+  // b.autoDone[projectId] remembers it fired, so reopening the book by hand is not undone; it clears when the project is reopened.
+  useEffect(() => {
+    const linked = (goals || []).filter(g => g.bookId);
+    if (!linked.length) return;
+    setTargetLog(l => {
+      let changed = false;
+      const out = (Array.isArray(l) ? l : []).map(b => {
+        let nb = b;
+        linked.filter(g => g.bookId === b.id).forEach(g => {
+          const flag = (nb.autoDone || {})[g.id];
+          if (g.status === 'done' && !flag) {
+            const d = glToday();
+            const rem = Math.max(0, (nb.total || 0) - tgRead(nb));
+            nb = { ...nb, autoDone: { ...(nb.autoDone || {}), [g.id]: true } };
+            if (!nb.finishedDate) nb = { ...nb, finishedDate: d, updates: rem > 0 ? [...(nb.updates || []), { date: d, pages: rem }] : (nb.updates || []) };
+            changed = true;
+          } else if (g.status !== 'done' && flag) {
+            const ad = { ...(nb.autoDone || {}) }; delete ad[g.id];
+            nb = { ...nb, autoDone: ad }; changed = true;
+          }
+        });
+        return nb;
+      });
+      return changed ? out : l;
+    });
+  }, [goals]);
   // Weight / calorie readings and their targets, bundled for the goal views (v4.8.0)
   // v5.11.0: the fitness log and exercise library ride along so goal rules can read them
   const mctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty };
@@ -13219,7 +13312,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.34.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.35.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
