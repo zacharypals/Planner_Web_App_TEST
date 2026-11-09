@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.35.1 -->
+<!-- LP Planner v5.36.0 -->
+<!-- v5.36.0 — Fitness: goals can cover a whole subcategory. In Fitness › Goals › New goal, the exercise list now has a "Whole subcategory" group (e.g. Run (all)). Progress adds up every library exercise tagged with that subcategory (miles, reps, sets, volume or sessions), on a weekly / monthly / yearly period, with the same pace line, versions, auto-roll and week / month / year tiles as single-exercise goals. -->
 <!-- v5.35.1 — Project detail: the back link now reads "‹ All projects". -->
 <!-- v5.35.0 — Goals tab: every goal now has a scope — Yearly (with a ‹ 2026 › switcher to look back or plan ahead), Time-bound (start and end dates, only counts progress inside them) or Open (no deadline). Filter chips Active / Completed / All: Active hides done and ended goals; another year always shows everything. Weekly / monthly goals are gone from the form (older ones are converted on read to time-bound). Projects can be linked to a Reading log book (Linked card): marking the project done marks the book finished, and goals update from the log. -->
 <!-- v5.34.0 — Goals tab restructure. Weekly / Monthly tabs are back to how they were before v5.30.0 (no target rows, no ◎ convert). Fitness goals are left to the Fitness tab (the read-only list is gone from the Goals tab). Renames inside the tab: the timeline sub-tab is now "Projects" and the former Targets sub-tab is now "Goals" (the top-level tab is still Goals). Goal tiles can be edited after creation (title, kind, period, repeat, book link, measure and amount). Goal kinds are General and Reading only. -->
@@ -3369,6 +3370,21 @@ function ruleSubs(fitnessExercises) {
   const seen = {};
   (fitnessExercises || []).forEach(e => { const k = ruleSubKey(e.subcategory); if (k && !seen[k]) seen[k] = String(e.subcategory).trim(); });
   return Object.values(seen).sort((a, b) => a.localeCompare(b));
+}
+// v5.36.0 — a fitness goal can cover a whole subcategory: exerciseId is 'sub:<key>' (same key the Charts picker uses)
+// instead of a library exercise id. Everything keyed on exerciseId (versions, auto-roll, grouping) keeps working.
+function fgSubKey(id) { return typeof id === 'string' && id.startsWith('sub:') ? id.slice(4) : null; }
+function fgGoalMatches(goal, ex, library) {
+  const k = fgSubKey(goal.exerciseId);
+  if (k === null) return ex.exerciseId === goal.exerciseId;
+  const lib = (library || []).find(e => e.id === ex.exerciseId);
+  return !!lib && ruleSubKey(lib.subcategory) === k;
+}
+function fgGoalName(exerciseId, library) {
+  const k = fgSubKey(exerciseId);
+  if (k === null) return (library || []).find(e => e.id === exerciseId)?.name || 'Unknown';
+  const m = (library || []).find(e => ruleSubKey(e.subcategory) === k);
+  return (m ? String(m.subcategory).trim() : k) + ' (all)';
 }
 function glNewRule(source) {
   return source === 'habits'
@@ -13313,7 +13329,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.35.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.36.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -14442,7 +14458,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
       if (dk<startDk||dk>endDk) return;
       const exList=(raw&&raw[0]&&Array.isArray(raw[0].exercises))?raw.flatMap(w=>w.exercises||[]):(raw||[]);
       exList.forEach(ex=>{
-        if (ex.exerciseId!==goal.exerciseId) return;
+        if (!fgGoalMatches(goal, ex, fitnessExercises)) return;
         const doneSets=ex.sets.filter(s=>s.done);
         if (goal.unit==='sets') total+=doneSets.length;
         else if (goal.unit==='reps') total+=doneSets.reduce((a,s)=>a+(parseFloat(s.reps)||0),0);
@@ -14504,7 +14520,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
     const volume=doneSets.reduce((acc,s)=>{const r=parseFloat(s.reps)||0,w=parseFloat(s.weight)||0;return acc+(w>0?r*w:r);},0);
     return {done:doneSets.length,total:ex.sets.length,volume:Math.round(volume),hasWeight,totalReps:Math.round(totalReps)};
   }
-  function exName(exerciseId) { return fitnessExercises.find(e=>e.id===exerciseId)?.name||'Unknown'; }
+  function exName(exerciseId) { return fgGoalName(exerciseId, fitnessExercises); }
 
   // Parse "M:SS" or legacy decimal string → decimal minutes
   function parseTimeInput(val) {
@@ -14788,7 +14804,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           const PERIOD_ORDER={week:0,month:1,year:2};
           const groups={};
           activeGoals.forEach(g=>{
-            const name=fitnessExercises.find(e=>e.id===g.exerciseId)?.name||'Unknown';
+            const name=fgGoalName(g.exerciseId, fitnessExercises);
             if(!groups[name]) groups[name]=[];
             groups[name].push(g);
           });
@@ -15072,7 +15088,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                     if(dk<mStart||dk>mEnd) return;
                     const exList=(raw&&raw[0]&&Array.isArray(raw[0].exercises))?raw.flatMap(w=>w.exercises||[]):(raw||[]);
                     exList.forEach(ex=>{
-                      if(ex.exerciseId!==goal.exerciseId) return;
+                      if(!fgGoalMatches(goal, ex, fitnessExercises)) return;
                       ex.sets.filter(s=>s.done).forEach(s=>{
                         if(goal.unit==='sets') mTotal+=1;
                         else if(goal.unit==='reps') mTotal+=parseFloat(s.reps)||0;
@@ -15253,7 +15269,7 @@ function GoalManager({ goals, exercises, onAddVersion, onEdit, onEnd, onDelete, 
           {goals.length===0&&<div style={{fontSize:12,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px'}}>No goals yet</div>}
           {families.map(key => {
             const [eId, per] = key.split('|');
-            const exLabel = exercises.find(e=>e.id===eId)?.name||'Unknown';
+            const exLabel = fgGoalName(eId, exercises);
             const versions = goals.filter(g=>g.exerciseId===eId&&g.period===per)
               .sort((a,b)=>(b.startDate||'0').localeCompare(a.startDate||'0'));
             return (
@@ -15352,7 +15368,12 @@ function GoalManager({ goals, exercises, onAddVersion, onEdit, onEnd, onDelete, 
             <div style={{display:'flex',flexDirection:'column',gap:7}}>
               <select value={exId} onChange={e=>setExId(e.target.value)}
                 style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 8px',background:'var(--surface)',color:'var(--ink)',outline:'none'}}>
-                {exercises.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+                {ruleSubs(exercises).length>0&&<optgroup label="Whole subcategory (all exercises added up)">
+                  {ruleSubs(exercises).map(n=><option key={'sub:'+ruleSubKey(n)} value={'sub:'+ruleSubKey(n)}>{n} (all)</option>)}
+                </optgroup>}
+                <optgroup label="Single exercise">
+                  {exercises.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+                </optgroup>
               </select>
               <div style={{display:'flex',gap:6}}>
                 <select value={period} onChange={e=>setPeriod(e.target.value)}
