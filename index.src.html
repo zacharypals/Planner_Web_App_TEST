@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.35.0 -->
+<!-- LP Planner v5.35.1 -->
+<!-- v5.35.1 — Project detail: the back link now reads "‹ All projects". -->
 <!-- v5.35.0 — Goals tab: every goal now has a scope — Yearly (with a ‹ 2026 › switcher to look back or plan ahead), Time-bound (start and end dates, only counts progress inside them) or Open (no deadline). Filter chips Active / Completed / All: Active hides done and ended goals; another year always shows everything. Weekly / monthly goals are gone from the form (older ones are converted on read to time-bound). Projects can be linked to a Reading log book (Linked card): marking the project done marks the book finished, and goals update from the log. -->
 <!-- v5.34.0 — Goals tab restructure. Weekly / Monthly tabs are back to how they were before v5.30.0 (no target rows, no ◎ convert). Fitness goals are left to the Fitness tab (the read-only list is gone from the Goals tab). Renames inside the tab: the timeline sub-tab is now "Projects" and the former Targets sub-tab is now "Goals" (the top-level tab is still Goals). Goal tiles can be edited after creation (title, kind, period, repeat, book link, measure and amount). Goal kinds are General and Reading only. -->
 <!-- v5.33.0 — Targets have a type. Type a goal in Weekly or Monthly Goals as usual, then tap its ◎ to turn it into a target: General (check box), Reading (optionally linked to one book in the Reading log; pages or finish-the-book), or Fitness (exercise + amount + unit; creates a real goal in the Fitness tab). "◎ + target" under each list creates one directly. All kinds show in Goals › Targets. Old typed goals are untouched until you tap ◎. -->
@@ -12031,7 +12032,7 @@ function GlDetail({ books, goal, onChange, onDelete, onBack, pagesData, onOpenPa
     : `${h.p >= h.used ? 'Ahead of pace' : h.key === 'ontrack' ? 'Roughly on pace' : 'Behind pace'}${ms.some(m => glMsOverdue(m, today)) ? ', with an overdue milestone' : ''}.${h.daysLeft != null ? ` ${h.daysLeft} day${h.daysLeft === 1 ? '' : 's'} to target.` : ''}`;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <button className="gl-btn ghost" style={{ alignSelf: 'flex-start', paddingLeft: 0 }} onClick={onBack}>‹ All goals</button>
+      <button className="gl-btn ghost" style={{ alignSelf: 'flex-start', paddingLeft: 0 }} onClick={onBack}>‹ All projects</button>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
         <div className="gl-card" style={{ flex: '999 1 520px', minWidth: 0, overflow: 'visible' }}>
           <div style={{ height: 6, background: c, borderRadius: '16px 16px 0 0' }} />
@@ -13312,7 +13313,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.35.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.35.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
