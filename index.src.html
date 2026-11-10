@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.38.0 -->
+<!-- LP Planner v5.39.0 -->
+<!-- v5.39.0 — Fitness › Goals: the goal manager opens on the goal you tapped (pencil) with every other goal collapsed to one line; older targets sit under History and ended goals under Show ended goals. "Change target…" starts a new target from this period or the next, so earlier weeks keep the target that was active then (Save on a changed number still rewrites all of that version's weeks, with a warning). -->
 <!-- v5.38.0 — Goals › Reading log: each book in "Reading now" now shows the pages remaining after the pages read, e.g. "110 / 200 pp · 90 left" (hidden once you reach the total or if no page count is set). -->
 <!-- v5.37.1 — Expanded task contents (Details, Time, Repeat, + List, Move to, etc.) now left-align with the tile's header (8px) instead of being indented 30px under the title. -->
 <!-- v5.37.0 — Pages tree: folder hues. Each top-level folder gets a color from the task-palette families; its subfolders inherit it and get stronger the deeper they nest, files are white cards, and a rule runs down each folder's contents. Folder icon is now a tappable color picker. Replaces the per-depth green/blue/amber tints; emoji icons replaced by SVG; dates/counts/chevrons raised to readable contrast. Design write-up: claude/pages-tree-color-options.md (option B). -->
@@ -13374,7 +13375,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.38.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.39.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
@@ -14201,6 +14202,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const [dragOverExId, setDragOverExId] = useState(null); // for day-view reorder
   const [showLibManager, setShowLibManager] = useState(false);
   const [showGoalManager, setShowGoalManager] = useState(false);
+  const [goalFocus, setGoalFocus] = useState(null); // v5.39.0: 'exerciseId|period' of the goal whose pencil opened the manager
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
   const prIndex = React.useMemo(() => prBuildIndex(fitnessLog), [fitnessLog]); // v5.17.0 PR history, derived
   // Collapsed/expanded state for Day-view exercise tiles is stored on the exercise
@@ -14316,24 +14318,42 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
 
   // ── Goal CRUD ────────────────────────────────────────────────────────────
   function addGoalVersion(exerciseId, period, target, unit, startDk) {
-    if (!exerciseId || !target) return;
+    // v5.39.0: startDk can be this period's start or the next one's. The version that was running is closed the
+    // day before the new one starts, so earlier periods keep the target that was active then.
+    const t = parseFloat(target);
+    if (!exerciseId || !t) return;
     const newStart = startDk || periodStart(period);
-    // End any currently-active version at prevPeriodEnd
+    const prevEnd = fmt(addDays(new Date(newStart + 'T00:00:00'), -1));
     setFitnessGoals(gs => {
-      const updated = gs.map(g => {
-        if (g.exerciseId!==exerciseId || g.period!==period) return g;
-        const eDk = fmt(today);
-        const isActive = (!g.startDate||g.startDate<=eDk) && (!g.endDate||g.endDate>=eDk);
-        if (isActive && (!g.endDate || g.endDate > prevPeriodEnd(period))) {
-          return {...g, endDate: prevPeriodEnd(period)};
-        }
-        return g;
+      const fam = g => g.exerciseId===exerciseId && g.period===period;
+      // anything already scheduled to start after the new one is replaced by it
+      const kept = gs.filter(g => !(fam(g) && g.startDate && g.startDate > newStart));
+      // a version already starting that day just takes the new numbers
+      if (kept.some(g => fam(g) && g.startDate===newStart)) {
+        return kept.map(g => fam(g) && g.startDate===newStart ? {...g, target:t, unit, endDate:null} : g);
+      }
+      const closed = kept.map(g => {
+        if (!fam(g)) return g;
+        const startsBefore = !g.startDate || g.startDate < newStart;
+        const stillOpen = !g.endDate || g.endDate >= newStart;
+        return startsBefore && stillOpen ? {...g, endDate: prevEnd} : g;
       });
-      return [...updated, {
+      return [...closed, {
         id:'fg'+Date.now(), exerciseId, period,
-        target:parseFloat(target), unit,
+        target:t, unit,
         startDate: newStart, endDate: null,
       }];
+    });
+  }
+
+  // v5.39.0: drop a version that has not started yet and reopen the one it was going to replace
+  function cancelUpcomingGoal(id) {
+    setFitnessGoals(gs => {
+      const up = gs.find(g => g.id===id);
+      if (!up || !up.startDate) return gs;
+      const prevEnd = fmt(addDays(new Date(up.startDate + 'T00:00:00'), -1));
+      return gs.filter(g => g.id!==id).map(g =>
+        (g.exerciseId===up.exerciseId && g.period===up.period && g.endDate===prevEnd) ? {...g, endDate:null} : g);
     });
   }
 
@@ -14876,8 +14896,8 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                             <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:ahead?'var(--accent)':'var(--red)',fontWeight:700}}>
                               {ahead?'▲':'▼'}{Math.abs(Math.round(aheadBehind))} vs target
                             </span>
-                            <button onClick={()=>setShowGoalManager(true)}
-                              style={{background:'none',border:'none',cursor:'pointer',fontSize:10,color:'var(--ink-faint)',padding:'0 2px',lineHeight:1}} title="Edit goals">✏️</button>
+                            <button onClick={()=>{setGoalFocus(goal.exerciseId+'|'+goal.period);setShowGoalManager(true);}}
+                              style={{background:'none',border:'none',cursor:'pointer',fontSize:10,color:'var(--ink-faint)',padding:'0 2px',lineHeight:1}} title="Edit this goal">✏️</button>
                           </div>
                         </div>
                         <div className="fitness-goal-bar-bg" style={{position:'relative',marginBottom:4}}>
@@ -15220,10 +15240,10 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
         onAddNew={(name,category)=>{const id=addExercise(name,category);if(id)setTimeout(()=>{addExerciseToDay(showExPicker.dk,id);setShowExPicker(null);},50);}}
         onClose={()=>setShowExPicker(null)}/>}
       {showLibManager&&<ExerciseLibraryManager exercises={fitnessExercises} onAdd={addExercise} onUpdate={updateExercise} onDelete={deleteExercise_lib} onClose={()=>setShowLibManager(false)}/>}
-      {showGoalManager&&<GoalManager goals={fitnessGoals} exercises={fitnessExercises}
+      {showGoalManager&&<GoalManager goals={fitnessGoals} exercises={fitnessExercises} focusKey={goalFocus}
         onAddVersion={addGoalVersion} onEdit={editGoalInPlace} onEnd={endGoal} onDelete={deleteGoalVersion}
-        periodStart={periodStart} periodEnd={periodEnd} prevPeriodEnd={prevPeriodEnd}
-        onClose={()=>setShowGoalManager(false)}/>}
+        onCancelUpcoming={cancelUpcomingGoal} periodStart={periodStart}
+        onClose={()=>{setShowGoalManager(false);setGoalFocus(null);}}/>}
     </div>
   );
 }
@@ -15231,235 +15251,293 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
 
 
 // ─────────────────────────────────────────────
-// GOAL MANAGER — add/remove fitness goals
+// GOAL MANAGER — add/edit/end fitness goals
+// v5.39.0: one collapsed row per goal (exercise + period). Opened from a goal's pencil it expands that goal;
+// older targets sit under "History", ended goals under "Show ended goals". "Change target…" starts a new
+// version (this period or next) so past weeks keep the target that was active then.
 // ─────────────────────────────────────────────
-function GoalManager({ goals, exercises, onAddVersion, onEdit, onEnd, onDelete, periodStart, periodEnd, prevPeriodEnd, onClose }) {
-  const today = new Date(); today.setHours(0,0,0,0);
-  const [exId, setExId] = useState(exercises[0]?.id||'');
+const GOAL_UNIT_LABEL = { distance: 'mi', volume: 'lbs' };
+function goalAmt(g) { return Number(g.target).toLocaleString() + ' ' + (GOAL_UNIT_LABEL[g.unit] || g.unit); }
+function goalDay(dk) {
+  if (!dk) return '';
+  const d = new Date(dk + 'T00:00:00');
+  return MONTHS[d.getMonth()].slice(0, 3) + ' ' + d.getDate() + (d.getFullYear() !== new Date().getFullYear() ? ', ' + d.getFullYear() : '');
+}
+function goalRange(g) { return (g.startDate ? goalDay(g.startDate) : 'start') + ' – ' + (g.endDate ? goalDay(g.endDate) : 'now'); }
+const GOAL_UNITS = [['reps', 'Reps'], ['sets', 'Sets'], ['volume', 'Volume (lbs)'], ['distance', 'Distance (mi)'], ['sessions', 'Sessions']];
+
+function GoalFamilyRow({ fam, ended, isOpen, autoScroll, onToggle, thisStart, nextStart, onAddVersion, onEdit, onEnd, onDelete, onCancelUpcoming }) {
+  const { exerciseId, period, versions, cur, up } = fam;
+  const shown = cur || up || versions[0];
+  const [tgt, setTgt] = useState(String(shown.target));
+  const [unit, setUnit] = useState(shown.unit);
+  const [endDate, setEndDate] = useState(shown.endDate || '');
+  const [warn, setWarn] = useState(false);
+  const [changing, setChanging] = useState(false);
+  const [newTgt, setNewTgt] = useState('');
+  const [when, setWhen] = useState('now');
+  const [histOpen, setHistOpen] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(null);
+  const ref = useRef();
+
+  useEffect(() => { if (autoScroll && ref.current) ref.current.scrollIntoView({ block: 'center' }); }, []);
+  // Re-sync the fields when the version being shown changes (after a Save or a new version)
+  useEffect(() => {
+    setTgt(String(shown.target)); setUnit(shown.unit); setEndDate(shown.endDate || ''); setWarn(false);
+  }, [shown.id, shown.target, shown.unit, shown.endDate]);
+
+  const dirty = parseFloat(tgt) !== shown.target || unit !== shown.unit || endDate !== (shown.endDate || '');
+  const past = versions.filter(v => v.id !== shown.id && !(up && v.id === up.id));
+  const inp = { fontSize: 12, fontFamily: "'DM Mono',monospace", border: '1px solid var(--border)', borderRadius: 4, padding: '3px 6px', outline: 'none', background: 'var(--surface)', color: 'var(--ink)', boxSizing: 'border-box' };
+  const btn = { background: 'none', border: '1px solid var(--border)', borderRadius: 4, padding: '3px 9px', cursor: 'pointer', fontSize: 11, color: 'var(--ink-light)', fontFamily: "'DM Sans',sans-serif" };
+  const btnMain = { ...btn, background: 'var(--accent)', border: 'none', color: 'white', fontWeight: 600 };
+  const nounCap = period.charAt(0).toUpperCase() + period.slice(1);
+
+  function save() {
+    const t = parseFloat(tgt);
+    if (!t) return;
+    if (t !== shown.target || unit !== shown.unit) { setWarn(true); return; }   // changing the number rewrites every period this version covered
+    onEdit(shown.id, { endDate: endDate || null });
+  }
+  function applyAll() {
+    onEdit(shown.id, { target: parseFloat(tgt), unit, endDate: endDate || null });
+    setWarn(false);
+  }
+  function startNew() {
+    const t = parseFloat(newTgt);
+    if (!t) return;
+    onAddVersion(exerciseId, period, t, shown.unit, when === 'next' ? nextStart : thisStart);
+    setChanging(false); setNewTgt(''); setWhen('now');
+  }
+  function endIt() {
+    if (up) onDelete(up.id);
+    onEnd(shown.id);
+  }
+  function delBtn(id) {
+    const c = confirmDel === id;
+    return (
+      <button onClick={() => { if (c) { onDelete(id); setConfirmDel(null); } else setConfirmDel(id); }}
+        onMouseLeave={() => setConfirmDel(null)}
+        style={{ background: c ? 'var(--red)' : 'none', color: c ? 'white' : 'var(--ink-faint)', border: 'none', borderRadius: c ? 4 : 0,
+          cursor: 'pointer', fontSize: c ? 10 : 13, padding: c ? '2px 5px' : '0 2px', fontFamily: "'DM Sans',sans-serif" }}>
+        {c ? 'Delete?' : '✕'}
+      </button>
+    );
+  }
+  const histList = (list) => list.map(v => (
+    <div key={v.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 0', borderBottom: '1px solid var(--border)', fontSize: 11 }}>
+      <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 600, color: 'var(--ink)' }}>{goalAmt(v)}</span>
+      <span style={{ flex: 1, textAlign: 'right', fontFamily: "'DM Mono',monospace", fontSize: 10, color: 'var(--ink-faint)' }}>{goalRange(v)}</span>
+      {delBtn(v.id)}
+    </div>
+  ));
+
+  const summary = ended
+    ? `${goalAmt(shown)} · ended ${goalDay(shown.endDate)}`
+    : (!cur && up) ? `starts ${goalDay(up.startDate)} · ${goalAmt(up)}`
+    : goalAmt(shown) + (up ? ` → ${goalAmt(up)}` : '');
+
+  return (
+    <div ref={ref} style={{ border: `1px solid ${isOpen ? 'var(--accent)' : 'var(--border)'}`, borderRadius: 'var(--radius-sm)', marginBottom: 6, background: 'var(--surface)' }}>
+      <div onClick={onToggle} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', cursor: 'pointer' }}>
+        <span style={{ fontSize: 10, color: 'var(--ink-faint)', width: 8, flexShrink: 0 }}>{isOpen ? '▾' : '▸'}</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 12, fontWeight: 700, color: ended ? 'var(--ink-light)' : 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{fam.name}</span>
+        <span style={{ fontSize: 9, fontFamily: "'DM Mono',monospace", textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700, flexShrink: 0,
+          background: period === 'week' ? 'var(--blue-light)' : period === 'month' ? 'var(--accent-light)' : 'var(--gold-light)',
+          color: period === 'week' ? 'var(--blue)' : period === 'month' ? 'var(--accent)' : 'var(--gold)', padding: '1px 5px', borderRadius: 3 }}>{period}</span>
+        <span style={{ fontSize: 11, fontFamily: "'DM Mono',monospace", color: 'var(--ink-light)', flexShrink: 0 }}>{summary}</span>
+      </div>
+      {isOpen && (
+        <div style={{ padding: '2px 10px 10px', borderTop: '1px solid var(--border)' }}>
+          {ended ? (
+            <div style={{ marginTop: 6 }}>{histList(versions)}</div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 8 }}>
+                <input type="number" value={tgt} onChange={e => setTgt(e.target.value)} style={{ ...inp, width: 76 }} />
+                <select value={unit} onChange={e => setUnit(e.target.value)} style={{ ...inp, flex: 1, fontFamily: "'DM Sans',sans-serif", fontSize: 11 }}>
+                  {GOAL_UNITS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </select>
+              </div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 6 }}>
+                <span style={{ fontSize: 10, fontFamily: "'DM Mono',monospace", color: 'var(--ink-faint)', flexShrink: 0 }}>End date</span>
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={{ ...inp, flex: 1, fontSize: 11 }} />
+              </div>
+              {dirty && !warn && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                  <button onClick={save} style={btnMain}>Save</button>
+                  <button onClick={() => { setTgt(String(shown.target)); setUnit(shown.unit); setEndDate(shown.endDate || ''); }} style={btn}>Cancel</button>
+                </div>
+              )}
+              {warn && (
+                <div style={{ marginTop: 8, padding: '8px 10px', background: '#fef3cd', border: '1px solid #f6c23e', borderRadius: 'var(--radius-sm)' }}>
+                  <div style={{ fontSize: 11, color: '#856404', marginBottom: 6, lineHeight: 1.45 }}>
+                    This changes every {period} this target covered ({goalRange(shown)}), not just from now on. To change it going forward, use “Change target…” below.
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={applyAll} style={{ ...btn, background: '#856404', border: 'none', color: 'white', fontWeight: 600 }}>Change all {period}s</button>
+                    <button onClick={() => setWarn(false)} style={{ ...btn, borderColor: '#856404', color: '#856404' }}>Cancel</button>
+                  </div>
+                </div>
+              )}
+              {up && cur && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, padding: '5px 8px', background: 'var(--accent-light)', borderRadius: 4, fontSize: 11 }}>
+                  <span style={{ flex: 1, color: 'var(--ink)' }}>Next: <b style={{ fontFamily: "'DM Mono',monospace" }}>{goalAmt(up)}</b> from {goalDay(up.startDate)}</span>
+                  <button onClick={() => onCancelUpcoming(up.id)} style={btn}>Cancel</button>
+                </div>
+              )}
+              {!changing ? (
+                <div style={{ display: 'flex', gap: 6, marginTop: 10, alignItems: 'center' }}>
+                  <button onClick={() => { setChanging(true); setNewTgt(String(shown.target)); }} style={btn}>Change target…</button>
+                  <span style={{ flex: 1 }} />
+                  <button onClick={endIt} style={{ ...btn, color: 'var(--red)' }} title={`Stops this goal from the start of this ${period}`}>End goal</button>
+                </div>
+              ) : (
+                <div style={{ marginTop: 10, padding: '8px 10px', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)' }}>
+                  <div style={{ fontSize: 10, fontFamily: "'DM Mono',monospace", color: 'var(--ink-faint)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>New target — earlier {period}s keep {goalAmt(shown)}</div>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                    <input type="number" min="1" autoFocus value={newTgt} onChange={e => setNewTgt(e.target.value)} style={{ ...inp, width: 76 }} />
+                    <span style={{ fontSize: 11, color: 'var(--ink-light)' }}>{GOAL_UNIT_LABEL[shown.unit] || shown.unit} per {period}</span>
+                  </div>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--ink)', marginBottom: 3, cursor: 'pointer' }}>
+                    <input type="radio" checked={when === 'now'} onChange={() => setWhen('now')} /> This {period} <span style={{ color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace", fontSize: 10 }}>(from {goalDay(thisStart)})</span>
+                  </label>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'var(--ink)', marginBottom: 8, cursor: 'pointer' }}>
+                    <input type="radio" checked={when === 'next'} onChange={() => setWhen('next')} /> Next {period} <span style={{ color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace", fontSize: 10 }}>(from {goalDay(nextStart)})</span>
+                  </label>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button onClick={startNew} style={btnMain}>Start new target</button>
+                    <button onClick={() => { setChanging(false); setNewTgt(''); }} style={btn}>Cancel</button>
+                  </div>
+                </div>
+              )}
+              {past.length > 0 && (
+                <>
+                  <div onClick={() => setHistOpen(h => !h)} style={{ marginTop: 10, fontSize: 11, color: 'var(--ink-light)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ fontSize: 9 }}>{histOpen ? '▾' : '▸'}</span> History ({past.length} earlier {past.length === 1 ? 'target' : 'targets'})
+                  </div>
+                  {histOpen && <div style={{ marginTop: 4 }}>{histList(past)}</div>}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GoalManager({ goals, exercises, focusKey, onAddVersion, onEdit, onEnd, onDelete, onCancelUpcoming, periodStart, onClose }) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const todayDk = fmt(today);
+  const PERIOD_ORDER = { week: 0, month: 1, year: 2 };
+  const [exId, setExId] = useState(exercises[0]?.id || '');
   const [period, setPeriod] = useState('week');
   const [target, setTarget] = useState('');
   const [unit, setUnit] = useState('reps');
-  const [editingId, setEditingId] = useState(null);
-  const [editTarget, setEditTarget] = useState('');
-  const [editUnit, setEditUnit] = useState('reps');
-  const [editEndDate, setEditEndDate] = useState('');
-  const [confirmEdit, setConfirmEdit] = useState(null); // id awaiting retroactive edit confirm
-  const [confirmDelete, setConfirmDelete] = useState(null);
 
-  // Group by exercise+period, show only current/recent versions
-  const families = [];
-  const seen = new Set();
+  // One family per exercise + period; versions newest first
+  const map = {};
   goals.forEach(g => {
-    const key = g.exerciseId+'|'+g.period;
-    if (!seen.has(key)) { seen.add(key); families.push(key); }
+    const k = g.exerciseId + '|' + g.period;
+    (map[k] = map[k] || { key: k, exerciseId: g.exerciseId, period: g.period, versions: [] }).versions.push(g);
   });
+  const fams = Object.values(map).map(f => {
+    f.versions.sort((a, b) => (b.startDate || '0').localeCompare(a.startDate || '0'));
+    f.cur = f.versions.find(g => (!g.startDate || g.startDate <= todayDk) && (!g.endDate || g.endDate >= todayDk)) || null;
+    const ups = f.versions.filter(g => g.startDate && g.startDate > todayDk);
+    f.up = ups.length ? ups[ups.length - 1] : null;   // sorted newest first, so the last one starts soonest
+    f.name = fgGoalName(f.exerciseId, exercises);
+    return f;
+  }).sort((a, b) => a.name.localeCompare(b.name) || (PERIOD_ORDER[a.period] ?? 3) - (PERIOD_ORDER[b.period] ?? 3));
+  const activeFams = fams.filter(f => f.cur || f.up);
+  const endedFams = fams.filter(f => !f.cur && !f.up);
 
-  function startEdit(g) {
-    setEditingId(g.id);
-    setEditTarget(String(g.target));
-    setEditUnit(g.unit);
-    setEditEndDate(g.endDate||'');
-  }
+  const [openKey, setOpenKey] = useState(focusKey && map[focusKey] ? focusKey : null);
+  const [showEnded, setShowEnded] = useState(false);
+  const [adding, setAdding] = useState(activeFams.length === 0);
 
-  function saveEdit(g) {
-    const newTarget = parseFloat(editTarget);
-    if (!newTarget) return;
-    const targetChanged = newTarget !== g.target || editUnit !== g.unit;
-    if (targetChanged) {
-      setConfirmEdit(g.id); // show confirmation before applying
-    } else {
-      onEdit(g.id, {endDate: editEndDate||null, unit:editUnit});
-      setEditingId(null);
-    }
+  // Where "next week / month / year" starts
+  function nextStartFor(per) {
+    const d = per === 'week' ? addDays(today, 7) : per === 'month' ? new Date(today.getFullYear(), today.getMonth() + 1, 1) : new Date(today.getFullYear() + 1, 0, 1);
+    return periodStart(per, d);
   }
-
-  function confirmEditApply(id) {
-    onEdit(id, {target:parseFloat(editTarget), unit:editUnit, endDate:editEndDate||null});
-    setEditingId(null);
-    setConfirmEdit(null);
-  }
+  const sel = { fontSize: 12, fontFamily: "'DM Sans',sans-serif", border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '5px 6px', background: 'var(--surface)', color: 'var(--ink)', outline: 'none' };
+  const rowProps = (f, ended) => ({
+    fam: f, ended, isOpen: openKey === f.key, autoScroll: f.key === focusKey,
+    onToggle: () => setOpenKey(k => k === f.key ? null : f.key),
+    thisStart: periodStart(f.period), nextStart: nextStartFor(f.period),
+    onAddVersion, onEdit, onEnd, onDelete, onCancelUpcoming,
+  });
 
   return (
     <div className="fitness-picker-overlay" onClick={onClose}>
-      <div className="fitness-picker-modal" style={{width:380,maxHeight:560}} onClick={e=>e.stopPropagation()}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
-          padding:'14px 16px 10px',borderBottom:'1px solid var(--border)',flexShrink:0}}>
-          <span style={{fontFamily:"'DM Sans',sans-serif",fontWeight:700,fontSize:14,color:'var(--ink)'}}>Fitness Goals</span>
-          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',fontSize:16,color:'var(--ink-faint)',lineHeight:1}}>✕</button>
+      <div className="fitness-picker-modal" style={{ width: 400, maxHeight: 600 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '14px 16px 10px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <span style={{ fontFamily: "'DM Sans',sans-serif", fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>Fitness Goals</span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, color: 'var(--ink-faint)', lineHeight: 1 }}>✕</button>
         </div>
 
-        {/* Confirm retroactive edit warning */}
-        {confirmEdit && (
-          <div style={{margin:'8px 12px',padding:'10px 12px',background:'#fef3cd',border:'1px solid #f6c23e',borderRadius:'var(--radius-sm)'}}>
-            <div style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",fontWeight:600,color:'#856404',marginBottom:6}}>
-              ⚠️ Retroactive edit
-            </div>
-            <div style={{fontSize:11,fontFamily:"'DM Sans',sans-serif",color:'#856404',marginBottom:8}}>
-              Changing the target will retroactively affect how all past weeks/months are measured. Use "New Version" instead to only change future periods.
-            </div>
-            <div style={{display:'flex',gap:8}}>
-              <button onClick={()=>confirmEditApply(confirmEdit)}
-                style={{background:'#856404',color:'white',border:'none',borderRadius:4,padding:'4px 12px',cursor:'pointer',fontSize:11,fontWeight:600}}>
-                Edit retroactively
-              </button>
-              <button onClick={()=>setConfirmEdit(null)}
-                style={{background:'none',border:'1px solid #856404',color:'#856404',borderRadius:4,padding:'4px 12px',cursor:'pointer',fontSize:11}}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Existing goal versions */}
-        <div style={{flex:1,overflowY:'auto',padding:'8px 12px'}}>
-          {goals.length===0&&<div style={{fontSize:12,color:'var(--ink-faint)',fontStyle:'italic',padding:'4px'}}>No goals yet</div>}
-          {families.map(key => {
-            const [eId, per] = key.split('|');
-            const exLabel = fgGoalName(eId, exercises);
-            const versions = goals.filter(g=>g.exerciseId===eId&&g.period===per)
-              .sort((a,b)=>(b.startDate||'0').localeCompare(a.startDate||'0'));
-            return (
-              <div key={key} style={{marginBottom:10}}>
-                <div style={{fontSize:11,fontFamily:"'DM Sans',sans-serif",fontWeight:700,color:'var(--ink)',
-                  borderBottom:'1px solid var(--border)',paddingBottom:3,marginBottom:4,display:'flex',justifyContent:'space-between'}}>
-                  <span>{exLabel}</span>
-                  <span style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',textTransform:'capitalize'}}>{per}</span>
-                </div>
-                {versions.map(g => {
-                  const isActive = (!g.startDate||g.startDate<=fmt(today))&&(!g.endDate||g.endDate>=fmt(today));
-                  const isEditing = editingId===g.id;
-                  return (
-                    <div key={g.id} style={{padding:'6px 8px',marginBottom:4,background:isActive?'var(--accent-light)':g.endDate?'var(--cream)':'var(--surface)',
-                      borderRadius:'var(--radius-sm)',border:`1px solid ${isActive?'var(--accent)':'var(--border)'}`}}>
-                      {isEditing ? (
-                        <div style={{display:'flex',flexDirection:'column',gap:6}}>
-                          <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                            <input type="number" value={editTarget} onChange={e=>setEditTarget(e.target.value)}
-                              style={{width:70,fontSize:12,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',outline:'none'}}/>
-                            <select value={editUnit} onChange={e=>setEditUnit(e.target.value)}
-                              style={{flex:1,fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',background:'var(--surface)',outline:'none'}}>
-                              <option value="reps">Reps</option>
-                              <option value="sets">Sets</option>
-                              <option value="volume">Volume (lbs)</option>
-                              <option value="distance">Distance (mi)</option>
-                              <option value="sessions">Sessions</option>
-                            </select>
-                          </div>
-                          <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                            <span style={{fontSize:10,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)',flexShrink:0}}>End date:</span>
-                            <input type="date" value={editEndDate} onChange={e=>setEditEndDate(e.target.value)}
-                              style={{flex:1,fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',outline:'none'}}/>
-                          </div>
-                          <div style={{display:'flex',gap:6}}>
-                            <button onClick={()=>saveEdit(g)}
-                              style={{background:'var(--accent)',color:'white',border:'none',borderRadius:4,padding:'3px 10px',cursor:'pointer',fontSize:11,fontWeight:600}}>Save</button>
-                            <button onClick={()=>setEditingId(null)}
-                              style={{background:'none',border:'1px solid var(--border)',borderRadius:4,padding:'3px 8px',cursor:'pointer',fontSize:11}}>Cancel</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{display:'flex',alignItems:'center',gap:6}}>
-                          <div style={{flex:1}}>
-                            <div style={{fontSize:12,fontFamily:"'DM Mono',monospace",fontWeight:600,color:'var(--ink)'}}>
-                              {g.target.toLocaleString()} {g.unit}
-                            </div>
-                            <div style={{fontSize:9,fontFamily:"'DM Mono',monospace",color:'var(--ink-faint)'}}>
-                              {g.startDate||'∞'} → {g.endDate||'ongoing'}
-                              {isActive&&<span style={{marginLeft:6,color:'var(--accent)',fontWeight:700}}>● active</span>}
-                            </div>
-                          </div>
-                          <button onClick={()=>startEdit(g)} title="Edit in place"
-                            style={{background:'none',border:'none',cursor:'pointer',fontSize:12,color:'var(--ink-faint)',padding:'0 3px',lineHeight:1}}>✏️</button>
-                          {isActive&&(
-                            <button onClick={()=>onEnd(g.id)} title="End after this period"
-                              style={{background:'none',border:'1px solid var(--border)',borderRadius:4,cursor:'pointer',fontSize:10,color:'var(--ink-faint)',padding:'2px 5px',lineHeight:1}}>
-                              End
-                            </button>
-                          )}
-                          <button onClick={()=>{if(confirmDelete===g.id){onDelete(g.id);setConfirmDelete(null);}else setConfirmDelete(g.id);}}
-                            onMouseLeave={()=>setConfirmDelete(null)}
-                            style={{background:confirmDelete===g.id?'var(--red)':'none',color:confirmDelete===g.id?'white':'var(--ink-faint)',
-                              border:'none',borderRadius:confirmDelete===g.id?4:0,cursor:'pointer',fontSize:confirmDelete===g.id?10:13,
-                              padding:confirmDelete===g.id?'2px 5px':'0 2px',fontFamily:"'DM Sans',sans-serif"}}>
-                            {confirmDelete===g.id?'Delete?':'✕'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {/* New version button for existing families */}
-                {isActive(eId,per)&&(
-                  <button onClick={()=>{
-                    const latest=versions[0];
-                    if(latest){onAddVersion(eId,per,latest.target,latest.unit);}
-                  }}
-                  style={{background:'none',border:'1px dashed var(--border)',borderRadius:4,cursor:'pointer',
-                    fontSize:10,color:'var(--ink-light)',padding:'3px 8px',width:'100%',fontFamily:"'DM Sans',sans-serif",marginTop:2}}
-                  title={`Start a new version from next ${per}`}>
-                    + New version (from next {per})
-                  </button>
-                )}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '10px 12px' }}>
+          {goals.length === 0 && <div style={{ fontSize: 12, color: 'var(--ink-faint)', fontStyle: 'italic', padding: '4px' }}>No goals yet</div>}
+          {activeFams.map(f => <GoalFamilyRow key={f.key} {...rowProps(f, false)} />)}
+          {endedFams.length > 0 && (
+            <>
+              <div onClick={() => setShowEnded(s => !s)} style={{ fontSize: 11, color: 'var(--ink-light)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, margin: '4px 0 6px' }}>
+                <span style={{ fontSize: 9 }}>{showEnded ? '▾' : '▸'}</span> {showEnded ? 'Hide' : 'Show'} ended goals ({endedFams.length})
               </div>
-            );
-          })}
+              {showEnded && endedFams.map(f => <GoalFamilyRow key={f.key} {...rowProps(f, true)} />)}
+            </>
+          )}
         </div>
 
-        {/* Add brand new goal */}
-        <div style={{padding:'10px 12px 12px',borderTop:'1px solid var(--border)',flexShrink:0}}>
-          <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:8,textTransform:'uppercase',letterSpacing:'0.05em'}}>New goal:</div>
-          {exercises.length===0 ? (
-            <div style={{fontSize:12,color:'var(--ink-faint)',fontStyle:'italic'}}>Add exercises to the library first</div>
+        <div style={{ padding: '10px 12px 12px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+          {exercises.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--ink-faint)', fontStyle: 'italic' }}>Add exercises to the library first</div>
+          ) : !adding ? (
+            <button onClick={() => setAdding(true)} style={{ width: '100%', background: 'none', border: '1px dashed var(--border)', borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer', fontSize: 12, color: 'var(--ink-light)', padding: '6px 8px', fontFamily: "'DM Sans',sans-serif" }}>+ New goal</button>
           ) : (
-            <div style={{display:'flex',flexDirection:'column',gap:7}}>
-              <select value={exId} onChange={e=>setExId(e.target.value)}
-                style={{width:'100%',fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 8px',background:'var(--surface)',color:'var(--ink)',outline:'none'}}>
-                {ruleSubs(exercises).length>0&&<optgroup label="Whole subcategory (all exercises added up)">
-                  {ruleSubs(exercises).map(n=><option key={'sub:'+ruleSubKey(n)} value={'sub:'+ruleSubKey(n)}>{n} (all)</option>)}
-                </optgroup>}
-                <optgroup label="Single exercise">
-                  {exercises.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
-                </optgroup>
-              </select>
-              <div style={{display:'flex',gap:6}}>
-                <select value={period} onChange={e=>setPeriod(e.target.value)}
-                  style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 6px',background:'var(--surface)',color:'var(--ink)',outline:'none'}}>
-                  <option value="week">Per Week</option>
-                  <option value="month">Per Month</option>
-                  <option value="year">Per Year</option>
+            <>
+              <div style={{ fontSize: 9, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace", marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>New goal:</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+                <select value={exId} onChange={e => setExId(e.target.value)} style={{ ...sel, width: '100%', padding: '5px 8px' }}>
+                  {ruleSubs(exercises).length > 0 && <optgroup label="Whole subcategory (all exercises added up)">
+                    {ruleSubs(exercises).map(n => <option key={'sub:' + ruleSubKey(n)} value={'sub:' + ruleSubKey(n)}>{n} (all)</option>)}
+                  </optgroup>}
+                  <optgroup label="Single exercise">
+                    {exercises.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                  </optgroup>
                 </select>
-                <select value={unit} onChange={e=>setUnit(e.target.value)}
-                  style={{flex:1,fontSize:12,fontFamily:"'DM Sans',sans-serif",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 6px',background:'var(--surface)',color:'var(--ink)',outline:'none'}}>
-                  <option value="reps">Reps</option>
-                  <option value="sets">Sets</option>
-                  <option value="volume">Volume (lbs)</option>
-                  <option value="distance">Distance (mi)</option>
-                  <option value="sessions">Sessions</option>
-                </select>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <select value={period} onChange={e => setPeriod(e.target.value)} style={{ ...sel, flex: 1 }}>
+                    <option value="week">Per Week</option>
+                    <option value="month">Per Month</option>
+                    <option value="year">Per Year</option>
+                  </select>
+                  <select value={unit} onChange={e => setUnit(e.target.value)} style={{ ...sel, flex: 1 }}>
+                    {GOAL_UNITS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input type="number" min="1" value={target} onChange={e => setTarget(e.target.value)} placeholder="Target amount"
+                    style={{ ...sel, flex: 1, fontFamily: "'DM Mono',monospace", padding: '5px 8px', boxSizing: 'border-box' }} />
+                  <button onClick={() => { if (exId && target) { onAddVersion(exId, period, target, unit); setOpenKey(exId + '|' + period); setTarget(''); setAdding(false); } }}
+                    disabled={!exId || !target}
+                    style={{ background: exId && target ? 'var(--accent)' : 'var(--border)', border: 'none', borderRadius: 'var(--radius-sm)',
+                      padding: '5px 16px', cursor: exId && target ? 'pointer' : 'default', fontSize: 12, fontWeight: 600,
+                      color: exId && target ? 'white' : 'var(--ink-faint)' }}>
+                    Add
+                  </button>
+                </div>
               </div>
-              <div style={{display:'flex',gap:6}}>
-                <input type="number" min="1" value={target} onChange={e=>setTarget(e.target.value)}
-                  placeholder="Target amount"
-                  style={{flex:1,fontSize:12,fontFamily:"'DM Mono',monospace",border:'1px solid var(--border)',borderRadius:'var(--radius-sm)',padding:'5px 8px',outline:'none',background:'var(--surface)',color:'var(--ink)',boxSizing:'border-box'}}/>
-                <button onClick={()=>{if(exId&&target){onAddVersion(exId,period,target,unit);setTarget('');}}}
-                  disabled={!exId||!target}
-                  style={{background:exId&&target?'var(--accent)':'var(--border)',border:'none',borderRadius:'var(--radius-sm)',
-                    padding:'5px 16px',cursor:exId&&target?'pointer':'default',fontSize:12,fontWeight:600,
-                    color:exId&&target?'white':'var(--ink-faint)'}}>
-                  Add
-                </button>
-              </div>
-            </div>
+            </>
           )}
         </div>
       </div>
     </div>
   );
-
-  function isActive(exerciseId, period) {
-    const dk=fmt(today);
-    return goals.some(g=>g.exerciseId===exerciseId&&g.period===period&&(!g.startDate||g.startDate<=dk)&&(!g.endDate||g.endDate>=dk));
-  }
 }
 
 
