@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.41.3 -->
+<!-- LP Planner v5.42.0 -->
+<!-- v5.42.0 — Weekly sidebar: Goals · next up, Weekly Goals and People to Connect With are now collapsible (tap the title; a count shows when folded; remembered per device; adding an item unfolds the section). Be-Word tile made more compact. -->
 <!-- v5.41.3 — Weekly sidebar: the Be-Word tile now sits directly under the Quote of the Week tile. -->
 <!-- v5.41.2 — Quote tile: gold quote mark is back, sitting on the same line as the "Quote of the Week" label (no extra height); breathing room restored between the Weekly review button and the Quote tile. -->
 <!-- v5.41.1 — Quote tile: removed the large quote mark and tightened the tile padding; removed the "Daily Pages" link from the Weekly sidebar. -->
@@ -2609,6 +2610,21 @@
   .wk-form label { display: block; font-size: 12px; color: var(--ink-light); margin: 10px 0 4px; }
   .wk-form .wk-tile-eyebrow { color: var(--accent); }
   .wk-form-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; }
+
+  /* ── v5.42.0 collapsible sidebar sections + compact Be-Word ── */
+  .sb-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+  .sb-head.folded { margin-bottom: 0; }
+  .sb-toggle { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; min-height: 28px; padding: 2px 0; background: none; border: none; cursor: pointer; color: inherit; text-align: left; font-family: inherit; }
+  .sb-toggle .sidebar-section-title { margin: 0; }
+  .sb-chev { font-size: 10px; width: 10px; color: var(--ink-light); transition: transform 0.15s; display: inline-block; }
+  .sb-head.folded .sb-chev { transform: rotate(-90deg); }
+  .sb-count { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-light); background: var(--cream); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+  @media (pointer: coarse) { .sb-toggle { min-height: 36px; } }
+  .wk-be { padding: 9px 44px 9px 16px; }
+  .wk-be .wk-be-word { font-size: 26px; margin-top: 3px; }
+  .wk-be .wk-be-word.long { font-size: 18px; }
+  .wk-be .wk-rule { margin: 6px 0; }
+  .wk-be .wk-be-note { font-size: 12.5px; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -5605,6 +5621,21 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
   );
 }
 
+// v5.42.0 — collapsible sidebar section header. folded/onToggle come from WeeklyPlanner (state remembered per device).
+function SbHead({ title, count, folded, onToggle, children }) {
+  return (
+    <div className={`sb-head ${folded ? 'folded' : ''}`}>
+      <button type="button" className="sb-toggle" aria-expanded={!folded} onClick={onToggle}
+        title={folded ? 'Expand' : 'Collapse'}>
+        <span className="sb-chev" aria-hidden="true">▾</span>
+        <span className="sidebar-section-title">{title}</span>
+        {folded && count != null && <span className="sb-count">{count}</span>}
+      </button>
+      {children}
+    </div>
+  );
+}
+
 // v5.41.0 — Quote of the Week / Be-Word tile. kind 'quote': text = proverb, extra = source. kind 'be': text = beWord (first line = word, rest = note).
 function WeekTile({ kind, text, extra, onSave }) {
   const isQuote = kind === 'quote';
@@ -6605,6 +6636,10 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const tbDayM = wkView === 'blocks' ? tbDayModel(weekDays[mobileDayIndex]) : null;
   const tbDayCtx = wkView === 'blocks' ? { ...tbCommon, day: tbDayM, range: tbRangeOf([tbDayM]), scrollKey: mobileDayKey } : null;
 
+  // v5.42.0 — which sidebar sections are folded (per device)
+  const [sbFold, setSbFold] = useState(() => { try { return JSON.parse(lsGet('sbFold') || '{}') || {}; } catch { return {}; } });
+  const setFold = (id, v) => setSbFold(f => { const n = { ...f, [id]: v }; lsSet('sbFold', JSON.stringify(n)); return n; });
+  const toggleFold = (id) => setFold(id, !sbFold[id]);
   const sidebarContent = (
     <>
       <div className="week-nav">
@@ -6624,28 +6659,26 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       </button>
       <WeekTile kind="quote" text={wd.proverb||''} extra={wd.proverbSrc||''} onSave={p=>setWD(w=>({...w,...p}))} />
       <WeekTile kind="be" text={wd.beWord||''} onSave={p=>setWD(w=>({...w,...p}))} />
-      {onOpenGoal && <GlNextUp goals={goals} weekKeys={weekDays.map(fmtLocal)} onOpenGoal={onOpenGoal} />}
+      {onOpenGoal && <GlNextUp goals={goals} weekKeys={weekDays.map(fmtLocal)} onOpenGoal={onOpenGoal} folded={!!sbFold.goals} onToggleFold={()=>toggleFold('goals')} />}
       <div className="sidebar-section">
-        <div className="checklist-header">
-          <div className="sidebar-section-title">Weekly Goals:</div>
-          <button className="add-btn" onClick={()=>addGoal(null)}>+</button>
-        </div>
-        <SortableChecklist
+        <SbHead title="Weekly Goals:" count={`${(wd.goals||[]).filter(g=>g.done).length} of ${(wd.goals||[]).length}`} folded={!!sbFold.weekly} onToggle={()=>toggleFold('weekly')}>
+          <button className="add-btn" onClick={()=>{ setFold('weekly', false); addGoal(null); }}>+</button>
+        </SbHead>
+        {!sbFold.weekly && <SortableChecklist
           items={wd.goals||[]}
           onUpdate={updateGoal}
           onAdd={addGoal}
           onDelete={deleteGoal}
           onReorder={reorderGoals}
           placeholder="Goal…"
-        />
+        />}
       </div>
 
       <div className="sidebar-section">
-        <div className="checklist-header">
-          <div className="sidebar-section-title">People to Connect With</div>
-          <button className="add-btn" onClick={()=>setShowPeoplePicker(true)} title="Add person">+</button>
-        </div>
-        <PeopleChecklist
+        <SbHead title="People to Connect With" count={`${(wd.people||[]).filter(x=>x.done).length} of ${(wd.people||[]).length}`} folded={!!sbFold.people} onToggle={()=>toggleFold('people')}>
+          <button className="add-btn" onClick={()=>{ setFold('people', false); setShowPeoplePicker(true); }} title="Add person">+</button>
+        </SbHead>
+        {!sbFold.people && <PeopleChecklist
           items={wd.people||[]}
           weekDays={weekDays}
           onUpdate={updatePerson}
@@ -6655,8 +6688,8 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           onRenameDirectory={(personId, newName) =>
             setPeopleDirectory(d => d.map(p => p.id===personId ? {...p, name:newName} : p))
           }
-        />
-        {(wd.people||[]).length === 0 && (
+        />}
+        {!sbFold.people && (wd.people||[]).length === 0 && (
           <div style={{fontSize:11,color:'var(--ink-faint)',fontStyle:'italic',padding:'2px 4px'}}>
             Press + to add people
           </div>
@@ -11491,18 +11524,17 @@ function GlWeekTask({ item, rule, onToggle, onMove, onOpen, onDragStart, onDragE
 }
 
 // ── "Goals · next up" block for the Weekly Planner sidebar ──
-function GlNextUp({ goals, weekKeys, onOpenGoal }) {
+function GlNextUp({ goals, weekKeys, onOpenGoal, folded, onToggleFold }) {
   const today = glToday();
   const active = (goals || []).filter(g => g.status === 'active');
   if (!active.length) return null;
   const inWeek = new Set(weekKeys);
   return (
     <div className="sidebar-section">
-      <div className="checklist-header">
-        <div className="sidebar-section-title">Goals · next up</div>
+      <SbHead title="Goals · next up" count={`${active.length} active`} folded={!!folded} onToggle={onToggleFold || (() => {})}>
         <button className="add-btn" title="Open Goals" onClick={() => onOpenGoal(null)}>›</button>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      </SbHead>
+      {!folded && <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {active.map(g => {
           const m = glNextMilestone(g);
           const late = m && glMsOverdue(m, today);
@@ -11521,7 +11553,7 @@ function GlNextUp({ goals, weekKeys, onOpenGoal }) {
             </button>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -13532,7 +13564,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.41.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.42.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
