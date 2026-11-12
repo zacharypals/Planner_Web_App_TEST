@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.41.1 -->
+<!-- LP Planner v5.41.2 -->
+<!-- v5.41.2 — Quote tile: gold quote mark is back, sitting on the same line as the "Quote of the Week" label (no extra height); breathing room restored between the Weekly review button and the Quote tile. -->
 <!-- v5.41.1 — Quote tile: removed the large quote mark and tightened the tile padding; removed the "Daily Pages" link from the Weekly sidebar. -->
 <!-- v5.41.0 — Weekly sidebar: "Proverb of the Week" is now a "Quote of the Week" tile (soft lavender card, serif text, gold quote mark, optional source line) and the Be-Word is a gold tile with the word set large and a short note beneath. Each has a pencil button that opens a small edit form (Save / Cancel). Stored in the same week fields as before (proverb, beWord — first line is the word, the rest the note), plus new optional proverbSrc; nothing to migrate. -->
 <!-- v5.40.0 — Goals › Reading log: books now have a Started date (explicit, or filled in automatically from the first pages logged while it is empty — shown as "Started Oct 3 · auto"). New Pages log list in each book's editor (change the date or page count of any entry, or delete it), a date picker next to "Log pages" so you can log for a past day, a Started field when adding a book, and finished books read "Oct 3 → Nov 1 · 29 days". -->
@@ -2590,7 +2591,9 @@
   @media (pointer: coarse) { .wk-tile-edit { width: 44px; height: 44px; } }
   .wk-quote { background: var(--accent-light); border: 1px solid color-mix(in oklab, var(--accent) 24%, var(--paper)); color: var(--ink); }
   .wk-quote .wk-tile-eyebrow, .wk-quote .wk-tile-edit, .wk-quote .wk-src { color: var(--accent); }
-  .wk-quote-mark { font-family: 'Playfair Display', serif; font-size: 64px; line-height: 0.6; color: var(--gold); height: 26px; }
+  .wk-quote-eyebrow { position: relative; padding-left: 22px; min-height: 14px; line-height: 14px; }
+  .wk-quote-mark { position: absolute; left: 0; top: 0; font-family: 'Playfair Display', serif; font-size: 34px; line-height: 34px; color: var(--gold); letter-spacing: 0; pointer-events: none; }
+  .wk-first { margin-top: 12px; }
   .wk-quote-text { margin: 6px 0 6px; font-family: 'Playfair Display', serif; font-size: 19px; line-height: 1.4; font-weight: 600; color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
   .wk-rule { width: 32px; height: 3px; border-radius: 2px; background: var(--gold); margin: 8px 0; }
   .wk-src { font-size: 12px; font-weight: 600; }
@@ -5628,7 +5631,7 @@ function WeekTile({ kind, text, extra, onSave }) {
   );
   if (editing) {
     return (
-      <div className="sidebar-section">
+      <div className={`sidebar-section ${isQuote ? 'wk-first' : ''}`}>
         <div className="wk-form">
           <div className="wk-tile-eyebrow">{isQuote ? 'Edit quote' : 'Edit be-word'}</div>
           <label>{isQuote ? 'Quote' : 'Word'}</label>
@@ -5651,16 +5654,16 @@ function WeekTile({ kind, text, extra, onSave }) {
   }
   if (!has) {
     return (
-      <div className="sidebar-section">
+      <div className={`sidebar-section ${isQuote ? 'wk-first' : ''}`}>
         <button type="button" className="wk-empty" onClick={open}>{isQuote ? '＋ Add this week’s quote' : '＋ Add this week’s be-word'}</button>
       </div>
     );
   }
   return (
-    <div className="sidebar-section">
+    <div className={`sidebar-section ${isQuote ? 'wk-first' : ''}`}>
       {isQuote ? (
         <div className="wk-tile wk-quote">
-          <div className="wk-tile-eyebrow">{eyebrow}</div>
+          <div className="wk-tile-eyebrow wk-quote-eyebrow"><span className="wk-quote-mark" aria-hidden="true">“</span>{eyebrow}</div>
           <p className="wk-quote-text">{text}</p>
           {(extra || '').trim() && (<><div className="wk-rule"></div><div className="wk-src">{extra}</div></>)}
           {pencil('Edit quote')}
@@ -13528,7 +13531,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.41.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.41.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
