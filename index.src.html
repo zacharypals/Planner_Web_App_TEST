@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.47.0 -->
+<!-- LP Planner v5.48.0 -->
+<!-- v5.48.0 — Weekly desktop: (1) a filled "Today" pill centered under the week arrows jumps to the current week (and re-focuses today if a day is focused); (2) Focus day — click a weekday header to show just that day in a wider centered column, click it again to return to the full week; ‹ / › in the focused header step to the previous/next day (crossing into the neighboring week at the edges). -->
 <!-- v5.47.0 — Weekly desktop grid: hold the right mouse button and drag to pan the grid left/right (and up/down), like a canvas app. A plain right-click still opens the task Copy/Paste menu. -->
 <!-- v5.46.1 — Dark Quote tile: quote text a touch deeper cream-gold (#efd9a3) and the circle accent slightly softer, for easier reading. -->
 <!-- v5.46.0 — Dark mode Quote and Be-Word tiles get the Poster shaping: a soft diagonal gradient fade plus translucent circle accents (colors, borders, fonts unchanged). -->
@@ -358,6 +359,23 @@
     flex: 1; overflow: auto;
   }
   .cal-scroll-wrapper.rc-panning, .cal-scroll-wrapper.rc-panning * { cursor: grabbing !important; user-select: none !important; -webkit-user-select: none !important; }
+  .week-today-row { display: flex; justify-content: center; margin: -8px 0 14px; }
+  .week-today-btn {
+    border: none; border-radius: 14px; padding: 5px 20px; cursor: pointer;
+    font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.04em;
+    color: #fff; box-shadow: var(--shadow-md); transition: filter 0.15s, transform 0.1s;
+  }
+  .week-today-btn:hover { filter: brightness(1.15); }
+  .week-today-btn:active { transform: scale(0.97); }
+  .cal-header-click { cursor: pointer; user-select: none; -webkit-user-select: none; transition: filter 0.15s; }
+  .cal-header-click:hover { filter: brightness(1.12); }
+  .cal-grid.focus-day { grid-template-columns: minmax(0, 680px); justify-content: center; min-width: 0; column-gap: 0; }
+  .focus-hdr-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .focus-hdr-arrow {
+    background: rgba(255,255,255,0.12); border: none; border-radius: 12px; color: rgba(255,255,255,0.85);
+    padding: 4px 10px; font-size: 11px; font-family: 'DM Mono', monospace; cursor: pointer; text-transform: none; letter-spacing: 0.02em;
+  }
+  .focus-hdr-arrow:hover { background: rgba(255,255,255,0.25); color: #fff; }
   .cal-scroll-wrapper::-webkit-scrollbar { width: 5px; height: 10px; }
   .cal-scroll-wrapper::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
   .cal-scroll-wrapper::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 5px; }
@@ -5935,6 +5953,14 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const [wkView, setWkView] = useWeekView();   // v5.16.0: 'list' | 'blocks' (per device)
   // v5.47.0: right-click-drag pans the weekly grid (desktop). A plain right-click still opens the task menu.
   const calScrollRef = useRef(null);
+  // v5.48.0: Focus day — null = full week, 0-6 = weekday index of the single visible column (not persisted)
+  const [focusIdx, setFocusIdx] = useState(null);
+  const stepFocus = (delta) => {
+    const n = focusIdx + delta;
+    if (n < 0) { setWeekStart(ws => addDays(ws, -7)); setFocusIdx(6); }
+    else if (n > 6) { setWeekStart(ws => addDays(ws, 7)); setFocusIdx(0); }
+    else setFocusIdx(n);
+  };
   useEffect(() => {
     const el = calScrollRef.current;
     if (!el) return;
@@ -6868,6 +6894,11 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         <span className="week-nav-label">{weekLabel}</span>
         <button className="nav-arrow" onClick={()=>setWeekStart(ws=>addDays(ws,7))}>›</button>
       </div>
+      <div className="week-today-row">
+        <button className="week-today-btn" title="Jump to today"
+          style={{background: themedBg('--hdr-bg', calHeaderColor)}}
+          onClick={()=>{setWeekStart(getWeekStart(today)); setMobileDayIndex(today.getDay()); if(focusIdx!==null) setFocusIdx(today.getDay());}}>Today</button>
+      </div>
       <div style={{margin:'0 0 8px'}}><TbViewSwitch view={wkView} onChange={setWkView} /></div>
       {/* v4.7.0 — Weekly Review. Highlighted Sat–Mon, when closing out a week is the natural thing to do. */}
       <button className={`wr-review-btn ${reviewDue ? 'due' : ''}`} onClick={()=>setReviewOpen(true)}
@@ -6947,15 +6978,30 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         ) : (
         <div className="weekly-calendar">
           <div className="cal-scroll-wrapper" ref={calScrollRef}>
-            <div className="cal-grid">
-              {weekDays.map((d,i)=>(
-                <div key={'h'+i} className={`cal-header-cell ${isSameDay(d,today)?'today':''}`}
-                  style={{background: themedBg('--hdr-bg', calHeaderColor)}}>
-                  <div className="day-name">{DAYS[d.getDay()]}</div>
-                  <div className="day-date">{d.getDate()}</div>
+            <div className={`cal-grid${focusIdx!==null?' focus-day':''}`}>
+              {(focusIdx===null ? weekDays : [weekDays[focusIdx]]).map((d,i)=>(
+                <div key={'h'+d.getDay()} className={`cal-header-cell cal-header-click ${isSameDay(d,today)?'today':''}`}
+                  style={{background: themedBg('--hdr-bg', calHeaderColor)}}
+                  title={focusIdx===null ? 'Focus this day' : 'Show full week'}
+                  onClick={()=>setFocusIdx(focusIdx===null ? d.getDay() : null)}>
+                  {focusIdx===null ? (
+                    <>
+                      <div className="day-name">{DAYS[d.getDay()]}</div>
+                      <div className="day-date">{d.getDate()}</div>
+                    </>
+                  ) : (
+                    <div className="focus-hdr-row">
+                      <button className="focus-hdr-arrow" title="Previous day" onClick={e=>{e.stopPropagation();stepFocus(-1);}}>‹ {DAYS[(focusIdx+6)%7]}</button>
+                      <div>
+                        <div className="day-name">{DAYS[d.getDay()]}</div>
+                        <div className="day-date">{d.getDate()}</div>
+                      </div>
+                      <button className="focus-hdr-arrow" title="Next day" onClick={e=>{e.stopPropagation();stepFocus(1);}}>{DAYS[(focusIdx+1)%7]} ›</button>
+                    </div>
+                  )}
                 </div>
               ))}
-              {weekDays.map((d,i)=>{
+              {(focusIdx===null ? weekDays : [weekDays[focusIdx]]).map((d,i)=>{
                 const dk = fmt(d);
                 const tasks = getTasks(dk);
                 return (
@@ -13827,7 +13873,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.47.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.48.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
