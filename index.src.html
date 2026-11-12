@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.44.4 -->
+<!-- LP Planner v5.44.5 -->
+<!-- v5.44.5 — Light mode: Quote tile is a deeper lavender with a darker border and deep-violet label/source (pill removed); Be-Word tile and the due "Weekly review" button use the apricot-sand task color (#f8d4a4) with golden-brown text and borders. Dark mode unchanged. -->
 <!-- v5.44.4 — Quote tile, light mode: the "Quote of the Week" label is now a solid violet pill with white text so it pops. Dark mode unchanged (gold text, no pill). -->
 <!-- v5.44.3 — Quote tile, light mode: label and source back to a deep violet (much darker than before, for contrast on the lavender tile) and the quote text is bolder (Cormorant Garamond 700). Dark mode unchanged. -->
 <!-- v5.44.2 — Quote tile, light mode: the "Quote of the Week" label and source line are now a deep warm gold-brown (same as the Be-Word label) instead of violet, so they stand out from the lavender tile. Dark mode unchanged. -->
@@ -2669,8 +2670,16 @@
   [data-theme="dark"] .wk-quote .wk-quote-text { font-weight: 600; }
 
   /* ── v5.44.4 Quote tile label as a pill in light mode ── */
-  .wk-quote .wk-quote-eyebrow { display: inline-block; background: var(--accent); color: #fff; padding: 3px 12px; border-radius: 999px; min-height: 0; line-height: 14px; }
-  [data-theme="dark"] .wk-quote .wk-quote-eyebrow { display: block; background: none; padding: 0; border-radius: 0; }
+  .wk-quote .wk-quote-eyebrow { display: block; }
+
+  /* ── v5.44.5 Light mode: deeper Quote tile, apricot Be-Word tile + due Weekly review button ── */
+  :root:not([data-theme="dark"]) .wk-quote { background: #d9d0f4; border-color: color-mix(in oklab, var(--accent) 60%, #d9d0f4); }
+  :root:not([data-theme="dark"]) .wk-quote .wk-tile-eyebrow, :root:not([data-theme="dark"]) .wk-quote .wk-src, :root:not([data-theme="dark"]) .wk-quote .wk-tile-edit { color: color-mix(in oklab, var(--accent) 45%, var(--ink)); }
+  :root:not([data-theme="dark"]) .wk-be { background: #f8d4a4; border-color: #d19a45; }
+  :root:not([data-theme="dark"]) .wk-be .wk-tile-eyebrow, :root:not([data-theme="dark"]) .wk-be .wk-tile-edit { color: #6b4a05; }
+  :root:not([data-theme="dark"]) .wk-be .wk-be-note { color: #4d3a1c; }
+  :root:not([data-theme="dark"]) .wk-be .wk-rule { background: #a8710f; }
+  :root:not([data-theme="dark"]) .wr-review-btn.due { background: #f8d4a4; border-color: #d19a45; color: #6b4a05; }
 </style>
 </head>
 <body>
@@ -13610,7 +13619,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.44.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.44.5</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
