@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.41.2 -->
+<!-- LP Planner v5.41.3 -->
+<!-- v5.41.3 — Weekly sidebar: the Be-Word tile now sits directly under the Quote of the Week tile. -->
 <!-- v5.41.2 — Quote tile: gold quote mark is back, sitting on the same line as the "Quote of the Week" label (no extra height); breathing room restored between the Weekly review button and the Quote tile. -->
 <!-- v5.41.1 — Quote tile: removed the large quote mark and tightened the tile padding; removed the "Daily Pages" link from the Weekly sidebar. -->
 <!-- v5.41.0 — Weekly sidebar: "Proverb of the Week" is now a "Quote of the Week" tile (soft lavender card, serif text, gold quote mark, optional source line) and the Be-Word is a gold tile with the word set large and a short note beneath. Each has a pencil button that opens a small edit form (Save / Cancel). Stored in the same week fields as before (proverb, beWord — first line is the word, the rest the note), plus new optional proverbSrc; nothing to migrate. -->
@@ -6622,6 +6623,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         )}
       </button>
       <WeekTile kind="quote" text={wd.proverb||''} extra={wd.proverbSrc||''} onSave={p=>setWD(w=>({...w,...p}))} />
+      <WeekTile kind="be" text={wd.beWord||''} onSave={p=>setWD(w=>({...w,...p}))} />
       {onOpenGoal && <GlNextUp goals={goals} weekKeys={weekDays.map(fmtLocal)} onOpenGoal={onOpenGoal} />}
       <div className="sidebar-section">
         <div className="checklist-header">
@@ -6660,7 +6662,6 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           </div>
         )}
       </div>
-      <WeekTile kind="be" text={wd.beWord||''} onSave={p=>setWD(w=>({...w,...p}))} />
       <div className="sidebar-section" style={{borderTop:'1px solid var(--border)',paddingTop:12}}>
         <button onClick={()=>setShowRepeatCleanup(true)}
           style={{width:'100%',padding:'6px 10px',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)',
@@ -13531,7 +13532,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.41.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.41.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
