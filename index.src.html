@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.48.0 -->
+<!-- LP Planner v5.49.0 -->
+<!-- v5.49.0 — Weekly desktop: the Today pill now sits on the same row as the List / Time blocks switch (switch left, Today right) instead of its own line; Focus day also works in the Time blocks view (click a weekday header; ‹ / › step days); Time blocks week grid labels every hour (rows 36px tall, was a label every 2 hours at 30px). -->
 <!-- v5.48.0 — Weekly desktop: (1) a filled "Today" pill centered under the week arrows jumps to the current week (and re-focuses today if a day is focused); (2) Focus day — click a weekday header to show just that day in a wider centered column, click it again to return to the full week; ‹ / › in the focused header step to the previous/next day (crossing into the neighboring week at the edges). -->
 <!-- v5.47.0 — Weekly desktop grid: hold the right mouse button and drag to pan the grid left/right (and up/down), like a canvas app. A plain right-click still opens the task Copy/Paste menu. -->
 <!-- v5.46.1 — Dark Quote tile: quote text a touch deeper cream-gold (#efd9a3) and the circle accent slightly softer, for easier reading. -->
@@ -359,9 +360,9 @@
     flex: 1; overflow: auto;
   }
   .cal-scroll-wrapper.rc-panning, .cal-scroll-wrapper.rc-panning * { cursor: grabbing !important; user-select: none !important; -webkit-user-select: none !important; }
-  .week-today-row { display: flex; justify-content: center; margin: -8px 0 14px; }
+  .week-switch-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; }
   .week-today-btn {
-    border: none; border-radius: 14px; padding: 5px 20px; cursor: pointer;
+    border: none; border-radius: 14px; padding: 5px 14px; cursor: pointer; flex-shrink: 0;
     font-family: 'DM Mono', monospace; font-size: 11px; font-weight: 500; letter-spacing: 0.04em;
     color: #fff; box-shadow: var(--shadow-md); transition: filter 0.15s, transform 0.1s;
   }
@@ -2582,6 +2583,7 @@
   .tb-pills-m { padding: 8px 12px; gap: 6px; justify-content: flex-start; flex-shrink: 0; }
   .tb-pills-m .tb-pill { font-size: 13px; padding: 6px 12px; }
   .tb-grid { display: grid; position: relative; }
+  .tb-wrap.tb-focus .tb-head, .tb-wrap.tb-focus .tb-grid { max-width: 820px; margin-left: auto; margin-right: auto; }
   .tb-gutter { position: relative; }
   .tb-gl { position: absolute; right: 4px; transform: translateY(-50%); font-size: 10px; color: var(--ink-faint); font-family: 'DM Mono', monospace; background: var(--paper); padding-left: 2px; }
   .tb-col { position: relative; border-left: 1px solid var(--border); }
@@ -6879,7 +6881,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     scrollKey: weekKey, dayName: m => DAYS[m.date.getDay()],
   };
   const tbWeekModels = wkView === 'blocks' ? weekDays.map(tbDayModel) : [];
-  const tbWeekCtx = wkView === 'blocks' ? { ...tbCommon, days: tbWeekModels, range: tbRangeOf(tbWeekModels), headerBg: themedBg('--hdr-bg', calHeaderColor) } : null;
+  const tbWeekCtx = wkView === 'blocks' ? { ...tbCommon, days: focusIdx===null ? tbWeekModels : [tbWeekModels[focusIdx]], range: tbRangeOf(tbWeekModels), headerBg: themedBg('--hdr-bg', calHeaderColor), focusIdx, setFocusIdx, stepFocus } : null;
   const tbDayM = wkView === 'blocks' ? tbDayModel(weekDays[mobileDayIndex]) : null;
   const tbDayCtx = wkView === 'blocks' ? { ...tbCommon, day: tbDayM, range: tbRangeOf([tbDayM]), scrollKey: mobileDayKey } : null;
 
@@ -6894,12 +6896,12 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         <span className="week-nav-label">{weekLabel}</span>
         <button className="nav-arrow" onClick={()=>setWeekStart(ws=>addDays(ws,7))}>›</button>
       </div>
-      <div className="week-today-row">
+      <div className="week-switch-row">
+        <TbViewSwitch view={wkView} onChange={setWkView} />
         <button className="week-today-btn" title="Jump to today"
           style={{background: themedBg('--hdr-bg', calHeaderColor)}}
           onClick={()=>{setWeekStart(getWeekStart(today)); setMobileDayIndex(today.getDay()); if(focusIdx!==null) setFocusIdx(today.getDay());}}>Today</button>
       </div>
-      <div style={{margin:'0 0 8px'}}><TbViewSwitch view={wkView} onChange={setWkView} /></div>
       {/* v4.7.0 — Weekly Review. Highlighted Sat–Mon, when closing out a week is the natural thing to do. */}
       <button className={`wr-review-btn ${reviewDue ? 'due' : ''}`} onClick={()=>setReviewOpen(true)}
         title={`Reviews ${fmtDisplay(reviewTarget)} – ${fmtDisplay(addDays(reviewTarget, 6))}`}>
@@ -10192,9 +10194,24 @@ function TbWeek({ ctx }) {
       <div />
       {days.map(d => (
         <div key={d.key} className={`tb-head-day ${d.today ? 'today' : ''}`}>
-          <div className={`cal-header-cell tb-hcell ${d.today ? 'today' : ''}`} style={{ background: ctx.headerBg }}>
-            <div className="day-name">{ctx.dayName(d)}</div>
-            <div className="day-date">{d.date.getDate()}</div>
+          <div className={`cal-header-cell cal-header-click tb-hcell ${d.today ? 'today' : ''}`} style={{ background: ctx.headerBg }}
+            title={ctx.focusIdx == null ? 'Focus this day' : 'Show full week'}
+            onClick={() => ctx.setFocusIdx(ctx.focusIdx == null ? d.date.getDay() : null)}>
+            {ctx.focusIdx == null ? (
+              <>
+                <div className="day-name">{ctx.dayName(d)}</div>
+                <div className="day-date">{d.date.getDate()}</div>
+              </>
+            ) : (
+              <div className="focus-hdr-row">
+                <button className="focus-hdr-arrow" title="Previous day" onClick={e => { e.stopPropagation(); ctx.stepFocus(-1); }}>‹ {DAYS[(ctx.focusIdx + 6) % 7]}</button>
+                <div>
+                  <div className="day-name">{ctx.dayName(d)}</div>
+                  <div className="day-date">{d.date.getDate()}</div>
+                </div>
+                <button className="focus-hdr-arrow" title="Next day" onClick={e => { e.stopPropagation(); ctx.stepFocus(1); }}>{DAYS[(ctx.focusIdx + 1) % 7]} ›</button>
+              </div>
+            )}
           </div>
           <TbPills d={d} openSec={pop && pop.dayKey === d.key ? pop.sec : null} onPick={(sec, el) => pick(sec, d.key, el)} />
         </div>
@@ -10203,12 +10220,12 @@ function TbWeek({ ctx }) {
   );
   const secTitle = !pop || !model ? '' : ({ habits: 'Habits', goals: 'Goals', notime: 'No time', item: 'Time block' }[pop.sec]) + ' · ' + ctx.dayName(model) + ' ' + model.date.getDate();
   return (
-    <div className="tb-wrap">
+    <div className={`tb-wrap${ctx.focusIdx != null ? ' tb-focus' : ''}`}>
       <div className="tb-viewbar">
         <TbViewSwitch view={ctx.view} onChange={ctx.setView} />
         <span className="tb-hint">Drag a block to move it · drag its bottom edge to resize · double-click empty space to add</span>
       </div>
-      <TbGrid days={days} hourPx={30} h0={h0} h1={h1} labelEvery={2} canDrag header={head} scrollKey={ctx.scrollKey}
+      <TbGrid days={days} hourPx={36} h0={h0} h1={h1} labelEvery={1} canDrag header={head} scrollKey={ctx.scrollKey}
         dropActive={ctx.dropActive} onOpen={openItem} onToggle={ctx.toggleDone} onPlace={ctx.place} onCreate={create} onDropMin={ctx.dropMin} />
       {pop && model && (
         <TbPopover anchor={pop.anchor} width={pop.sec === 'item' ? 330 : 310} hidden={ctx.dropActive} onClose={close} title={secTitle}>
@@ -13873,7 +13890,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.48.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.49.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
