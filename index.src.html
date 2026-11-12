@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.45.0 -->
+<!-- LP Planner v5.45.1 -->
+<!-- v5.45.1 — Quote tile text centered again; pencil edit buttons back at top-right of the Quote and Be-Word tiles. -->
 <!-- v5.45.0 — Light-mode theme picker: six selectable themes (Current, Dusty jewel, Jewel tonal, Rich tonal, Earthy, Fresh) via the 🎨 button in the top bar, synced across devices; Quote/Be-Word tiles redesigned ("Poster") and tinted per theme. Dark mode unchanged. -->
 <!-- v5.44.5 — Light mode: Quote tile is a deeper lavender with a darker border and deep-violet label/source (pill removed); Be-Word tile and the due "Weekly review" button use the apricot-sand task color (#f8d4a4) with golden-brown text and borders. Dark mode unchanged. -->
 <!-- v5.44.4 — Quote tile, light mode: the "Quote of the Week" label is now a solid violet pill with white text so it pops. Dark mode unchanged (gold text, no pill). -->
@@ -2737,20 +2738,21 @@
   .cal-header-cell.today .day-date { color: var(--hdr-today, var(--gold)); }
 
   /* ── v5.45.0 T2 "Poster" Quote / Be-Word tiles (light mode, tinted per theme) ── */
-  :root:not([data-theme="dark"]) .wk-quote { position: relative; overflow: hidden; background: var(--t2-q, linear-gradient(145deg,#463a82,#6a58b0)); border: none; border-radius: 18px; padding: 14px 44px 16px 16px; text-align: left; box-shadow: 0 8px 18px var(--t2-qsh, rgba(40,25,80,.22)); color: var(--t2-qtx, #fff); }
+  :root:not([data-theme="dark"]) .wk-quote { position: relative; overflow: hidden; background: var(--t2-q, linear-gradient(145deg,#463a82,#6a58b0)); border: none; border-radius: 18px; padding: 14px 44px 16px; text-align: center; box-shadow: 0 8px 18px var(--t2-qsh, rgba(40,25,80,.22)); color: var(--t2-qtx, #fff); }
+  :root:not([data-theme="dark"]) .wk-tile-edit { z-index: 2; }
   :root:not([data-theme="dark"]) .wk-quote::before { content: ''; position: absolute; top: -34px; right: -26px; width: 120px; height: 120px; border-radius: 50%; background: rgba(255,255,255,.10); pointer-events: none; }
   :root:not([data-theme="dark"]) .wk-quote::after { content: ''; position: absolute; top: 14px; right: 30px; width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(255,255,255,.14); pointer-events: none; }
-  :root:not([data-theme="dark"]) .wk-quote > * { position: relative; z-index: 1; }
+  :root:not([data-theme="dark"]) .wk-quote > *:not(.wk-tile-edit) { position: relative; z-index: 1; }
   :root:not([data-theme="dark"]) .wk-quote .wk-tile-eyebrow, :root:not([data-theme="dark"]) .wk-quote .wk-src, :root:not([data-theme="dark"]) .wk-quote .wk-tile-edit { color: var(--t2-lab, #f6c667); }
-  :root:not([data-theme="dark"]) .wk-quote .wk-quote-text { font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 21px; line-height: 1.25; color: var(--t2-qtx, #fff); text-align: left; }
+  :root:not([data-theme="dark"]) .wk-quote .wk-quote-text { font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: 21px; line-height: 1.25; color: var(--t2-qtx, #fff); text-align: center; }
   :root:not([data-theme="dark"]) .wk-quote .wk-quote-text.q-m { font-size: 18.5px; }
   :root:not([data-theme="dark"]) .wk-quote .wk-quote-text.q-l { font-size: 16px; }
   :root:not([data-theme="dark"]) .wk-quote .wk-quote-text.q-xl { font-size: 14px; }
   :root:not([data-theme="dark"]) .wk-quote .wk-src { font-size: 12px; font-weight: 500; }
-  :root:not([data-theme="dark"]) .wk-quote .wk-rule { margin-left: 0; margin-right: auto; background: var(--t2-lab, #f6c667); }
+  :root:not([data-theme="dark"]) .wk-quote .wk-rule { margin-left: auto; margin-right: auto; background: var(--t2-lab, #f6c667); }
   :root:not([data-theme="dark"]) .wk-be { position: relative; overflow: hidden; background: var(--t2-gold, linear-gradient(135deg,#f9d27c,#eaa83c)); border: none; border-radius: 16px; box-shadow: 0 6px 14px rgba(120,80,10,.22); color: var(--t2-gtx, #4a2d00); }
   :root:not([data-theme="dark"]) .wk-be::after { content: ''; position: absolute; bottom: -30px; right: -20px; width: 90px; height: 90px; border-radius: 50%; background: rgba(255,255,255,.22); pointer-events: none; }
-  :root:not([data-theme="dark"]) .wk-be > * { position: relative; z-index: 1; }
+  :root:not([data-theme="dark"]) .wk-be > *:not(.wk-tile-edit) { position: relative; z-index: 1; }
   :root:not([data-theme="dark"]) .wk-be .wk-tile-eyebrow, :root:not([data-theme="dark"]) .wk-be .wk-tile-edit { color: var(--t2-gtx, #4a2d00); }
   :root:not([data-theme="dark"]) .wk-be .wk-be-word { font-family: 'DM Sans', sans-serif; font-weight: 800; font-size: 28px; color: var(--t2-gtx, #4a2d00); }
   :root:not([data-theme="dark"]) .wk-be .wk-be-word.long { font-size: 19px; }
@@ -13749,7 +13751,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.45.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.45.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
