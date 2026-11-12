@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.45.2 -->
+<!-- LP Planner v5.46.0 -->
+<!-- v5.46.0 — Dark mode Quote and Be-Word tiles get the Poster shaping: a soft diagonal gradient fade plus translucent circle accents (colors, borders, fonts unchanged). -->
 <!-- v5.45.2 — Quote tile: side padding trimmed (14px; eyebrow row keeps clear of the pencil) and text 19px so short quotes fit on two lines. -->
 <!-- v5.45.1 — Quote tile text centered again; pencil edit buttons back at top-right of the Quote and Be-Word tiles. -->
 <!-- v5.45.0 — Light-mode theme picker: six selectable themes (Current, Dusty jewel, Jewel tonal, Rich tonal, Earthy, Fresh) via the 🎨 button in the top bar, synced across devices; Quote/Be-Word tiles redesigned ("Poster") and tinted per theme. Dark mode unchanged. -->
@@ -2772,6 +2773,16 @@
   .lt-sw i { flex: 1; }
   .lt-note { font-size: 11px; color: var(--ink-light); padding: 6px 4px 2px; }
 
+
+  /* ── v5.46.0 Dark mode: Poster shaping on the Quote / Be-Word tiles (gradient fade + circle accents; same colors, borders and fonts) ── */
+  [data-theme="dark"] .wk-quote, [data-theme="dark"] .wk-be { position: relative; overflow: hidden; }
+  [data-theme="dark"] .wk-quote { background: linear-gradient(145deg, #3d3363 0%, #302844 55%, #262038 100%); }
+  [data-theme="dark"] .wk-be { background: linear-gradient(135deg, #3b2c10 0%, #2d220f 55%, #241a0b 100%); }
+  [data-theme="dark"] .wk-quote::before { content: ''; position: absolute; top: -34px; right: -26px; width: 120px; height: 120px; border-radius: 50%; background: rgba(229,177,91,.08); pointer-events: none; }
+  [data-theme="dark"] .wk-quote::after { content: ''; position: absolute; top: 14px; right: 30px; width: 44px; height: 44px; border-radius: 50%; border: 2px solid rgba(229,177,91,.16); pointer-events: none; }
+  [data-theme="dark"] .wk-be::after { content: ''; position: absolute; bottom: -30px; right: -20px; width: 90px; height: 90px; border-radius: 50%; background: rgba(229,177,91,.09); pointer-events: none; }
+  [data-theme="dark"] .wk-quote > *:not(.wk-tile-edit), [data-theme="dark"] .wk-be > *:not(.wk-tile-edit) { position: relative; z-index: 1; }
+  [data-theme="dark"] .wk-tile-edit { z-index: 2; }
 </style>
 </head>
 <body>
@@ -13753,7 +13764,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.45.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.46.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
