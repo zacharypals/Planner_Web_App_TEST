@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.49.0 -->
+<!-- LP Planner v5.50.0 -->
+<!-- v5.50.0 — Google Calendar two-way sync hardening: every push/update/delete now fetches a fresh Google token first (edits used to be silently skipped when the cached token was near expiry, then overwritten by the next pull); failed edits/deletes are remembered and retried before the next pull (newest edit wins); a time added to an all-day event converts it properly (and back); events deleted in Google are removed from the app; app events whose Google link was lost are re-linked; deletes in the app are confirmed with Google. Monthly view: events get a Length picker next to Time. -->
 <!-- v5.49.0 — Weekly desktop: the Today pill now sits on the same row as the List / Time blocks switch (switch left, Today right) instead of its own line; Focus day also works in the Time blocks view (click a weekday header; ‹ / › step days); Time blocks week grid labels every hour (rows 36px tall, was a label every 2 hours at 30px). -->
 <!-- v5.48.0 — Weekly desktop: (1) a filled "Today" pill centered under the week arrows jumps to the current week (and re-focuses today if a day is focused); (2) Focus day — click a weekday header to show just that day in a wider centered column, click it again to return to the full week; ‹ / › in the focused header step to the previous/next day (crossing into the neighboring week at the edges). -->
 <!-- v5.47.0 — Weekly desktop grid: hold the right mouse button and drag to pan the grid left/right (and up/down), like a canvas app. A plain right-click still opens the task Copy/Paste menu. -->
@@ -5150,21 +5151,45 @@ function useSynced(key, init) {
 }
 
 // ── CALENDAR HELPERS ──
-async function pushEventToCalendar(event, dateKey) {
-  const token = getToken();
+// v5.50.0 — two-way sync hardening. Every call below gets a FRESH Google token first (the old code silently
+// skipped the call when the cached token was within 2 min of expiry), retries once on a 401, and records
+// edits/deletes Google hasn't confirmed in a small persisted "pending" list that is retried on the next sync.
+const CAL_PEND_KEY = 'calPending';
+function calPendRead() { try { return JSON.parse(lsGet(CAL_PEND_KEY) || '{}') || {}; } catch { return {}; } }
+function calPendWrite(o) { lsSet(CAL_PEND_KEY, JSON.stringify(o)); }
+function calPendSet(gcalId, op) { const p = calPendRead(); p[gcalId] = { op, ts: Date.now() }; calPendWrite(p); }
+function calPendClear(gcalId) { const p = calPendRead(); if (p[gcalId]) { delete p[gcalId]; calPendWrite(p); } }
+// True when a Google sign-in exists that can produce a token (the token itself is fetched per call).
+function calReady() { return !!(getToken() || getSession()); }
+async function calFetch(url, opts = {}) {
+  let token = (await ensureGoogleToken()) || getToken();
   if (!token) throw new Error('Not signed in to Google — please sign in and try again');
-  const dateObj = new Date(dateKey + 'T00:00:00');
-  const dateStr = dateKey; // YYYY-MM-DD
-  let start, end;
-  if (event.eventTime) {
-    start = { dateTime: `${dateStr}T${event.eventTime}:00`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
-    end = { dateTime: `${dateStr}T${tbEndClock(event.eventTime, event.durMin)}:00`, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
-  } else {
-    const nextDay = new Date(dateObj); nextDay.setDate(nextDay.getDate() + 1);
-    const nextStr = fmt(nextDay);
-    start = { date: dateStr };
-    end = { date: nextStr };
+  const go = t => fetch(url, { ...opts, headers: { ...(opts.headers || {}), 'Authorization': `Bearer ${t}` } });
+  let res = await go(token);
+  if (res.status === 401) {                      // token was rejected — force a refresh and try once more
+    token = await ensureGoogleToken(true);
+    if (token) res = await go(token);
   }
+  return res;
+}
+// Start/end for Google. Both forms name the field they are NOT using as null, so a PATCH can turn an
+// all-day event into a timed one (or back) instead of being rejected for carrying both.
+function calStartEnd(event, dateStr) {
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (event.eventTime) {
+    return {
+      start: { dateTime: `${dateStr}T${event.eventTime}:00`, timeZone: tz, date: null },
+      end:   { dateTime: `${dateStr}T${tbEndClock(event.eventTime, event.durMin)}:00`, timeZone: tz, date: null },
+    };
+  }
+  const nextDay = new Date(dateStr + 'T00:00:00'); nextDay.setDate(nextDay.getDate() + 1);
+  return { start: { date: dateStr, dateTime: null }, end: { date: fmt(nextDay), dateTime: null } };
+}
+
+async function pushEventToCalendar(event, dateKey) {
+  const { start, end } = calStartEnd(event, dateKey);
+  if (start.date === null) delete start.date; else delete start.dateTime;   // a brand-new event needs no clearing
+  if (end.date === null) delete end.date; else delete end.dateTime;
   const inviteeList = (event.invitees||[]).filter(Boolean);
   const body = {
     summary: event.title || 'Untitled Event',
@@ -5173,9 +5198,9 @@ async function pushEventToCalendar(event, dateKey) {
     extendedProperties: { private: { plannerId: event.id } },
     ...(inviteeList.length > 0 ? { attendees: inviteeList.map(email=>({email})) } : {}),
   };
-  const res = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all', {
+  const res = await calFetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -5189,13 +5214,17 @@ async function pushEventToCalendar(event, dateKey) {
   return created.id;
 }
 
+// Returns true once Google has confirmed the delete (or the event is already gone); otherwise the delete
+// stays in the pending list and is retried on the next sync.
 async function deleteEventFromCalendar(gcalId) {
-  const token = getToken();
-  if (!token || !gcalId) return;
-  await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}`, {
-    method: 'DELETE',
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
+  if (!gcalId) return true;
+  calPendSet(gcalId, 'delete');
+  try {
+    const res = await calFetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}`, { method: 'DELETE' });
+    if (res.ok || res.status === 404 || res.status === 410) { calPendClear(gcalId); return true; }
+    console.error('deleteEventFromCalendar failed:', res.status);
+  } catch (e) { console.error('deleteEventFromCalendar failed:', e && e.message); }
+  return false;
 }
 
 async function respondToCalendarInvite(gcalId, response) {
@@ -5217,22 +5246,12 @@ async function respondToCalendarInvite(gcalId, response) {
   return response;
 }
 
+// Returns true once Google has confirmed the change. Until then the edit stays in the pending list.
 async function updateEventInCalendar(gcalId, event, dateKey) {
-  const token = getToken();
-  if (!token || !gcalId) return;
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const dateStr = dateKey;
-  let start, end;
-  if (event.eventTime) {
-    start = { dateTime: `${dateStr}T${event.eventTime}:00`, timeZone: tz };
-    end   = { dateTime: `${dateStr}T${tbEndClock(event.eventTime, event.durMin)}:00`, timeZone: tz };
-  } else {
-    const nextDay = new Date(dateStr + 'T00:00:00'); nextDay.setDate(nextDay.getDate() + 1);
-    start = { date: dateStr };
-    end   = { date: fmt(nextDay) };
-  }
-  // Use PATCH (not PUT) — PATCH merges fields rather than replacing the entire event.
-  // PUT would wipe any attendees/fields not included in the body.
+  if (!gcalId) return false;
+  calPendSet(gcalId, 'update');   // stamped with the time of this edit; cleared when Google confirms
+  const { start, end } = calStartEnd(event, dateKey);
+  // PATCH (not PUT) merges fields, so attendees/other settings we don't manage are left alone.
   const inviteeList = (event.invitees||[]).filter(Boolean);
   const body = {
     summary: event.title || 'Untitled Event',
@@ -5242,19 +5261,42 @@ async function updateEventInCalendar(gcalId, event, dateKey) {
     // Only include attendees if we have them — PATCH won't remove existing ones if omitted
     ...(inviteeList.length > 0 ? { attendees: inviteeList.map(email=>({email})) } : {}),
   };
-  console.log('updateEventInCalendar PATCH body:', JSON.stringify({
-    gcalId, summary: body.summary, attendees: body.attendees||'(not included)', start, end
-  }));
-  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}?sendUpdates=all`, {
-    method: 'PATCH',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
+  try {
+    const res = await calFetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${gcalId}?sendUpdates=all`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) { calPendClear(gcalId); return true; }
+    if (res.status === 404 || res.status === 410) { calPendClear(gcalId); return false; }   // deleted in Google — the next pull removes the app copy
     const err = await res.json().catch(()=>({}));
     console.error('updateEventInCalendar failed:', res.status, err?.error?.message);
-  } else {
-    console.log('updateEventInCalendar succeeded:', res.status);
+  } catch (e) { console.error('updateEventInCalendar failed:', e && e.message); }
+  return false;
+}
+
+// Retry edits/deletes Google never confirmed. Newest edit wins: if the Google copy changed AFTER the
+// pending edit was made, the Google version stands and the pending edit is dropped.
+async function flushCalPending(weekData) {
+  const pend = calPendRead(); const ids = Object.keys(pend);
+  if (!ids.length) return;
+  const idx = {};
+  Object.values(weekData || {}).forEach(w => Object.entries((w && w.tasks) || {}).forEach(([dk, ts]) =>
+    (ts || []).forEach(t => { if (t && t.gcalId) idx[t.gcalId] = { task: t, dk }; })));
+  for (const id of ids) {
+    const p = pend[id];
+    if (p.op === 'delete') { await deleteEventFromCalendar(id); continue; }
+    const hit = idx[id];
+    if (!hit) { calPendClear(id); continue; }
+    try {
+      const r = await calFetch(`https://www.googleapis.com/calendar/v3/calendars/primary/events/${id}?fields=updated,status`);
+      if (r.status === 404 || r.status === 410) { calPendClear(id); continue; }
+      if (r.ok) {
+        const g = await r.json();
+        if (g.status === 'cancelled' || (g.updated && Date.parse(g.updated) > p.ts + 2000)) { calPendClear(id); continue; }
+      }
+    } catch (e) { continue; }
+    await updateEventInCalendar(id, hit.task, hit.dk);
   }
 }
 
@@ -5278,10 +5320,13 @@ async function calendarRequest(url, opts = {}) {
 async function pullNewFromCalendar(weekData) {
   const token = getToken();
   if (!token) return null;
+  // v5.50.0: first retry anything Google never confirmed (newest edit wins), then pull.
+  try { await flushCalPending(weekData); } catch (e) { console.error('Pending calendar changes could not be retried:', e && e.message); }
+  const pendNow = calPendRead();
   const now = new Date();
   const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
   const oneYearFwd = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
-  const baseParams = `timeMin=${oneYearAgo.toISOString()}&timeMax=${oneYearFwd.toISOString()}&singleEvents=true&maxResults=2500&showHiddenInvitations=true&fields=items(id,summary,description,start,end,extendedProperties,attendees,organizer),nextPageToken`;
+  const baseParams = `timeMin=${oneYearAgo.toISOString()}&timeMax=${oneYearFwd.toISOString()}&singleEvents=true&maxResults=2500&showHiddenInvitations=true&showDeleted=true&fields=items(id,status,updated,summary,description,start,end,extendedProperties,attendees,organizer),nextPageToken`;
 
   // Paginate through ALL results — maxResults=2500/page means a single request covers
   // most calendars, but we keep paginating via nextPageToken for very large ones.
@@ -5306,20 +5351,34 @@ async function pullNewFromCalendar(weekData) {
   // Build a map of gcalId → local task for quick lookup
   const gcalIdToTask = {}; // gcalId → {task, wk, dayKey}
   const existingPlannerIds = new Set();
+  const plannerLoc = {}; // plannerId → {task, wk, dayKey}
   Object.entries(weekData).forEach(([wk, wd]) => {
     Object.entries(wd.tasks || {}).forEach(([dayKey, tasks]) => {
       tasks.filter(t => t.isEvent).forEach(t => {
         existingPlannerIds.add(t.id);
+        plannerLoc[t.id] = {task: t, wk, dayKey};
         if (t.gcalId) gcalIdToTask[t.gcalId] = {task: t, wk, dayKey};
       });
     });
   });
 
   const newWeekData = JSON.parse(JSON.stringify(weekData));
-  let added = 0, updated = 0, durFixed = 0;
+  let added = 0, updated = 0, durFixed = 0, deleted = 0, linked = 0;
   const addedDates = [];
 
   gcalEvents.forEach(ev => {
+    // v5.50.0: deleted in Google → remove the app copy (and forget any pending edit for it)
+    if (ev.status === 'cancelled') {
+      const hit = gcalIdToTask[ev.id];
+      if (hit) {
+        newWeekData[hit.wk].tasks[hit.dayKey] = (newWeekData[hit.wk].tasks[hit.dayKey] || []).filter(t => t.id !== hit.task.id);
+        deleted++;
+      }
+      if (pendNow[ev.id] && pendNow[ev.id].op === 'update') calPendClear(ev.id);
+      return;
+    }
+    // deleted in the app but Google hasn't confirmed yet — don't bring it back
+    if (pendNow[ev.id] && pendNow[ev.id].op === 'delete') return;
     const newDateStr = ev.start?.date || ev.start?.dateTime?.slice(0, 10);
     if (!newDateStr) {
       console.warn('Calendar sync: skipping event with no start date', ev.id, ev.summary);
@@ -5336,6 +5395,8 @@ async function pullNewFromCalendar(weekData) {
     if (gcalIdToTask[ev.id]) {
       // Event exists in app — update title, details, time, and date if changed
       const {task, wk, dayKey} = gcalIdToTask[ev.id];
+      // an edit made here that Google hasn't accepted yet is newer than Google's copy — keep it, it is retried next sync
+      if (pendNow[ev.id] && pendNow[ev.id].op === 'update') return;
       const changed = task.title !== (ev.summary||'') ||
         task.details !== (ev.description||'') ||
         task.eventTime !== newTimeStr ||
@@ -5371,8 +5432,14 @@ async function pullNewFromCalendar(weekData) {
       // Net new event — add it
       const plannerId = ev.extendedProperties?.private?.plannerId;
       if (plannerId && existingPlannerIds.has(plannerId)) {
-        console.log('Calendar sync: skipping (plannerId match)', ev.id, ev.summary);
-        return; // already tracked
+        // Already tracked. If the app copy never got its Google link (the create succeeded but the reply was lost), link it now.
+        const loc = plannerLoc[plannerId];
+        if (loc && !loc.task.gcalId) {
+          const tl = newWeekData[loc.wk].tasks[loc.dayKey] || [];
+          const ti = tl.findIndex(t => t.id === plannerId);
+          if (ti >= 0) { tl[ti] = { ...tl[ti], gcalId: ev.id }; linked++; }
+        }
+        return;
       }
       added++;
       addedDates.push(newDateStr);
@@ -5393,7 +5460,7 @@ async function pullNewFromCalendar(weekData) {
     }
   });
 
-  return { added, updated, durFixed, newWeekData, addedDates };
+  return { added, updated, durFixed, deleted, linked, newWeekData, addedDates };
 }
 
 function useStorage(key, init) {
@@ -6343,7 +6410,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       return o;
     }));
     // Copies that are already Google Calendar events get the change too (one after another, best effort)
-    if (cal.length && getToken()) (async () => {
+    if (cal.length && calReady()) (async () => {
       for (const c of cal) { try { await updateEventInCalendar(c.task.gcalId, c.task, c.dk); } catch (err) { console.error('Calendar update failed:', err); } }
     })();
     setSeriesPrompt(null);
@@ -6355,7 +6422,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     // v5.16.0: the ref still holds the pre-edit task when this runs straight after updateTask, so merge the
     // time fields from the patch (otherwise Google Calendar was sent the OLD time/length).
     const task = (task0 && ('eventTime' in patch || 'durMin' in patch)) ? { ...task0, ...('eventTime' in patch ? { eventTime: patch.eventTime } : {}), ...('durMin' in patch ? { durMin: patch.durMin } : {}) } : task0;
-    if (!task || !getToken()) return;
+    if (!task || !calReady()) return;
 
     if (task.isEvent) {
       if (task.gcalId) {
@@ -6407,7 +6474,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     const prevSched = task?.isProjectTask
       ? (((pagesData||[]).find(d => d.id === task.projectDocId)?.tasks||[]).find(t => t.id===id)?.scheduledDate || dayKey)
       : null;
-    if (task && task.gcalId && getToken()) deleteEventFromCalendar(task.gcalId).catch(()=>{});
+    if (task && task.gcalId && calReady()) deleteEventFromCalendar(task.gcalId).catch(()=>{});
     // If this is a project task, clear its scheduledDate in pagesData (removes from planner but keeps in doc)
     if (task?.isProjectTask && task?.projectDocId && setPagesData) {
       setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : {
@@ -6425,7 +6492,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           }));
         }
         // The calendar event was removed with the task — put it back
-        if (task.gcalId && task.isEvent && getToken()) {
+        if (task.gcalId && task.isEvent && calReady()) {
           pushEventToCalendar(task, dayKey).then(gcalId => {
             if (!gcalId) return;
             setWeekData(wd => {
@@ -6661,7 +6728,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       return { ...allWD, [fromWk]: nextFromWD, [toWk]: nextToWD };
     });
     // Sync date change to Google Calendar
-    if (taskForSync?.isEvent && taskForSync?.gcalId && getToken()) {
+    if (taskForSync?.isEvent && taskForSync?.gcalId && calReady()) {
       updateEventInCalendar(taskForSync.gcalId, taskForSync, toDayKey)
         .catch(e => console.error('Calendar move failed:', e));
     }
@@ -10299,7 +10366,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
   const [selectedDate, setSelectedDate] = useState(null);
   const [showEventModal, setShowEventModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null); // {dayKey, taskId} or null
-  const [eventForm, setEventForm] = useState({title:'', time:'', date:'', details:'', invitees:''});
+  const [eventForm, setEventForm] = useState({title:'', time:'', dur:0, date:'', details:'', invitees:''});
   const [dragInfo, setDragInfo] = useState(null); // {eventId, fromDayKey}
   const [dragOverDay, setDragOverDay] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -10343,7 +10410,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
       if (!updated[newWeekKey].tasks[toDayKey]) updated[newWeekKey].tasks[toDayKey] = [];
       updated[newWeekKey].tasks[toDayKey].push(movedTask);
       // Update Google Calendar if signed in
-      if (movedTask.gcalId && getToken()) updateEventInCalendar(movedTask.gcalId, movedTask, toDayKey);
+      if (movedTask.gcalId && calReady()) updateEventInCalendar(movedTask.gcalId, movedTask, toDayKey);
       return updated;
     });
   }
@@ -10393,13 +10460,13 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
   function openAddEvent(dateKey) {
     setSelectedDate(dateKey);
     setEditingEvent(null);
-    setEventForm({title:'', time:'', date:dateKey, details:'', invitees:''});
+    setEventForm({title:'', time:'', dur:0, date:dateKey, details:'', invitees:''});
     setShowEventModal(true);
   }
 
   function openEditEvent(ev) {
     setEditingEvent({dayKey: ev.dayKey, taskId: ev.id});
-    setEventForm({title: ev.title||'', time: ev.eventTime||'', date: ev.dayKey||'', details: ev.details||'', invitees:(ev.invitees||[]).join(', ')});
+    setEventForm({title: ev.title||'', time: ev.eventTime||'', dur: ev.durMin||0, date: ev.dayKey||'', details: ev.details||'', invitees:(ev.invitees||[]).join(', ')});
     setShowEventModal(true);
   }
 
@@ -10416,7 +10483,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
           if (tasks) {
             const idx = tasks.findIndex(t => t.id === editingEvent.taskId);
             if (idx !== -1) {
-              const updatedTask = {...tasks[idx], title:eventForm.title, eventTime:eventForm.time, details:eventForm.details, invitees:eventForm.invitees.split(',').map(s=>s.trim()).filter(Boolean)};
+              const updatedTask = {...tasks[idx], title:eventForm.title, eventTime:eventForm.time, durMin: eventForm.time ? (eventForm.dur||0) : 0, details:eventForm.details, invitees:eventForm.invitees.split(',').map(s=>s.trim()).filter(Boolean)};
               if (dateChanged) {
                 // Remove from old day
                 updated[wk].tasks[editingEvent.dayKey] = tasks.filter(t => t.id !== editingEvent.taskId);
@@ -10429,7 +10496,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
               } else {
                 updated[wk].tasks[editingEvent.dayKey][idx] = updatedTask;
               }
-              if (updatedTask.gcalId && getToken()) {
+              if (updatedTask.gcalId && calReady()) {
                 updateEventInCalendar(updatedTask.gcalId, updatedTask, newDayKey);
               }
             }
@@ -10445,6 +10512,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
       const newTask = {
         id: Date.now().toString(), title: eventForm.title, details: eventForm.details, invitees:eventForm.invitees.split(',').map(s=>s.trim()).filter(Boolean),
         done: false, expanded: false, colorIndex: 3, isEvent: true, eventTime: eventForm.time,
+        ...(eventForm.time && eventForm.dur ? { durMin: eventForm.dur } : {}),
         gcalId: null,
       };
       setWeekData(wd => {
@@ -10453,7 +10521,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
         return {...wd, [weekKey]: {...cur, tasks: {...(cur.tasks||{}), [targetDate]: [...dayTasks, newTask]}}};
       });
       // Push to Google Calendar and store gcalId back
-      if (getToken()) {
+      if (calReady()) {
         pushEventToCalendar(newTask, targetDate).then(gcalId => {
           if (gcalId) {
             setWeekData(wd => {
@@ -10481,7 +10549,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
 
   function deleteEvent(ev) {
     // Remove from Google Calendar if signed in and has gcalId
-    if (ev.gcalId && getToken()) deleteEventFromCalendar(ev.gcalId);
+    if (ev.gcalId && calReady()) deleteEventFromCalendar(ev.gcalId);
     setWeekData(wd => {
       const updated = {...wd};
       Object.keys(updated).forEach(wk => {
@@ -10718,6 +10786,16 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
                 onChange={e=>setEventForm(f=>({...f,date:e.target.value}))} />
               <label style={{fontSize:12,color:'var(--ink-faint)'}}>Time:</label>
               <TimeSelect value={eventForm.time} onChange={v=>setEventForm(f=>({...f,time:v}))} />
+              {eventForm.time && (
+                <>
+                  <label style={{fontSize:12,color:'var(--ink-faint)'}}>Length:</label>
+                  <select className="task-time-input" style={{padding:'3px 2px'}}
+                    value={TB_DURS.includes(eventForm.dur) ? eventForm.dur : (eventForm.dur ? eventForm.dur : 60)}
+                    onChange={e=>setEventForm(f=>({...f,dur:parseInt(e.target.value,10)}))}>
+                    {(TB_DURS.includes(eventForm.dur) || !eventForm.dur ? TB_DURS : [...TB_DURS, eventForm.dur].sort((a,b)=>a-b)).map(d=><option key={d} value={d}>{tbDurLabel(d)}</option>)}
+                  </select>
+                </>
+              )}
             </div>
             <textarea className="modal-textarea" placeholder="Details (optional)…"
               value={eventForm.details} onChange={e=>setEventForm(f=>({...f,details:e.target.value}))} rows={3} />
@@ -13536,7 +13614,7 @@ function App() {
     _lastCalSyncMs = Date.now();
     try {
       const result = await pullNewFromCalendar(currentWeekData);
-      if (!result || (result.added === 0 && result.updated === 0 && !(result.durFixed > 0))) return;
+      if (!result || (result.added === 0 && result.updated === 0 && !(result.durFixed > 0) && !(result.deleted > 0) && !(result.linked > 0))) return;
       applyCalendarResult(currentWeekData, result.newWeekData);
       console.log(`Auto calendar sync: ${result.added} added, ${result.updated} updated`);
     } catch (e) {
@@ -13698,7 +13776,7 @@ function App() {
       const result = await pullNewFromCalendar(weekData);
       if (!result) {
         alert('Calendar sync failed: could not reach Google Calendar.\n\nMake sure:\n1. Google Calendar API is enabled in Cloud Console\n2. You signed in and approved Calendar access on the consent screen\n3. Try signing out and back in');
-      } else if (result.added > 0 || result.updated > 0 || result.durFixed > 0) {
+      } else if (result.added > 0 || result.updated > 0 || result.durFixed > 0 || result.deleted > 0 || result.linked > 0) {
         applyCalendarResult(weekData, result.newWeekData);   // only the changed weeks; the sync engine uploads them
         const parts = [];
         if (result.added > 0) {
@@ -13711,7 +13789,8 @@ function App() {
           if (dateLabels.length) parts.push(`(${dateLabels.join(', ')})`);
         }
         if (result.updated > 0) parts.push(`${result.updated} event${result.updated===1?'':'s'} updated`);
-        alert('✓ ' + parts.join(' ') + ' from Google Calendar.');
+        if (result.deleted > 0) parts.push(`${result.deleted} event${result.deleted===1?'':'s'} removed (deleted in Google)`);
+        alert('✓ ' + (parts.length ? parts.join(' ') + ' from Google Calendar.' : 'Calendar links repaired — nothing else to import.'));
       } else {
         alert('✓ All caught up — no changes to import from Google Calendar.');
       }
@@ -13890,7 +13969,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.49.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.50.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
