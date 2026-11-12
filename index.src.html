@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.39.0 -->
+<!-- LP Planner v5.40.0 -->
+<!-- v5.40.0 — Goals › Reading log: books now have a Started date (explicit, or filled in automatically from the first pages logged while it is empty — shown as "Started Oct 3 · auto"). New Pages log list in each book's editor (change the date or page count of any entry, or delete it), a date picker next to "Log pages" so you can log for a past day, a Started field when adding a book, and finished books read "Oct 3 → Nov 1 · 29 days". -->
 <!-- v5.39.0 — Fitness › Goals: the goal manager opens on the goal you tapped (pencil) with every other goal collapsed to one line; older targets sit under History and ended goals under Show ended goals. "Change target…" starts a new target from this period or the next, so earlier weeks keep the target that was active then (Save on a changed number still rewrites all of that version's weeks, with a warning). -->
 <!-- v5.38.0 — Goals › Reading log: each book in "Reading now" now shows the pages remaining after the pages read, e.g. "110 / 200 pp · 90 left" (hidden once you reach the total or if no page count is set). -->
 <!-- v5.37.1 — Expanded task contents (Details, Time, Repeat, + List, Move to, etc.) now left-align with the tile's header (8px) instead of being indented 30px under the title. -->
@@ -12262,7 +12263,7 @@ function GlDetail({ books, goal, onChange, onDelete, onBack, pagesData, onOpenPa
 // it is computed from the log for the current period. Only kind 'reading' has a UI so far; entries carry a `kind`
 // so other types (general counters) can reuse the same store.
 //   targets:   [{id, kind, period:'week'|'month'|'year', books, pages}]
-//   targetLog: [{id, kind, title, author, total, updates:[{date,pages}], finishedDate|null, notes}]
+//   targetLog: [{id, kind, title, author, total, updates:[{date,pages}], startDate?, finishedDate|null, notes}]
 function tgUid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 // Goal scope (v5.35.0): 'year' (a calendar year, year: 2026) | 'range' (startDate..endDate) | 'open' (no dates, counts everything).
 // Records from v5.30–v5.34 used period/startKey/repeat; tgNorm maps them on read without rewriting saved data.
@@ -12283,6 +12284,27 @@ function tgSpan(t) {
   return { s: '0000-01-01', e: '9999-12-31' };
 }
 function tgRead(x) { return (x.updates || []).reduce((a, u) => a + (Number(u.pages) || 0), 0); }
+// v5.40.0 — start date: the explicit startDate if one is set, otherwise the date of the earliest logged pages (0-page entries ignored).
+function tgStart(x) {
+  if (x.startDate) return x.startDate;
+  const ds = (x.updates || []).filter(u => u.date && Number(u.pages) > 0).map(u => u.date).sort();
+  return ds[0] || '';
+}
+function tgDayWord(a, b) {
+  const da = parseLocal(a), db = parseLocal(b);
+  if (!da || !db) return '';
+  const n = Math.round((db - da) / 86400000);
+  return n < 0 ? '' : n === 0 ? 'same day' : n === 1 ? '1 day' : n + ' days';
+}
+function tgDate(s, withYear) { const d = parseLocal(s); return d ? glShort(s) + (withYear ? ', ' + d.getFullYear() : '') : ''; }
+// "Oct 3 → Nov 1 · 29 days" for a finished book (falls back to just the finish date)
+function tgSpanLabel(x) {
+  const s = tgStart(x), f = x.finishedDate;
+  if (!f) return '';
+  if (!s) return tgDate(f);
+  const y = s.slice(0, 4) !== f.slice(0, 4), w = tgDayWord(s, f);
+  return w ? `${tgDate(s, y)} → ${tgDate(f, y)} · ${w}` : tgDate(f);
+}
 function tgStats(t, log, todayStr) {
   const sp = tgSpan(t);
   let books = 0, pages = 0;
@@ -12424,6 +12446,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
   const [bookForm, setBookForm] = useState(null);
   const [openId, setOpenId] = useState(null);
   const [pageIn, setPageIn] = useState({});
+  const [logDate, setLogDate] = useState({});
   const [finishId, setFinishId] = useState(null);
   const [finishDate, setFinishDate] = useState(today);
   const accent = 'var(--accent)';
@@ -12436,15 +12459,20 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
     if (!bookForm || !(bookForm.title || '').trim()) return;
     const read = parseInt(bookForm.read, 10) || 0;
     setTargetLog(l => [...(Array.isArray(l) ? l : []), { id: tgUid(), kind: 'reading', title: bookForm.title.trim(), author: (bookForm.author || '').trim(),
-      total: parseInt(bookForm.total, 10) || 0, updates: read > 0 ? [{ date: today, pages: read }] : [], finishedDate: null, notes: '' }]);
+      total: parseInt(bookForm.total, 10) || 0, updates: read > 0 ? [{ date: today, pages: read }] : [], finishedDate: null, notes: '', ...(bookForm.start ? { startDate: bookForm.start } : {}) }]);
     setBookForm(null);
   }
   function logPages(x) {
     const n = parseInt(pageIn[x.id], 10);
     if (!n || n < 1) return;
-    patchBook(x.id, b => ({ ...b, updates: [...(b.updates || []), { date: today, pages: n }] }));
+    const d = logDate[x.id] || today;
+    patchBook(x.id, b => ({ ...b, updates: [...(b.updates || []), { date: d, pages: n }] }));
     setPageIn(p => ({ ...p, [x.id]: '' }));
+    setLogDate(p => ({ ...p, [x.id]: '' }));
   }
+  // v5.40.0 — edit / delete one logged-pages entry (addressed by its index in the book's updates array)
+  function setEntry(id, i, patch) { patchBook(id, b => ({ ...b, updates: (b.updates || []).map((u, j) => j === i ? { ...u, ...patch } : u) })); }
+  function delEntry(id, i) { patchBook(id, b => ({ ...b, updates: (b.updates || []).filter((u, j) => j !== i) })); }
   function finishBook(x) {
     const rem = Math.max(0, (x.total || 0) - tgRead(x));
     patchBook(x.id, b => ({ ...b, finishedDate: finishDate || today, updates: rem > 0 ? [...(b.updates || []), { date: finishDate || today, pages: rem }] : (b.updates || []) }));
@@ -12498,6 +12526,30 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
           <input className="gl-input" style={{ width: 90 }} type="number" min="0" placeholder="Pages" value={x.total || ''} onChange={e => patchBook(x.id, b => ({ ...b, total: parseInt(e.target.value, 10) || 0 }))} />
           {x.finishedDate && <label style={{ ...lab, display: 'flex', alignItems: 'center', gap: 6 }}>Finished
             <input className="gl-input" type="date" value={x.finishedDate} onChange={e => e.target.value && patchBook(x.id, b => ({ ...b, finishedDate: e.target.value }))} /></label>}
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <label style={{ ...lab, display: 'flex', alignItems: 'center', gap: 6 }}>Started
+            <input className="gl-input" type="date" value={x.startDate || ''} max={today}
+              onChange={e => patchBook(x.id, b => ({ ...b, startDate: e.target.value || '' }))} /></label>
+          {x.startDate
+            ? <button className="gl-btn ghost" onClick={() => patchBook(x.id, b => ({ ...b, startDate: '' }))}>{(x.updates || []).some(u => u.date && Number(u.pages) > 0) ? 'Use first pages logged' : 'Clear'}</button>
+            : (tgStart(x) ? <span style={lab}>auto: {tgDate(tgStart(x), true)} (first pages logged)</span> : <span style={lab}>auto: set by the first pages you log</span>)}
+        </div>
+        <div>
+          <div className="gl-label" style={{ margin: '2px 0 4px' }}>Pages log · {(x.updates || []).length} {(x.updates || []).length === 1 ? 'entry' : 'entries'} · {tgRead(x)} pp</div>
+          {!(x.updates || []).length && <div style={lab}>No pages logged yet.</div>}
+          <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+            {(x.updates || []).map((u, i) => ({ u, i })).sort((a, b) => (b.u.date || '').localeCompare(a.u.date || '') || b.i - a.i).map(({ u, i }) => (
+              <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '3px 0' }}>
+                <input className="gl-input" type="date" style={{ width: 138 }} aria-label="Date read" value={u.date || ''}
+                  onChange={e => e.target.value && setEntry(x.id, i, { date: e.target.value })} />
+                <input className="gl-input" type="number" min="0" style={{ width: 80 }} aria-label="Pages" value={u.pages}
+                  onChange={e => setEntry(x.id, i, { pages: e.target.value === '' ? '' : Number(e.target.value) })} />
+                <span style={lab}>pp</span>
+                <button className="gl-btn ghost danger" aria-label="Delete this entry" title="Delete this entry" onClick={() => delEntry(x.id, i)}>✕</button>
+              </div>
+            ))}
+          </div>
         </div>
         <textarea className="gl-input" rows={3} placeholder="Summary / takeaways" value={x.notes || ''} onChange={e => patchBook(x.id, b => ({ ...b, notes: e.target.value }))} style={{ resize: 'vertical' }} />
         <div style={{ display: 'flex', gap: 8 }}>
@@ -12561,7 +12613,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
         <section className="gl-card" style={{ padding: '14px 16px', flexShrink: 0, flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
             <span className="gl-h2" style={{ fontSize: 20 }}>Reading log</span>
-            <button className="gl-btn primary" onClick={() => setBookForm(bookForm ? null : { title: '', author: '', total: '', read: '' })}>{bookForm ? 'Cancel' : '+ Add book'}</button>
+            <button className="gl-btn primary" onClick={() => setBookForm(bookForm ? null : { title: '', author: '', total: '', read: '', start: '' })}>{bookForm ? 'Cancel' : '+ Add book'}</button>
           </div>
           {bookForm && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, padding: 10, background: 'var(--cream)', borderRadius: 10 }}>
@@ -12569,6 +12621,8 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
               <input className="gl-input" style={{ flex: 1, minWidth: 110 }} placeholder="Author (optional)" value={bookForm.author} onChange={e => setBookForm(f => ({ ...f, author: e.target.value }))} />
               <input className="gl-input" style={{ width: 90 }} type="number" min="0" placeholder="Pages" value={bookForm.total} onChange={e => setBookForm(f => ({ ...f, total: e.target.value }))} />
               <input className="gl-input" style={{ width: 110 }} type="number" min="0" placeholder="Read so far" value={bookForm.read} onChange={e => setBookForm(f => ({ ...f, read: e.target.value }))} />
+              <label style={{ ...lab, display: 'flex', alignItems: 'center', gap: 6 }}>Started
+                <input className="gl-input" type="date" max={today} value={bookForm.start || ''} onChange={e => setBookForm(f => ({ ...f, start: e.target.value }))} /></label>
               <button className="gl-btn primary" onClick={addBook}>Add</button>
             </div>
           )}
@@ -12583,9 +12637,12 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
                   <span className="gl-mono" style={{ ...lab, whiteSpace: 'nowrap' }}>{rd}{x.total ? ` / ${x.total}` : ''} pp{x.total > rd ? ` · ${x.total - rd} left` : ''}</span>
                 </div>
                 {x.total > 0 && <div className="gl-bar" style={{ margin: '6px 0', background: glTint('#2d6b4a', 0.15) }}><div style={{ width: Math.round(p * 100) + '%', background: accent }} /></div>}
+                {tgStart(x) && <div style={{ ...lab, margin: '2px 0 6px' }}>Started {tgDate(tgStart(x), tgStart(x).slice(0, 4) !== today.slice(0, 4))}{!x.startDate && <span style={{ color: 'var(--ink-faint)' }}> · auto</span>}</div>}
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <input className="gl-input" style={{ width: 90 }} type="number" min="1" placeholder="+ pages" value={pageIn[x.id] || ''}
                     onChange={e => setPageIn(s => ({ ...s, [x.id]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && logPages(x)} />
+                  <input className="gl-input" type="date" style={{ width: 138 }} aria-label="Date these pages were read" title="Date these pages were read" max={today}
+                    value={logDate[x.id] || today} onChange={e => setLogDate(s => ({ ...s, [x.id]: e.target.value }))} />
                   <button className="gl-btn" onClick={() => logPages(x)}>Log pages</button>
                   {finishId === x.id ? (
                     <>
@@ -12605,7 +12662,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
                 <span style={{ color: 'var(--accent)' }}>✓</span>
                 <span style={{ fontWeight: 600, fontSize: 14, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
-                <span className="gl-mono" style={lab}>{x.total ? x.total + ' pp · ' : ''}{glShort(x.finishedDate)}</span>
+                <span className="gl-mono" style={lab}>{x.total ? x.total + ' pp · ' : ''}{tgSpanLabel(x)}</span>
               </div>
               {x.notes && openId !== x.id && <div style={{ ...lab, marginTop: 4, whiteSpace: 'pre-wrap', maxHeight: 40, overflow: 'hidden' }}>{x.notes}</div>}
               {openId === x.id && bookEditor(x)}
@@ -13375,7 +13432,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.39.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.40.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
