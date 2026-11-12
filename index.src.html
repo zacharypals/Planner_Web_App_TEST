@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.44.2 -->
+<!-- LP Planner v5.44.3 -->
+<!-- v5.44.3 — Quote tile, light mode: label and source back to a deep violet (much darker than before, for contrast on the lavender tile) and the quote text is bolder (Cormorant Garamond 700). Dark mode unchanged. -->
 <!-- v5.44.2 — Quote tile, light mode: the "Quote of the Week" label and source line are now a deep warm gold-brown (same as the Be-Word label) instead of violet, so they stand out from the lavender tile. Dark mode unchanged. -->
 <!-- v5.44.1 — Quote tile, light mode: same centered Cormorant Garamond text as dark mode, quote mark removed, and a slim border in a darker shade of the tile color. -->
 <!-- v5.44.0 — Quote tile: text now shrinks in steps as the quote gets longer (both themes) and wraps balanced; dark-mode side padding reduced so centered quotes use the full tile width (short quotes stay on two lines). -->
@@ -100,7 +101,7 @@
 <script>/* v4.4.0: apply saved theme before first paint */(function(){try{var p=localStorage.getItem('lp_theme')||'auto';var d=p==='dark'||(p==='auto'&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');}catch(e){}})();</script>
 <title>Weekly Planner & Habit Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Cormorant+Garamond:wght@600&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Cormorant+Garamond:wght@600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
 <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
 <script src="https://unpkg.com/@babel/standalone@7.26.5/babel.min.js"></script>
@@ -2662,7 +2663,9 @@
   .wk-quote .wk-rule { margin-left: auto; margin-right: auto; }
 
   /* ── v5.44.2 Quote tile label + source, light mode: deep gold-brown for contrast on lavender ── */
-  .wk-quote .wk-tile-eyebrow, .wk-quote .wk-src { color: color-mix(in oklab, var(--gold) 55%, var(--ink)); }
+  .wk-quote .wk-tile-eyebrow, .wk-quote .wk-src { color: color-mix(in oklab, var(--accent) 55%, var(--ink)); }
+  .wk-quote .wk-quote-text { font-weight: 700; }
+  [data-theme="dark"] .wk-quote .wk-quote-text { font-weight: 600; }
 </style>
 </head>
 <body>
@@ -13602,7 +13605,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themeColor(navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.44.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.44.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ColorPickerPopover color={navColor} onChange={setNavColor} />
         </div>
         <div className="nav-tabs">
