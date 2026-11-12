@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.46.1 -->
+<!-- LP Planner v5.47.0 -->
+<!-- v5.47.0 — Weekly desktop grid: hold the right mouse button and drag to pan the grid left/right (and up/down), like a canvas app. A plain right-click still opens the task Copy/Paste menu. -->
 <!-- v5.46.1 — Dark Quote tile: quote text a touch deeper cream-gold (#efd9a3) and the circle accent slightly softer, for easier reading. -->
 <!-- v5.46.0 — Dark mode Quote and Be-Word tiles get the Poster shaping: a soft diagonal gradient fade plus translucent circle accents (colors, borders, fonts unchanged). -->
 <!-- v5.45.2 — Quote tile: side padding trimmed (14px; eyebrow row keeps clear of the pencil) and text 19px so short quotes fit on two lines. -->
@@ -356,6 +357,7 @@
   .cal-scroll-wrapper {
     flex: 1; overflow: auto;
   }
+  .cal-scroll-wrapper.rc-panning, .cal-scroll-wrapper.rc-panning * { cursor: grabbing !important; user-select: none !important; -webkit-user-select: none !important; }
   .cal-scroll-wrapper::-webkit-scrollbar { width: 5px; height: 10px; }
   .cal-scroll-wrapper::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; }
   .cal-scroll-wrapper::-webkit-scrollbar-track { background: rgba(0,0,0,0.05); border-radius: 5px; }
@@ -5931,6 +5933,66 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   });
   const [sheetOpen, setSheetOpen] = useState(false);
   const [wkView, setWkView] = useWeekView();   // v5.16.0: 'list' | 'blocks' (per device)
+  // v5.47.0: right-click-drag pans the weekly grid (desktop). A plain right-click still opens the task menu.
+  const calScrollRef = useRef(null);
+  useEffect(() => {
+    const el = calScrollRef.current;
+    if (!el) return;
+    let pan = null, moved = false, pending = null, replaying = false, clearT = null;
+    const isEditable = t => !!(t && t.closest && t.closest('input,textarea,select,[contenteditable="true"],[contenteditable=""]'));
+    const stop = () => { pan = null; el.classList.remove('rc-panning'); };
+    const onDown = e => {
+      moved = false; pending = null; clearTimeout(clearT);
+      if (e.button !== 2) { stop(); return; }
+      pan = { x: e.clientX, y: e.clientY, l: el.scrollLeft, t: el.scrollTop };
+    };
+    const onMove = e => {
+      if (!pan) return;
+      if (!(e.buttons & 2)) { stop(); return; }
+      const dx = e.clientX - pan.x, dy = e.clientY - pan.y;
+      if (!moved) {
+        if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+        moved = true; pending = null;
+        el.classList.add('rc-panning');
+        try { window.getSelection().removeAllRanges(); } catch (err) {}
+      }
+      el.scrollLeft = pan.l - dx;
+      el.scrollTop = pan.t - dy;
+      e.preventDefault();
+    };
+    const onUp = e => {
+      if (e.button !== 2 || !pan) return;
+      const p = pending;
+      stop();
+      if (moved) { clearT = setTimeout(() => { moved = false; }, 120); return; }
+      if (p) {   // Mac/Linux fire contextmenu on mousedown; replay it now that we know it was a plain click
+        replaying = true;
+        try { p.target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: p.x, clientY: p.y, button: 2 })); } finally { replaying = false; }
+        pending = null;
+      }
+    };
+    const onCtx = e => {
+      if (replaying) return;
+      if (moved) { e.preventDefault(); e.stopPropagation(); return; }          // Windows: menu fires after a drag ends
+      if (pan) {                                                               // Mac/Linux: menu fires on mousedown
+        if (isEditable(e.target)) { stop(); return; }                          // keep native menu in text fields
+        e.preventDefault(); e.stopPropagation();
+        pending = { target: e.target, x: e.clientX, y: e.clientY };
+      }
+    };
+    el.addEventListener('mousedown', onDown);
+    el.addEventListener('contextmenu', onCtx, true);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      el.removeEventListener('mousedown', onDown);
+      el.removeEventListener('contextmenu', onCtx, true);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      clearTimeout(clearT);
+      el.classList.remove('rc-panning');
+    };
+  }, [wkView]);
   const [showPeoplePicker, setShowPeoplePicker] = useState(false);
   const [showRepeatCleanup, setShowRepeatCleanup] = useState(false);
   const [repeatScope, setRepeatScope] = useState(null); // {kind:'delete'|'apply', task, dayKey, rule?}
@@ -6884,7 +6946,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         <div className="weekly-calendar tb-cal"><TbWeek ctx={tbWeekCtx} /></div>
         ) : (
         <div className="weekly-calendar">
-          <div className="cal-scroll-wrapper">
+          <div className="cal-scroll-wrapper" ref={calScrollRef}>
             <div className="cal-grid">
               {weekDays.map((d,i)=>(
                 <div key={'h'+i} className={`cal-header-cell ${isSameDay(d,today)?'today':''}`}
@@ -13765,7 +13827,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.46.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.47.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
