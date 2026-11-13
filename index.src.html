@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.50.3 -->
+<!-- LP Planner v5.50.4 -->
+<!-- v5.50.4 — Mobile Pages: when the keyboard opens, the editor card is resized to the space above the keyboard and the page is pinned in place (visualViewport), so tapping into a long page keeps the top visible/scrollable and the cursor lands where you tapped. Phones only; desktop untouched. -->
 <!-- v5.50.3 — Mobile Pages: the editor card can no longer be scrolled by iOS when the keyboard opens (overflow:clip), so tapping into a long page no longer leaves the top cut off and un-draggable. Only the inner scroll area scrolls. CSS-only; desktop untouched. -->
 <!-- v5.50.2 — Pages sidebar: the folder expand/collapse caret is bigger on every device (18px glyph, 30px-wide hit area on desktop; 22px glyph, 40px-wide on touch) and its tap area spans the full row height, so it is much easier to hit. Rows do not get taller. -->
 <!-- v5.50.1 — Monthly > Add/Edit Event: the Length (duration) picker no longer spills out of the box. Date now has its own line; Time and Length sit together below it and wrap if space is tight. No data change. -->
@@ -2208,6 +2209,10 @@
     .pages-mobile-back { display: block; }
     .pages-mobile-list { display: flex; flex-direction: column; flex: 1; overflow-y: auto; }
     .pages-main { height: calc(100dvh - 48px - 56px); flex: 0 0 auto; overflow: hidden; overflow: clip; }
+    /* v5.50.4 — keyboard open (html.pages-kb, set by PagesView): card = visible area above the keyboard minus the top bar;
+       the bottom nav is hidden behind the keyboard and the page's bottom padding is dropped so the page can't scroll. */
+    html.pages-kb .pages-main { height: calc(var(--pages-vvh) - 48px); }
+    html.pages-kb .main-content { padding-bottom: 0; }
     /* v5.50.3 — overflow:clip (hidden is the fallback) stops iOS from programmatically scrolling this card when the
        keyboard opens, which left the top of long pages cut off and un-draggable. Only .pages-scroll-area scrolls now. */
   }
@@ -13987,7 +13992,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.50.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.50.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -16610,6 +16615,26 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   const getBodyHtml = () => (quillApi.current ? quillApi.current.getHtml() : null);
   const [qFmt, setQFmt] = useState({});
   const [qPop, setQPop] = useState(null);     // open toolbar popover: { kind, x, y }
+  // v5.50.4 — phones: when the on-screen keyboard opens, size the Pages card to the space above it and keep the
+  // page itself pinned (iOS otherwise pans/scrolls the page, hiding the top of long pages and misplacing the cursor).
+  // Toggles html.pages-kb with --pages-vvh; CSS does the rest. Removed when this view unmounts.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 767px)');
+    const root = document.documentElement;
+    const off = () => { root.classList.remove('pages-kb'); root.style.removeProperty('--pages-vvh'); };
+    const update = () => {
+      if (!mq.matches || window.innerHeight - vv.height < 120) { off(); return; }
+      root.style.setProperty('--pages-vvh', Math.round(vv.height) + 'px');
+      root.classList.add('pages-kb');
+      if (window.scrollY || vv.offsetTop) window.scrollTo(0, 0);
+    };
+    vv.addEventListener('resize', update);
+    vv.addEventListener('scroll', update);
+    update();
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); off(); };
+  }, []);
   const titleRef = useRef(null);
   const debounceRef = useRef(null);
   // Always-current ref to selectedId so flush fn closure never goes stale
