@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.57.1 -->
+<!-- LP Planner v5.57.2 -->
+<!-- v5.57.2 — Exercises are now listed A–Z (ignoring capitals) within each section of the Exercise Library, and in the "Link exercises" list inside a habit. While you are editing a library row it holds its place, so it doesn't jump around as you type the name. -->
 <!-- v5.57.1 — Fitness dot colours: picking a colour for one group no longer changes the others. The first time you pick, every group's current colour is saved as it is, so only the group you tapped changes. Duplicates are allowed. "Auto" still puts a single group back to an automatic colour. -->
 <!-- v5.57.0 — Fitness: (1) dot order puts Push before Pull before Legs (the rest stay cardio first, then A–Z); (2) the exercise tiles in the Fitness Week (iPad/desktop) and Month views now carry their group's dot colour — a tinted tile with a colour bar on the left — so a Run is the same colour in every view. Colours you set in Exercise Library › Dot colors apply here too. -->
 <!-- v5.56.1 — Fitness week dots: new "Jewel" colour palette (sapphire, emerald, ruby, amber, teal, rose, slate, then amethyst, olive, brown if you have more than seven groups). Colours you picked yourself are unchanged. -->
@@ -8778,7 +8779,7 @@ function HabitExerciseLinks({ goal, exercises, onChange }) {
       {!shut && (
         <div style={{display:'flex',flexDirection:'column',gap:2,maxHeight:80,overflowY:'auto',
           border:'1px solid var(--border)',borderRadius:4,padding:'3px 6px',background:'var(--surface)'}}>
-          {exercises.map(e => (
+          {[...exercises].sort((a, b) => String(a.name || '').toLowerCase().localeCompare(String(b.name || '').toLowerCase())).map(e => (
             <label key={e.id} style={{display:'flex',alignItems:'center',gap:5,cursor:'pointer',
               fontSize:11,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}
               onClick={ev=>ev.stopPropagation()}>
@@ -14313,7 +14314,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.57.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.57.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -16663,8 +16664,15 @@ function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose,
   const subInputStyle = {width:60,minWidth:0,flexShrink:1,fontSize:11,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',
     background:'var(--surface)',color:'var(--ink)',outline:'none',boxSizing:'border-box'};
 
+  // v5.57.2: A–Z within each section; while a row is being edited the order is held so it doesn't jump as you type
+  const orderRef = useRef(null);
+  const byName = (a, b) => String(a.name || '').toLowerCase().localeCompare(String(b.name || '').toLowerCase());
+  if (!editId) orderRef.current = null;
+  else if (!orderRef.current) orderRef.current = [...exercises].sort(byName).map(e => e.id);
+  const held = orderRef.current;
   const grouped = FITNESS_CATEGORIES.reduce((acc, cat) => {
-    const items = exercises.filter(e => (e.category || 'Other') === cat);
+    const items = exercises.filter(e => (e.category || 'Other') === cat)
+      .sort((a, b) => held ? held.indexOf(a.id) - held.indexOf(b.id) : byName(a, b));
     if (items.length) acc[cat] = items;
     return acc;
   }, {});
