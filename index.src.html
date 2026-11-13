@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.57.2 -->
+<!-- LP Planner v5.58.0 -->
+<!-- v5.58.0 — Light themes now carry through to two more places: the Pages folder colors (each theme has its own set of 8 folder colors) and the Fitness weekly weekday headers (they use the theme's header color, with a lighter "today" header and the theme's today-date color). Current theme and dark mode are unchanged. Folder color swatches are labeled Color 1–8 since the hue names no longer match every theme. -->
 <!-- v5.57.2 — Exercises are now listed A–Z (ignoring capitals) within each section of the Exercise Library, and in the "Link exercises" list inside a habit. While you are editing a library row it holds its place, so it doesn't jump around as you type the name. -->
 <!-- v5.57.1 — Fitness dot colours: picking a colour for one group no longer changes the others. The first time you pick, every group's current colour is saved as it is, so only the group you tapped changes. Duplicates are allowed. "Auto" still puts a single group back to an automatic colour. -->
 <!-- v5.57.0 — Fitness: (1) dot order puts Push before Pull before Legs (the rest stay cardio first, then A–Z); (2) the exercise tiles in the Fitness Week (iPad/desktop) and Month views now carry their group's dot colour — a tinted tile with a colour bar on the left — so a Run is the same colour in every view. Colours you set in Exercise Library › Dot colors apply here too. -->
@@ -740,13 +741,13 @@
   .fitness-week-col.today { border-color: var(--accent); }
   .fitness-week-col-hdr {
     padding: 6px 8px; text-align: center;
-    background: linear-gradient(180deg, #523e82 0%, #44326e 100%);
+    background: var(--hdr-bg, linear-gradient(180deg, #523e82 0%, #44326e 100%));
     border-radius: var(--radius-md) var(--radius-md) 0 0;
   }
-  .fitness-week-col.today .fitness-week-col-hdr { background: linear-gradient(180deg, #6953a0 0%, #523e82 100%); }
+  .fitness-week-col.today .fitness-week-col-hdr { background: var(--fit-hdr-today, linear-gradient(180deg, #6953a0 0%, #523e82 100%)); }
   .fitness-week-col-day { font-size: 9px; color: rgba(255,255,255,0.65); font-family: 'DM Mono',monospace; text-transform: uppercase; letter-spacing: 0.06em; }
   .fitness-week-col-date { font-size: 16px; color: white; font-family: 'Playfair Display',serif; font-weight: 600; }
-  .fitness-week-col.today .fitness-week-col-date { color: var(--gold); }
+  .fitness-week-col.today .fitness-week-col-date { color: var(--hdr-today, var(--gold)); }
   .fitness-week-col-body { padding: 6px; min-height: 60px; }
   .fitness-week-col.drag-over { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-light); }
   .fitness-week-col.drag-over .fitness-week-col-body { background: var(--accent-light); }
@@ -2809,7 +2810,8 @@
   :root[data-lp-theme="j2"]:not([data-theme="dark"]) {
     --cream:#f6f5fa; --paper:#fdfcff; --border:#e2e0ec; --gold-light:#fbf5e9;
     --ink:#2a2738; --ink-light:#666379; --accent:#6857a3; --accent-light:#efecfa; --tint:#e6e1f6;
-    --nav-bg:linear-gradient(135deg,#352a57 0%,#483d72 100%); --hdr-bg:linear-gradient(180deg,#564a86 0%,#473d75 100%); --hdr-today:#e4b862;
+    --nav-bg:linear-gradient(135deg,#352a57 0%,#483d72 100%); --hdr-bg:linear-gradient(180deg,#564a86 0%,#473d75 100%); --hdr-today:#e4b862; --fit-hdr-today:linear-gradient(180deg,#6e60a2 0%,#564a86 100%);
+    --fhue-0:#cdb8e0; --fhue-1:#a9d1bf; --fhue-2:#b3c8e6; --fhue-3:#e8b8b3; --fhue-4:#e6cf92; --fhue-5:#a6d3dc; --fhue-6:#e3b3cd; --fhue-7:#cfd9a3;
     --t2-q:linear-gradient(145deg,#463a82,#6a58b0); --t2-qtx:#fff; --t2-lab:#f6c667; --t2-gold:linear-gradient(135deg,#f9d27c,#eaa83c); --t2-gtx:#4a2d00; --t2-qsh:rgba(40,25,80,.22);
     --tc-0:#6f4b8b; --tc-1:#2f6b56; --tc-2:#41679c; --tc-3:#a14a43; --tc-4:#9a6b12; --tc-5:#1f7482; --tc-6:#92456f; --tc-7:#5f7430; --tc-8:#7e4b8b; --tc-9:#2f6b64; --tc-10:#41529c; --tc-11:#a16043; --tc-12:#83760f; --tc-13:#1f5d82; --tc-14:#92455d; --tc-15:#4f7430; --tc-16:#8b4b89; --tc-17:#2f646b; --tc-18:#45419c; --tc-19:#936b3d; --tc-20:#6d7a0e; --tc-21:#1f4682;
     --ec-0:#e6dcee; --ec-1:#d6e8e0; --ec-2:#d9e3f1; --ec-3:#f0dad7; --ec-4:#efe3c6; --ec-5:#d3e8ec; --ec-6:#eed9e4; --ec-7:#e4e9d1; --ec-8:#eadcee; --ec-9:#d6e8e4; --ec-10:#d9ddf1; --ec-11:#f0e0d7; --ec-12:#efedc6; --ec-13:#d3e2ec; --ec-14:#eed9df; --ec-15:#dee9d1;
@@ -2817,21 +2819,24 @@
   :root[data-lp-theme="k1"]:not([data-theme="dark"]) {
     --cream:#f6f5fa; --paper:#fdfcff; --border:#e2e0ec; --gold-light:#fbf5e9;
     --ink:#2a2738; --ink-light:#666379; --accent:#6857a3; --accent-light:#efecfa; --tint:#e6e1f6;
-    --nav-bg:linear-gradient(135deg,#352a57 0%,#483d72 100%); --hdr-bg:linear-gradient(180deg,#564a86 0%,#473d75 100%); --hdr-today:#e4b862;
+    --nav-bg:linear-gradient(135deg,#352a57 0%,#483d72 100%); --hdr-bg:linear-gradient(180deg,#564a86 0%,#473d75 100%); --hdr-today:#e4b862; --fit-hdr-today:linear-gradient(180deg,#6e60a2 0%,#564a86 100%);
+    --fhue-0:#c4bdf0; --fhue-1:#a9c9f0; --fhue-2:#f0cd96; --fhue-3:#d6b8ec; --fhue-4:#a3d4e6; --fhue-5:#f0b0b6; --fhue-6:#b4bfe8; --fhue-7:#e6b3e3;
     --t2-q:linear-gradient(145deg,#463a82,#6a58b0); --t2-qtx:#fff; --t2-lab:#f6c667; --t2-gold:linear-gradient(135deg,#f9d27c,#eaa83c); --t2-gtx:#4a2d00; --t2-qsh:rgba(40,25,80,.22);
     --tc-0:#6a5bc2; --tc-1:#2f6fc0; --tc-2:#a9640c; --tc-3:#8a4fb8; --tc-4:#1b7a9f; --tc-5:#bf4a55; --tc-6:#4b5fb0; --tc-7:#a1479f; --tc-8:#825bc2; --tc-9:#2f4dc0; --tc-10:#8c720a; --tc-11:#a24fb8; --tc-12:#1b5b9f; --tc-13:#bc5343; --tc-14:#4f4bb0; --tc-15:#a1478a; --tc-16:#9a5bc2; --tc-17:#332fc0; --tc-18:#777909; --tc-19:#b449b1; --tc-20:#1b3c9f; --tc-21:#a6633b;
   }
   :root[data-lp-theme="k2"]:not([data-theme="dark"]) {
     --cream:#f6f5fa; --paper:#fdfcff; --border:#e2e0ec; --gold-light:#fbf5e9;
     --ink:#2a2738; --ink-light:#666379; --accent:#6857a3; --accent-light:#efecfa; --tint:#e6e1f6;
-    --nav-bg:linear-gradient(135deg,#352a57 0%,#483d72 100%); --hdr-bg:linear-gradient(180deg,#564a86 0%,#473d75 100%); --hdr-today:#e4b862;
+    --nav-bg:linear-gradient(135deg,#352a57 0%,#483d72 100%); --hdr-bg:linear-gradient(180deg,#564a86 0%,#473d75 100%); --hdr-today:#e4b862; --fit-hdr-today:linear-gradient(180deg,#6e60a2 0%,#564a86 100%);
+    --fhue-0:#a99ff0; --fhue-1:#7fb3f5; --fhue-2:#f2b45c; --fhue-3:#b78ae0; --fhue-4:#6fc0e6; --fhue-5:#f08a86; --fhue-6:#8b9be0; --fhue-7:#d79ae0;
     --t2-q:linear-gradient(145deg,#463a82,#6a58b0); --t2-qtx:#fff; --t2-lab:#f6c667; --t2-gold:linear-gradient(135deg,#f9d27c,#eaa83c); --t2-gtx:#4a2d00; --t2-qsh:rgba(40,25,80,.22);
     --tc-0:#a99ff0; --tc-1:#7fb3f5; --tc-2:#f2b45c; --tc-3:#b78ae0; --tc-4:#6fc0e6; --tc-5:#f08a86; --tc-6:#8b9be0; --tc-7:#d79ae0; --tc-8:#bc9ff0; --tc-9:#7f97f5; --tc-10:#f2d75c; --tc-11:#cb8ae0; --tc-12:#6fa4e6; --tc-13:#f0a386; --tc-14:#8f8be0; --tc-15:#e09ad9; --tc-16:#cf9ff0; --tc-17:#8b88f6; --tc-18:#eaf25c; --tc-19:#df8ae0; --tc-20:#788fe8; --tc-21:#f0bb86;
   }
   :root[data-lp-theme="b3"]:not([data-theme="dark"]) {
     --cream:#faf6ef; --paper:#fffdf9; --border:#e6dfd1; --gold-light:#fff1d6;
     --ink:#2d2620; --ink-light:#6a6054; --accent:#8a5a7a; --accent-light:#f6ecf1; --tint:#efe4ea;
-    --nav-bg:linear-gradient(135deg,#3f2f3c 0%,#53404f 100%); --hdr-bg:linear-gradient(180deg,#665062 0%,#54404f 100%); --hdr-today:#f0c27a;
+    --nav-bg:linear-gradient(135deg,#3f2f3c 0%,#53404f 100%); --hdr-bg:linear-gradient(180deg,#665062 0%,#54404f 100%); --hdr-today:#f0c27a; --fit-hdr-today:linear-gradient(180deg,#826a7e 0%,#665062 100%);
+    --fhue-0:#e8c9c6; --fhue-1:#cfdcc4; --fhue-2:#ecd9ae; --fhue-3:#c5d3e0; --fhue-4:#e3bfa8; --fhue-5:#d8c8df; --fhue-6:#dbe0b8; --fhue-7:#e9c4d6;
     --t2-q:linear-gradient(145deg,#8a4a37,#bf7650); --t2-qtx:#fff6ea; --t2-lab:#f8d4a4; --t2-gold:linear-gradient(135deg,#f8d4a4,#eeaf66); --t2-gtx:#5e3d05; --t2-qsh:rgba(90,40,20,.24);
     --tc-0:#e8c9c6; --tc-1:#cfdcc4; --tc-2:#ecd9ae; --tc-3:#c5d3e0; --tc-4:#e3bfa8; --tc-5:#d8c8df; --tc-6:#dbe0b8; --tc-7:#e9c4d6; --tc-8:#e8d1c6; --tc-9:#c9dcc4; --tc-10:#ece7ae; --tc-11:#c5cde0; --tc-12:#e3cda8; --tc-13:#ddc8df; --tc-14:#d2e0b8; --tc-15:#e9c4cd; --tc-16:#e8d9c6; --tc-17:#c4dcc4; --tc-18:#e2ecae; --tc-19:#c5c6e0; --tc-20:#e3dba8; --tc-21:#dfc8db;
     --ec-0:#f5e4e2; --ec-1:#e5ede0; --ec-2:#f6ecd2; --ec-3:#dfe8f0; --ec-4:#ebeed8; --ec-5:#f6e1ea; --ec-6:#f5e8e2; --ec-7:#e2ede0; --ec-8:#f6f4d2; --ec-9:#dfe4f0; --ec-10:#e6eed8; --ec-11:#f6e1e5; --ec-12:#f5ede2; --ec-13:#e0ede1; --ec-14:#eff6d2; --ec-15:#dfe0f0;
@@ -2839,7 +2844,8 @@
   :root[data-lp-theme="c3"]:not([data-theme="dark"]) {
     --cream:#faf6ef; --paper:#fffdf9; --border:#e6dfd1; --gold-light:#fff1d6;
     --ink:#2d2620; --ink-light:#6a6054; --accent:#8a5a7a; --accent-light:#f6ecf1; --tint:#efe4ea;
-    --nav-bg:linear-gradient(135deg,#3f2f3c 0%,#53404f 100%); --hdr-bg:linear-gradient(180deg,#665062 0%,#54404f 100%); --hdr-today:#f0c27a;
+    --nav-bg:linear-gradient(135deg,#3f2f3c 0%,#53404f 100%); --hdr-bg:linear-gradient(180deg,#665062 0%,#54404f 100%); --hdr-today:#f0c27a; --fit-hdr-today:linear-gradient(180deg,#826a7e 0%,#665062 100%);
+    --fhue-0:#f5e9a8; --fhue-1:#bfe8d4; --fhue-2:#fbcfb5; --fhue-3:#bcdcf5; --fhue-4:#d9cdf0; --fhue-5:#f5c6d2; --fhue-6:#c9ecf0; --fhue-7:#f9d9a6;
     --t2-q:linear-gradient(145deg,#8a4a37,#bf7650); --t2-qtx:#fff6ea; --t2-lab:#f8d4a4; --t2-gold:linear-gradient(135deg,#f8d4a4,#eeaf66); --t2-gtx:#5e3d05; --t2-qsh:rgba(90,40,20,.24);
     --tc-0:#f5e9a8; --tc-1:#bfe8d4; --tc-2:#fbcfb5; --tc-3:#bcdcf5; --tc-4:#d9cdf0; --tc-5:#f5c6d2; --tc-6:#c9ecf0; --tc-7:#f9d9a6; --tc-8:#eff5a8; --tc-9:#bfe8de; --tc-10:#fbdfb5; --tc-11:#bccff5; --tc-12:#e1cdf0; --tc-13:#f5c6c7; --tc-14:#c9e3f0; --tc-15:#f9eca6; --tc-16:#ddf5a8; --tc-17:#bfe8e7; --tc-18:#fbf0b5; --tc-19:#bcc1f5; --tc-20:#e9cdf0; --tc-21:#f5d0c6;
     --ec-0:#faf3cf; --ec-1:#def3e9; --ec-2:#fde4d5; --ec-3:#deeefa; --ec-4:#e0f4f6; --ec-5:#fcebcf; --ec-6:#f7facf; --ec-7:#def3ee; --ec-8:#fdedd5; --ec-9:#dee7fa; --ec-10:#e0eff6; --ec-11:#fcf5cf; --ec-12:#edfacf; --ec-13:#def3f3; --ec-14:#fdf7d5; --ec-15:#dee1fa;
@@ -14314,7 +14320,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.57.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.58.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -17020,7 +17026,7 @@ function PagesQuill({ docId, html, apiRef, onInput, onFmt, onText, onGone }) {
 }
 
 // v5.37.0: Pages tree folder hues. Hue slot i maps to --fhue-i (light and dark values live in CSS).
-const FOLDER_HUE_NAMES = ['Periwinkle', 'Apricot', 'Sea glass', 'Rose', 'Violet', 'Sage', 'Butter', 'Dusty mauve'];
+const FOLDER_HUE_NAMES = ['Color 1', 'Color 2', 'Color 3', 'Color 4', 'Color 5', 'Color 6', 'Color 7', 'Color 8']; // v5.58.0: neutral labels — each light theme supplies its own --fhue-N colors
 function folderHueCounts(folders) {
   const c = FOLDER_HUE_NAMES.map(() => 0);
   (folders || []).forEach(f => { if (!f.parentFolderId && Number.isInteger(f.colorIndex)) c[f.colorIndex % c.length]++; });
