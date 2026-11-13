@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.50.2 -->
+<!-- LP Planner v5.50.3 -->
+<!-- v5.50.3 — Mobile Pages: the editor card can no longer be scrolled by iOS when the keyboard opens (overflow:clip), so tapping into a long page no longer leaves the top cut off and un-draggable. Only the inner scroll area scrolls. CSS-only; desktop untouched. -->
 <!-- v5.50.2 — Pages sidebar: the folder expand/collapse caret is bigger on every device (18px glyph, 30px-wide hit area on desktop; 22px glyph, 40px-wide on touch) and its tap area spans the full row height, so it is much easier to hit. Rows do not get taller. -->
 <!-- v5.50.1 — Monthly > Add/Edit Event: the Length (duration) picker no longer spills out of the box. Date now has its own line; Time and Length sit together below it and wrap if space is tight. No data change. -->
 <!-- v5.50.0 — Google Calendar two-way sync hardening: every push/update/delete now fetches a fresh Google token first (edits used to be silently skipped when the cached token was near expiry, then overwritten by the next pull); failed edits/deletes are remembered and retried before the next pull (newest edit wins); a time added to an all-day event converts it properly (and back); events deleted in Google are removed from the app; app events whose Google link was lost are re-linked; deletes in the app are confirmed with Google. Monthly view: events get a Length picker next to Time. -->
@@ -2206,7 +2207,9 @@
     .pages-doc-header { padding: 10px 16px 6px; box-shadow: none; }
     .pages-mobile-back { display: block; }
     .pages-mobile-list { display: flex; flex-direction: column; flex: 1; overflow-y: auto; }
-    .pages-main { height: calc(100dvh - 48px - 56px); flex: 0 0 auto; }
+    .pages-main { height: calc(100dvh - 48px - 56px); flex: 0 0 auto; overflow: hidden; overflow: clip; }
+    /* v5.50.3 — overflow:clip (hidden is the fallback) stops iOS from programmatically scrolling this card when the
+       keyboard opens, which left the top of long pages cut off and un-draggable. Only .pages-scroll-area scrolls now. */
   }
   @media (min-width: 768px) {
     .pages-mobile-back { display: none !important; }
@@ -13984,7 +13987,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.50.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.50.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
