@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.56.0 -->
+<!-- LP Planner v5.56.1 -->
+<!-- v5.56.1 — Fitness week dots: new "Jewel" colour palette (sapphire, emerald, ruby, amber, teal, rose, slate, then amethyst, olive, brown if you have more than seven groups). Colours you picked yourself are unchanged. -->
 <!-- v5.56.0 — Fitness week dots: (1) more distinct automatic colours (blue, orange, magenta, green, yellow, purple, cyan, red, brown, slate — only one green), (2) pick your own colour per subcategory in Exercise Library › "Dot colors" (synced; "Auto" puts it back), (3) a steady dot order — cardio groups first, then strength, mobility, sport, other, each A–Z — so e.g. Run always sits left of Push. -->
 <!-- v5.55.0 — Fitness week on phones (portrait, under 600px): the seven cramped columns now show one coloured dot per subcategory per day (exercises with no subcategory use their category, e.g. Strength). Filled dot = every exercise in that group has a done set; hollow ring = planned / not finished. Tap a day to open it, as before. A small colour key under the grid lists only the groups used that week. iPad, desktop and phone landscape keep the text pills, + Add and drag-and-drop. -->
 <!-- v5.54.2 — Fix: deleting an event from the monthly edit window now also deletes it from Google Calendar (the window's Delete button didn't pass the Google link, so the event stayed in Google and could come back on the next sync). -->
@@ -14308,7 +14309,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.56.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.56.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15127,7 +15128,7 @@ function FitnessCharts({ fitnessLog, fitnessExercises, goals, habitGoals, habitC
 
 // ── v5.55.0: compact Fitness week — dots by subcategory ──
 // A "group" is the exercise's subcategory (Run, Push…) or, if it has none, its category (Strength…).
-const FIT_DOT_COLORS = ['#2f6fdc','#f07d2a','#d63fa0','#2e9e5b','#e6b800','#7c4dcc','#12b5cb','#d93a3a','#8d6e63','#64748b'];
+const FIT_DOT_COLORS = ['#2f5fb3','#1f8a63','#b8333f','#d9922b','#2a8a96','#c2548a','#5b6b82','#7a5ab0','#7a8a3b','#8a6a52'];   // v5.56.1 Jewel
 const FIT_CAT_RANK = { Cardio: 0, Strength: 1, Mobility: 2, Sport: 3, Other: 4 };
 function fitGroupOf(libEx) {
   if (!libEx) return { key: 'cat:other', label: 'Other', cat: 'Other' };
