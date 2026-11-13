@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.55.0 -->
+<!-- LP Planner v5.56.0 -->
+<!-- v5.56.0 — Fitness week dots: (1) more distinct automatic colours (blue, orange, magenta, green, yellow, purple, cyan, red, brown, slate — only one green), (2) pick your own colour per subcategory in Exercise Library › "Dot colors" (synced; "Auto" puts it back), (3) a steady dot order — cardio groups first, then strength, mobility, sport, other, each A–Z — so e.g. Run always sits left of Push. -->
 <!-- v5.55.0 — Fitness week on phones (portrait, under 600px): the seven cramped columns now show one coloured dot per subcategory per day (exercises with no subcategory use their category, e.g. Strength). Filled dot = every exercise in that group has a done set; hollow ring = planned / not finished. Tap a day to open it, as before. A small colour key under the grid lists only the groups used that week. iPad, desktop and phone landscape keep the text pills, + Add and drag-and-drop. -->
 <!-- v5.54.2 — Fix: deleting an event from the monthly edit window now also deletes it from Google Calendar (the window's Delete button didn't pass the Google link, so the event stayed in Google and could come back on the next sync). -->
 <!-- v5.54.1 — Monthly calendar (desktop/iPad): the 7 columns now stay the same width no matter how long an event title is. Long titles wrap to two lines inside the chip and are trimmed with "…" after that (full title on hover and in the edit window). -->
@@ -13802,6 +13803,7 @@ function App() {
   const [peopleDirectory, setPeopleDirectory] = useSynced('peopleDirectory', []); // [{id, name}] — master list across weeks
   const [fitnessLog, setFitnessLog] = useSynced('fitnessLog', {}); // {[dateKey]: [{id, name, exercises:[{id, exerciseId, sets:[{id,reps,weight,done}]}]}]}
   const [fitnessExercises, setFitnessExercises] = useSynced('fitnessExercises', []); // [{id, name, category}] library
+  const [fitnessDotColors, setFitnessDotColors] = useSynced('fitnessDotColors', {}); // v5.56.0 chosen dot colour per Fitness group {'sub:run':'#hex'}
   const [fitnessCompare, setFitnessCompare] = useSynced('fitnessCompare', []); // v5.19.0 saved Fitness > Charts comparisons [{id,name,metric,untagged,groups:[{id,name,subs,exerciseIds}]}]
   const [fitnessGoals, setFitnessGoals] = useSynced('fitnessGoals', []); // [{id, exerciseId, period, target, unit}]
   const [targets, setTargets] = useSynced('targets', []); // v5.30.0 [{id,kind,period,books,pages}] — see TARGETS section
@@ -14306,7 +14308,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.55.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.56.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -14402,7 +14404,7 @@ function App() {
         calsTarget={calsTarget} setCalsTarget={setCalsTarget}
         onBack={()=>setPage('habit')} />}
       {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} foldersData={foldersData} setFoldersData={setFoldersData} weekData={weekData} setWeekData={setWeekData} selectedId={selectedPagesId} setSelectedId={setSelectedPagesId} />}
-      {page==='fitness' && <FitnessView fitnessLog={fitnessLog} setFitnessLog={setFitnessLog} fitnessExercises={fitnessExercises} setFitnessExercises={setFitnessExercises} fitnessGoals={fitnessGoals} setFitnessGoals={setFitnessGoals} goals={goals} habitGoals={habitGoals} habitCompletions={habitCompletions} habitQty={habitQty} fitnessCompare={fitnessCompare} setFitnessCompare={setFitnessCompare} />}
+      {page==='fitness' && <FitnessView fitnessLog={fitnessLog} setFitnessLog={setFitnessLog} fitnessExercises={fitnessExercises} setFitnessExercises={setFitnessExercises} fitnessGoals={fitnessGoals} setFitnessGoals={setFitnessGoals} goals={goals} habitGoals={habitGoals} habitCompletions={habitCompletions} habitQty={habitQty} fitnessCompare={fitnessCompare} setFitnessCompare={setFitnessCompare} fitnessDotColors={fitnessDotColors} setFitnessDotColors={setFitnessDotColors} />}
       {page==='goals' && <GoalsView goals={goals} setGoals={setGoals} pagesData={pagesData}
         countdowns={countdowns} setCountdowns={setCountdowns}
         selectedId={selectedGoalId} setSelectedId={setSelectedGoalId}
@@ -15125,30 +15127,39 @@ function FitnessCharts({ fitnessLog, fitnessExercises, goals, habitGoals, habitC
 
 // ── v5.55.0: compact Fitness week — dots by subcategory ──
 // A "group" is the exercise's subcategory (Run, Push…) or, if it has none, its category (Strength…).
-const FIT_DOT_COLORS = ['#3b82d6','#e8643a','#2fa56b','#e0a100','#d9609a','#8b5cc7','#17a2b8','#c0392b','#7a8b3a','#8d6e63'];
+const FIT_DOT_COLORS = ['#2f6fdc','#f07d2a','#d63fa0','#2e9e5b','#e6b800','#7c4dcc','#12b5cb','#d93a3a','#8d6e63','#64748b'];
+const FIT_CAT_RANK = { Cardio: 0, Strength: 1, Mobility: 2, Sport: 3, Other: 4 };
 function fitGroupOf(libEx) {
-  if (!libEx) return { key: 'cat:other', label: 'Other' };
-  const sub = String(libEx.subcategory || '').trim();
-  if (sub) return { key: 'sub:' + ruleSubKey(sub), label: sub };
+  if (!libEx) return { key: 'cat:other', label: 'Other', cat: 'Other' };
   const cat = libEx.category || UNCATEGORIZED;
-  return { key: 'cat:' + ruleSubKey(cat), label: cat };
+  const sub = String(libEx.subcategory || '').trim();
+  if (sub) return { key: 'sub:' + ruleSubKey(sub), label: sub, cat };
+  return { key: 'cat:' + ruleSubKey(cat), label: cat, cat };
 }
-// Colours are picked from the whole library (sorted, with a stable hash start) so a group keeps its colour week to week
-function fitGroupColors(library) {
-  const groups = {};
-  (library || []).forEach(e => { const g = fitGroupOf(e); groups[g.key] = g.label; });
-  const keys = Object.keys(groups).sort();
-  const used = new Set(), out = {};
-  keys.forEach(k => {
-    let h = 0; for (let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
-    let idx = h % FIT_DOT_COLORS.length, tries = 0;
-    while (used.has(idx) && tries < FIT_DOT_COLORS.length) { idx = (idx + 1) % FIT_DOT_COLORS.length; tries++; }
-    used.add(idx); out[k] = FIT_DOT_COLORS[idx];
+// Everything about the groups in the library: a steady order (cardio first, then strength…, each A–Z),
+// labels, and colours. A colour you chose wins; the rest take the palette in a stable hash order and skip colours already taken.
+function fitGroupMeta(library, overrides) {
+  const info = {};
+  (library || []).forEach(e => {
+    const g = fitGroupOf(e), r = FIT_CAT_RANK[g.cat] ?? 4;
+    if (!info[g.key]) info[g.key] = { key: g.key, label: g.label, rank: r };
+    else if (r < info[g.key].rank) info[g.key].rank = r;
   });
-  return out;
+  const list = Object.values(info).sort((a, b) => a.rank - b.rank || a.label.toLowerCase().localeCompare(b.label.toLowerCase()));
+  const order = {}, labels = {}, colors = {}, auto = {}, ov = overrides || {};
+  const used = new Set();
+  list.forEach((g, i) => { order[g.key] = i; labels[g.key] = g.label; if (ov[g.key]) { colors[g.key] = ov[g.key]; used.add(String(ov[g.key]).toLowerCase()); } });
+  list.forEach(g => {
+    if (ov[g.key]) return;
+    let h = 0; for (let i = 0; i < g.key.length; i++) h = (h * 31 + g.key.charCodeAt(i)) >>> 0;
+    let idx = h % FIT_DOT_COLORS.length, tries = 0;
+    while (used.has(FIT_DOT_COLORS[idx]) && tries < FIT_DOT_COLORS.length) { idx = (idx + 1) % FIT_DOT_COLORS.length; tries++; }
+    used.add(FIT_DOT_COLORS[idx]); colors[g.key] = FIT_DOT_COLORS[idx]; auto[g.key] = true;
+  });
+  return { list, order, labels, colors, auto };
 }
-// One entry per group for a day, in first-seen order. done = every exercise in the group has at least one done set.
-function fitDayDots(dayExs, library) {
+// One entry per group for a day, in the steady group order. done = every exercise in the group has at least one done set.
+function fitDayDots(dayExs, library, order) {
   const map = new Map();
   (dayExs || []).forEach(ex => {
     const g = fitGroupOf((library || []).find(e => e.id === ex.exerciseId));
@@ -15156,10 +15167,11 @@ function fitDayDots(dayExs, library) {
     const cur = map.get(g.key);
     if (cur) cur.done = cur.done && exDone; else map.set(g.key, { key: g.key, label: g.label, done: exDone });
   });
-  return Array.from(map.values());
+  const o = order || {};
+  return Array.from(map.values()).sort((a, b) => (o[a.key] ?? 99) - (o[b.key] ?? 99));
 }
 
-function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessExercises, fitnessGoals, setFitnessGoals, goals, habitGoals, habitCompletions, habitQty, fitnessCompare, setFitnessCompare }) {
+function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessExercises, fitnessGoals, setFitnessGoals, goals, habitGoals, habitCompletions, habitQty, fitnessCompare, setFitnessCompare, fitnessDotColors, setFitnessDotColors }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDate] = useState(today);
   const [fitView, setFitView] = useState('week');
@@ -15196,6 +15208,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const dateKey = fmt(selectedDate);
   const weekStart = getWeekStart(selectedDate);
   const weekDays = Array.from({length:7}, (_,i) => addDays(weekStart, i));
+  const dotMeta = React.useMemo(() => fitGroupMeta(fitnessExercises, fitnessDotColors), [fitnessExercises, fitnessDotColors]);   // v5.56.0
   const viewYear = selectedDate.getFullYear();
   const viewMonth = selectedDate.getMonth();
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
@@ -15979,8 +15992,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
               const dk=fmt(d),isToday=isSameDay(d,today);
               const dayExs=getDayExercises(dk);
               const isDragOver=dragOverDk===dk;
-              const dotColors=fitCompact?fitGroupColors(fitnessExercises):null;
-              const dayDots=fitCompact?fitDayDots(dayExs,fitnessExercises):null;
+              const dayDots=fitCompact?fitDayDots(dayExs,fitnessExercises,dotMeta.order):null;
               return (
                 <div key={dk} className={`fitness-week-col ${isToday?'today':''} ${isDragOver?'drag-over':''}`}
                   onClick={()=>{if(!dragEx){setSelectedDate(d);setFitView('day');}}}
@@ -15997,7 +16009,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                   </div>
                   <div className="fitness-week-col-body">
                     {fitCompact&&dayDots.slice(0,6).map(g=>(
-                      <span key={g.key} className={`fit-dot${g.done?'':' planned'}`} style={{'--dot':dotColors[g.key]||'#8d6e63'}} title={`${g.label} — ${g.done?'done':'planned'}`}/>
+                      <span key={g.key} className={`fit-dot${g.done?'':' planned'}`} style={{'--dot':dotMeta.colors[g.key]||'#8d6e63'}} title={`${g.label} — ${g.done?'done':'planned'}`}/>
                     ))}
                     {fitCompact&&dayDots.length>6&&<span className="fit-dot-more">+{dayDots.length-6}</span>}
                     {!fitCompact&&dayExs.map(ex=>{
@@ -16021,16 +16033,17 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
           </div>
           {fitCompact&&(()=>{
             // colour key: only the groups that appear this week
-            const colors=fitGroupColors(fitnessExercises),seen=new Map();
-            weekDays.forEach(d=>fitDayDots(getDayExercises(fmt(d)),fitnessExercises).forEach(g=>{if(!seen.has(g.key))seen.set(g.key,g.label);}));
+            const colors=dotMeta.colors,seen=new Map();
+            weekDays.forEach(d=>fitDayDots(getDayExercises(fmt(d)),fitnessExercises,dotMeta.order).forEach(g=>{if(!seen.has(g.key))seen.set(g.key,g.label);}));
             if(!seen.size) return null;
+            const keyOrder=Array.from(seen.keys()).sort((a,b)=>(dotMeta.order[a]??99)-(dotMeta.order[b]??99));
             return (
               <div className="fit-key">
                 <span className="fit-key-item"><span className="fit-dot" style={{'--dot':'var(--ink-light)'}}/>done</span>
                 <span className="fit-key-item"><span className="fit-dot planned" style={{'--dot':'var(--ink-light)'}}/>planned</span>
                 <span className="fit-key-sep"/>
-                {Array.from(seen.entries()).map(([k,label])=>(
-                  <span key={k} className="fit-key-item"><span className="fit-dot" style={{'--dot':colors[k]||'#8d6e63'}}/>{label}</span>
+                {keyOrder.map(k=>(
+                  <span key={k} className="fit-key-item"><span className="fit-dot" style={{'--dot':colors[k]||'#8d6e63'}}/>{seen.get(k)}</span>
                 ))}
               </div>
             );
@@ -16238,7 +16251,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
         onAdd={exerciseId=>{addExerciseToDay(showExPicker.dk,exerciseId);setShowExPicker(null);}}
         onAddNew={(name,category)=>{const id=addExercise(name,category);if(id)setTimeout(()=>{addExerciseToDay(showExPicker.dk,id);setShowExPicker(null);},50);}}
         onClose={()=>setShowExPicker(null)}/>}
-      {showLibManager&&<ExerciseLibraryManager exercises={fitnessExercises} onAdd={addExercise} onUpdate={updateExercise} onDelete={deleteExercise_lib} onClose={()=>setShowLibManager(false)}/>}
+      {showLibManager&&<ExerciseLibraryManager exercises={fitnessExercises} onAdd={addExercise} onUpdate={updateExercise} onDelete={deleteExercise_lib} dotMeta={dotMeta} dotColors={fitnessDotColors} onDotColor={(k,c)=>setFitnessDotColors(m=>{const n={...(m||{})};if(c)n[k]=c;else delete n[k];return n;})} onClose={()=>setShowLibManager(false)}/>}
       {showGoalManager&&<GoalManager goals={fitnessGoals} exercises={fitnessExercises} focusKey={goalFocus}
         onAddVersion={addGoalVersion} onEdit={editGoalInPlace} onEnd={endGoal} onDelete={deleteGoalVersion}
         onCancelUpcoming={cancelUpcomingGoal} periodStart={periodStart}
@@ -16633,7 +16646,7 @@ function ExercisePicker({ exercises, onAdd, onAddNew, onClose }) {
 // ─────────────────────────────────────────────
 // EXERCISE LIBRARY MANAGER
 // ─────────────────────────────────────────────
-function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose }) {
+function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose, dotMeta, dotColors, onDotColor }) {
   const [newName, setNewName] = useState('');
   const [newCat, setNewCat] = useState('Strength');
   const [newSub, setNewSub] = useState('');
@@ -16711,6 +16724,31 @@ function ExerciseLibraryManager({ exercises, onAdd, onUpdate, onDelete, onClose 
             </div>
           ))}
         </div>
+        {/* v5.56.0 — dot colours for the Fitness week on phones */}
+        {dotMeta&&dotMeta.list.length>0&&(
+          <div style={{padding:'8px 12px',borderTop:'1px solid var(--border)',flexShrink:0,maxHeight:170,overflowY:'auto'}}>
+            <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:4,textTransform:'uppercase',letterSpacing:'0.05em'}}>Dot colors (phone week view):</div>
+            {dotMeta.list.map(g=>{
+              const cur=dotMeta.colors[g.key],chosen=!!(dotColors&&dotColors[g.key]);
+              return (
+                <div key={g.key} style={{display:'flex',alignItems:'center',gap:6,padding:'3px 0',flexWrap:'wrap'}}>
+                  <span style={{width:11,height:11,borderRadius:'50%',background:cur,flexShrink:0,boxShadow:'inset 0 0 0 1px rgba(0,0,0,0.28)'}}/>
+                  <span style={{width:84,flexShrink:0,display:'inline-flex',alignItems:'baseline',gap:5,minWidth:0}}>
+                    <span style={{fontSize:12,color:'var(--ink)',fontFamily:"'DM Sans',sans-serif",overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{g.label}</span>
+                    {chosen&&<button onClick={()=>onDotColor(g.key,null)} title="Back to the automatic colour" style={{background:'none',border:'none',cursor:'pointer',fontSize:10,color:'var(--ink-light)',textDecoration:'underline',padding:0,flexShrink:0}}>Auto</button>}
+                  </span>
+                  <span style={{display:'inline-flex',gap:3,flexWrap:'wrap',alignItems:'center'}}>
+                    {FIT_DOT_COLORS.map(c=>(
+                      <button key={c} aria-label={'Use this colour for '+g.label} aria-pressed={chosen&&cur===c} onClick={()=>onDotColor(g.key,c)}
+                        style={{width:17,height:17,borderRadius:'50%',background:c,padding:0,cursor:'pointer',border:'none',
+                          boxShadow:(cur===c)?'0 0 0 2px var(--surface), 0 0 0 3.5px var(--ink)':'inset 0 0 0 1px rgba(0,0,0,0.2)'}}/>
+                    ))}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
         {/* Add new */}
         <div style={{padding:'8px 12px 12px',borderTop:'1px solid var(--border)',flexShrink:0}}>
           <div style={{fontSize:9,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",marginBottom:4,textTransform:'uppercase',letterSpacing:'0.05em'}}>Add exercise:</div>
