@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.50.0 -->
+<!-- LP Planner v5.50.1 -->
+<!-- v5.50.1 — Monthly > Add/Edit Event: the Length (duration) picker no longer spills out of the box. Date now has its own line; Time and Length sit together below it and wrap if space is tight. No data change. -->
 <!-- v5.50.0 — Google Calendar two-way sync hardening: every push/update/delete now fetches a fresh Google token first (edits used to be silently skipped when the cached token was near expiry, then overwritten by the next pull); failed edits/deletes are remembered and retried before the next pull (newest edit wins); a time added to an all-day event converts it properly (and back); events deleted in Google are removed from the app; app events whose Google link was lost are re-linked; deletes in the app are confirmed with Google. Monthly view: events get a Length picker next to Time. -->
 <!-- v5.49.0 — Weekly desktop: the Today pill now sits on the same row as the List / Time blocks switch (switch left, Today right) instead of its own line; Focus day also works in the Time blocks view (click a weekday header; ‹ / › step days); Time blocks week grid labels every hour (rows 36px tall, was a label every 2 hours at 30px). -->
 <!-- v5.48.0 — Weekly desktop: (1) a filled "Today" pill centered under the week arrows jumps to the current week (and re-focuses today if a day is focused); (2) Focus day — click a weekday header to show just that day in a wider centered column, click it again to return to the full week; ‹ / › in the focused header step to the previous/next day (crossing into the neighboring week at the edges). -->
@@ -10784,17 +10785,21 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
               <input type="date" className="task-time-input"
                 value={eventForm.date||''}
                 onChange={e=>setEventForm(f=>({...f,date:e.target.value}))} />
-              <label style={{fontSize:12,color:'var(--ink-faint)'}}>Time:</label>
-              <TimeSelect value={eventForm.time} onChange={v=>setEventForm(f=>({...f,time:v}))} />
+            </div>
+            <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',columnGap:8,rowGap:6,marginTop:8}}>
+              <div style={{display:'flex',alignItems:'center',gap:8}}>
+                <label style={{fontSize:12,color:'var(--ink-faint)'}}>Time:</label>
+                <TimeSelect value={eventForm.time} onChange={v=>setEventForm(f=>({...f,time:v}))} />
+              </div>
               {eventForm.time && (
-                <>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
                   <label style={{fontSize:12,color:'var(--ink-faint)'}}>Length:</label>
                   <select className="task-time-input" style={{padding:'3px 2px'}}
                     value={TB_DURS.includes(eventForm.dur) ? eventForm.dur : (eventForm.dur ? eventForm.dur : 60)}
                     onChange={e=>setEventForm(f=>({...f,dur:parseInt(e.target.value,10)}))}>
                     {(TB_DURS.includes(eventForm.dur) || !eventForm.dur ? TB_DURS : [...TB_DURS, eventForm.dur].sort((a,b)=>a-b)).map(d=><option key={d} value={d}>{tbDurLabel(d)}</option>)}
                   </select>
-                </>
+                </div>
               )}
             </div>
             <textarea className="modal-textarea" placeholder="Details (optional)…"
@@ -13969,7 +13974,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.50.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.50.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
