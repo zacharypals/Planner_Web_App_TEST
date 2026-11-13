@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.58.0 -->
+<!-- LP Planner v5.58.1 -->
+<!-- v5.58.1 — Earthy and Fresh: the main banner and weekday headers lean slightly more red/purple (banner #47293c to #5e3d52). -->
 <!-- v5.58.0 — Light themes now carry through to two more places: the Pages folder colors (each theme has its own set of 8 folder colors) and the Fitness weekly weekday headers (they use the theme's header color, with a lighter "today" header and the theme's today-date color). Current theme and dark mode are unchanged. Folder color swatches are labeled Color 1–8 since the hue names no longer match every theme. -->
 <!-- v5.57.2 — Exercises are now listed A–Z (ignoring capitals) within each section of the Exercise Library, and in the "Link exercises" list inside a habit. While you are editing a library row it holds its place, so it doesn't jump around as you type the name. -->
 <!-- v5.57.1 — Fitness dot colours: picking a colour for one group no longer changes the others. The first time you pick, every group's current colour is saved as it is, so only the group you tapped changes. Duplicates are allowed. "Auto" still puts a single group back to an automatic colour. -->
@@ -2835,7 +2836,7 @@
   :root[data-lp-theme="b3"]:not([data-theme="dark"]) {
     --cream:#faf6ef; --paper:#fffdf9; --border:#e6dfd1; --gold-light:#fff1d6;
     --ink:#2d2620; --ink-light:#6a6054; --accent:#8a5a7a; --accent-light:#f6ecf1; --tint:#efe4ea;
-    --nav-bg:linear-gradient(135deg,#3f2f3c 0%,#53404f 100%); --hdr-bg:linear-gradient(180deg,#665062 0%,#54404f 100%); --hdr-today:#f0c27a; --fit-hdr-today:linear-gradient(180deg,#826a7e 0%,#665062 100%);
+    --nav-bg:linear-gradient(135deg,#47293c 0%,#5e3d52 100%); --hdr-bg:linear-gradient(180deg,#704d64 0%,#5e3d52 100%); --hdr-today:#f0c27a; --fit-hdr-today:linear-gradient(180deg,#8a6a7e 0%,#704d64 100%);
     --fhue-0:#e8c9c6; --fhue-1:#cfdcc4; --fhue-2:#ecd9ae; --fhue-3:#c5d3e0; --fhue-4:#e3bfa8; --fhue-5:#d8c8df; --fhue-6:#dbe0b8; --fhue-7:#e9c4d6;
     --t2-q:linear-gradient(145deg,#8a4a37,#bf7650); --t2-qtx:#fff6ea; --t2-lab:#f8d4a4; --t2-gold:linear-gradient(135deg,#f8d4a4,#eeaf66); --t2-gtx:#5e3d05; --t2-qsh:rgba(90,40,20,.24);
     --tc-0:#e8c9c6; --tc-1:#cfdcc4; --tc-2:#ecd9ae; --tc-3:#c5d3e0; --tc-4:#e3bfa8; --tc-5:#d8c8df; --tc-6:#dbe0b8; --tc-7:#e9c4d6; --tc-8:#e8d1c6; --tc-9:#c9dcc4; --tc-10:#ece7ae; --tc-11:#c5cde0; --tc-12:#e3cda8; --tc-13:#ddc8df; --tc-14:#d2e0b8; --tc-15:#e9c4cd; --tc-16:#e8d9c6; --tc-17:#c4dcc4; --tc-18:#e2ecae; --tc-19:#c5c6e0; --tc-20:#e3dba8; --tc-21:#dfc8db;
@@ -2844,7 +2845,7 @@
   :root[data-lp-theme="c3"]:not([data-theme="dark"]) {
     --cream:#faf6ef; --paper:#fffdf9; --border:#e6dfd1; --gold-light:#fff1d6;
     --ink:#2d2620; --ink-light:#6a6054; --accent:#8a5a7a; --accent-light:#f6ecf1; --tint:#efe4ea;
-    --nav-bg:linear-gradient(135deg,#3f2f3c 0%,#53404f 100%); --hdr-bg:linear-gradient(180deg,#665062 0%,#54404f 100%); --hdr-today:#f0c27a; --fit-hdr-today:linear-gradient(180deg,#826a7e 0%,#665062 100%);
+    --nav-bg:linear-gradient(135deg,#47293c 0%,#5e3d52 100%); --hdr-bg:linear-gradient(180deg,#704d64 0%,#5e3d52 100%); --hdr-today:#f0c27a; --fit-hdr-today:linear-gradient(180deg,#8a6a7e 0%,#704d64 100%);
     --fhue-0:#f5e9a8; --fhue-1:#bfe8d4; --fhue-2:#fbcfb5; --fhue-3:#bcdcf5; --fhue-4:#d9cdf0; --fhue-5:#f5c6d2; --fhue-6:#c9ecf0; --fhue-7:#f9d9a6;
     --t2-q:linear-gradient(145deg,#8a4a37,#bf7650); --t2-qtx:#fff6ea; --t2-lab:#f8d4a4; --t2-gold:linear-gradient(135deg,#f8d4a4,#eeaf66); --t2-gtx:#5e3d05; --t2-qsh:rgba(90,40,20,.24);
     --tc-0:#f5e9a8; --tc-1:#bfe8d4; --tc-2:#fbcfb5; --tc-3:#bcdcf5; --tc-4:#d9cdf0; --tc-5:#f5c6d2; --tc-6:#c9ecf0; --tc-7:#f9d9a6; --tc-8:#eff5a8; --tc-9:#bfe8de; --tc-10:#fbdfb5; --tc-11:#bccff5; --tc-12:#e1cdf0; --tc-13:#f5c6c7; --tc-14:#c9e3f0; --tc-15:#f9eca6; --tc-16:#ddf5a8; --tc-17:#bfe8e7; --tc-18:#fbf0b5; --tc-19:#bcc1f5; --tc-20:#e9cdf0; --tc-21:#f5d0c6;
@@ -14320,7 +14321,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.58.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.58.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
