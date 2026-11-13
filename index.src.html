@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.54.0 -->
+<!-- LP Planner v5.54.1 -->
+<!-- v5.54.1 — Monthly calendar (desktop/iPad): the 7 columns now stay the same width no matter how long an event title is. Long titles wrap to two lines inside the chip and are trimmed with "…" after that (full title on hover and in the edit window). -->
 <!-- v5.54.0 — Monthly calendar on phones (portrait, under 600px): no more cramped text chips. Each day shows small colour dots; tapping a day selects it and its events (time + full title) list under the grid with an "Add event" button. iPad, desktop and phone landscape keep the text chips, tap-to-add and drag-and-drop exactly as before. -->
 <!-- v5.53.0 — Goals › Reading log: the Pages read chart now lives inside the Reading log tile behind a Log | Chart toggle (remembered per device), so the two share one tile instead of stacking. -->
 <!-- v5.52.0 — Goals › Reading log: new "Pages read" chart above the log. Stacked bars of pages read per Week / Month / Year (12 / 12 / 5 periods, arrows page back), split by book in "All books" or filtered to a single book; tap a bar for the per-book breakdown, Table button for a list view. Reads the existing entries in each book's Pages log, no data changes. -->
@@ -1289,7 +1290,7 @@
   /* ===================== MONTHLY CALENDAR ===================== */
   .monthly-cal-wrap { padding: 20px 24px; min-width: 560px; }
   .monthly-cal-header {
-    display: grid; grid-template-columns: repeat(7, 1fr);
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
     column-gap: 2px; /* match monthly-cal-grid gap so DOW labels stay over their columns */
     margin-bottom: 4px;
   }
@@ -1299,7 +1300,7 @@
     font-family: 'DM Mono', monospace;
   }
   .monthly-cal-grid {
-    display: grid; grid-template-columns: repeat(7, 1fr);
+    display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 2px;
   }
   .monthly-cell {
@@ -1325,7 +1326,8 @@
   .monthly-event-chip {
     font-size: 10.5px; padding: 2px 6px; border-radius: 5px; cursor: pointer;
     font-family: 'DM Sans', sans-serif; color: var(--ink);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    line-height: 1.3; overflow: hidden; overflow-wrap: anywhere; /* v5.54.1: wrap, then trim after 2 lines */
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2;
     transition: filter 0.1s;
   }
   .monthly-event-chip:hover { filter: brightness(0.92); }
@@ -10815,6 +10817,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
                     <div className="monthly-cell-events">
                       {dayEvents.slice(0,3).map(ev=>(
                         <div key={ev.id} className="monthly-event-chip"
+                          title={`${ev.eventTime ? ev.eventTime + ' ' : ''}${ev.title || ''}`.trim()}
                           style={{background: taskBg(ev.colorIndex??3), cursor:'grab', opacity: dragInfo?.eventId===ev.id ? 0.4 : 1}}
                           draggable
                           onDragStart={e=>{e.stopPropagation();handleDragStart(e,ev.id,dk);}}
@@ -14286,7 +14289,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.54.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.54.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
