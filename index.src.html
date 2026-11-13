@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.56.1 -->
+<!-- LP Planner v5.57.0 -->
+<!-- v5.57.0 — Fitness: (1) dot order puts Push before Pull before Legs (the rest stay cardio first, then A–Z); (2) the exercise tiles in the Fitness Week (iPad/desktop) and Month views now carry their group's dot colour — a tinted tile with a colour bar on the left — so a Run is the same colour in every view. Colours you set in Exercise Library › Dot colors apply here too. -->
 <!-- v5.56.1 — Fitness week dots: new "Jewel" colour palette (sapphire, emerald, ruby, amber, teal, rose, slate, then amethyst, olive, brown if you have more than seven groups). Colours you picked yourself are unchanged. -->
 <!-- v5.56.0 — Fitness week dots: (1) more distinct automatic colours (blue, orange, magenta, green, yellow, purple, cyan, red, brown, slate — only one green), (2) pick your own colour per subcategory in Exercise Library › "Dot colors" (synced; "Auto" puts it back), (3) a steady dot order — cardio groups first, then strength, mobility, sport, other, each A–Z — so e.g. Run always sits left of Push. -->
 <!-- v5.55.0 — Fitness week on phones (portrait, under 600px): the seven cramped columns now show one coloured dot per subcategory per day (exercises with no subcategory use their category, e.g. Strength). Filled dot = every exercise in that group has a done set; hollow ring = planned / not finished. Tap a day to open it, as before. A small colour key under the grid lists only the groups used that week. iPad, desktop and phone landscape keep the text pills, + Add and drag-and-drop. -->
@@ -756,6 +757,8 @@
     margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .fitness-week-workout-pill.cardio { background: var(--gold-light); color: var(--gold); border: 1px solid rgba(203,146,56,0.25); }
+  /* v5.57.0 — tiles take their group's dot colour */
+  .fitness-week-workout-pill.grp { background: color-mix(in srgb, var(--dot) 18%, var(--surface)); color: var(--ink); border: none; border-left: 3px solid var(--dot); border-radius: 4px; }
   .fitness-week-add {
     background: none; border: 1px dashed var(--border); border-radius: 4px;
     color: var(--ink-faint); font-size: 10px; cursor: pointer; width: 100%;
@@ -14309,7 +14312,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.56.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.57.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15146,7 +15149,9 @@ function fitGroupMeta(library, overrides) {
     if (!info[g.key]) info[g.key] = { key: g.key, label: g.label, rank: r };
     else if (r < info[g.key].rank) info[g.key].rank = r;
   });
-  const list = Object.values(info).sort((a, b) => a.rank - b.rank || a.label.toLowerCase().localeCompare(b.label.toLowerCase()));
+  const FIT_PREFER = ['push', 'pull', 'legs'];   // v5.57.0: Push / Pull / Legs lead their category, in that order
+  const pref = g => { const i = FIT_PREFER.indexOf(g.label.toLowerCase()); return i < 0 ? 99 : i; };
+  const list = Object.values(info).sort((a, b) => a.rank - b.rank || pref(a) - pref(b) || a.label.toLowerCase().localeCompare(b.label.toLowerCase()));
   const order = {}, labels = {}, colors = {}, auto = {}, ov = overrides || {};
   const used = new Set();
   list.forEach((g, i) => { order[g.key] = i; labels[g.key] = g.label; if (ov[g.key]) { colors[g.key] = ov[g.key]; used.add(String(ov[g.key]).toLowerCase()); } });
@@ -16015,9 +16020,9 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                     {fitCompact&&dayDots.length>6&&<span className="fit-dot-more">+{dayDots.length-6}</span>}
                     {!fitCompact&&dayExs.map(ex=>{
                       const libEx=fitnessExercises.find(e=>e.id===ex.exerciseId);
-                      const isCardio=libEx?.category==='Cardio';
+                      const gcol=dotMeta.colors[fitGroupOf(libEx).key];
                       return (
-                        <div key={ex.id} className={`fitness-week-workout-pill${isCardio?' cardio':''}`} title={exName(ex.exerciseId)}
+                        <div key={ex.id} className="fitness-week-workout-pill grp" style={{'--dot':gcol||'#5b6b82'}} title={exName(ex.exerciseId)}
                           draggable={true}
                           onDragStart={e=>{e.stopPropagation();setDragEx({exId:ex.id,fromDk:dk,exerciseId:ex.exerciseId});}}
                           onDragEnd={()=>{setDragEx(null);setDragOverDk(null);}}>
@@ -16097,9 +16102,9 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                     <div style={{marginTop:3}}>
                       {dayExs.map(ex=>{
                         const libEx=fitnessExercises.find(e=>e.id===ex.exerciseId);
-                        const isCardio=libEx?.category==='Cardio';
+                        const gcol=dotMeta.colors[fitGroupOf(libEx).key];
                         return (
-                          <div key={ex.id} className={`fitness-week-workout-pill${isCardio?' cardio':''}`} style={{fontSize:9,padding:'1px 4px',marginBottom:1}} title={exName(ex.exerciseId)}
+                          <div key={ex.id} className="fitness-week-workout-pill grp" style={{fontSize:9,padding:'1px 4px',marginBottom:1,'--dot':gcol||'#5b6b82'}} title={exName(ex.exerciseId)}
                             draggable={true}
                             onDragStart={e=>{e.stopPropagation();setDragEx({exId:ex.id,fromDk:dk,exerciseId:ex.exerciseId});}}
                             onDragEnd={()=>{setDragEx(null);setDragOverDk(null);}}>
