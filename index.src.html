@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.53.0 -->
+<!-- LP Planner v5.54.0 -->
+<!-- v5.54.0 — Monthly calendar on phones (portrait, under 600px): no more cramped text chips. Each day shows small colour dots; tapping a day selects it and its events (time + full title) list under the grid with an "Add event" button. iPad, desktop and phone landscape keep the text chips, tap-to-add and drag-and-drop exactly as before. -->
 <!-- v5.53.0 — Goals › Reading log: the Pages read chart now lives inside the Reading log tile behind a Log | Chart toggle (remembered per device), so the two share one tile instead of stacking. -->
 <!-- v5.52.0 — Goals › Reading log: new "Pages read" chart above the log. Stacked bars of pages read per Week / Month / Year (12 / 12 / 5 periods, arrows page back), split by book in "All books" or filtered to a single book; tap a bar for the per-book breakdown, Table button for a list view. Reads the existing entries in each book's Pages log, no data changes. -->
 <!-- v5.51.1 — Pages: ticking/unticking a checklist box no longer yanks the cursor/scroll to the top of the page when the editor wasn't focused (the format read-back after each edit was focusing the editor). -->
@@ -2388,6 +2389,34 @@
     .monthly-cal-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
     .monthly-event-chip .chip-time { display: none; } /* narrow cells: show the title, not the time */
   }
+
+  /* v5.54.0 — compact month (phones in portrait): dots in the grid + selected-day panel below */
+  .monthly-cal-wrap.compact { padding-bottom: 64px; }
+  .monthly-cal-wrap.compact .monthly-cal-header { display: grid; column-gap: 0; }
+  .monthly-cal-wrap.compact .monthly-dow { font-size: 10px; letter-spacing: 0.02em; }
+  .monthly-cal-wrap.compact .monthly-cell-dow { display: none; }
+  .monthly-cal-wrap.compact .monthly-cell { min-height: 54px; padding: 4px 2px 3px; }
+  .monthly-cal-wrap.compact .monthly-cell-date { font-size: 14px; margin-bottom: 3px; }
+  .monthly-cal-wrap.compact .monthly-cell.picked { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-light); }
+  .monthly-cell-dots { display: flex; justify-content: center; align-items: center; gap: 2px; height: 8px; }
+  .monthly-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.28); }
+  .monthly-dot-more { font-family: 'DM Mono', monospace; font-size: 9px; line-height: 8px; color: var(--ink-light); }
+  .monthly-day-panel { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .monthly-day-panel-title { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .monthly-day-panel-title .today-tag { font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 400; color: var(--gold); margin-left: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .monthly-day-event { display: flex; align-items: stretch; gap: 10px; padding: 8px 2px; min-height: 44px; cursor: pointer; border-radius: var(--radius-sm); }
+  .monthly-day-event:active { background: var(--cream); }
+  .monthly-day-event-bar { width: 4px; border-radius: 2px; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.2); }
+  .monthly-day-event-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
+  .monthly-day-event-time { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--gold); }
+  .monthly-day-event-title { font-size: 14px; line-height: 1.3; color: var(--ink); overflow-wrap: anywhere; }
+  .monthly-day-empty { font-size: 12.5px; color: var(--ink-faint); font-style: italic; padding: 6px 2px 10px; }
+  .monthly-day-add {
+    width: 100%; margin-top: 6px; min-height: 40px; padding: 8px; border-radius: 8px;
+    border: 1.5px dashed var(--border); background: none; color: var(--ink-light);
+    font-size: 13px; font-family: 'DM Sans', sans-serif; cursor: pointer;
+  }
+  .monthly-day-add:active { border-color: var(--accent); color: var(--accent); }
 
   /* ═══════════════════════════════════════════════════════════════
      v4.2.0 GOALS — Goals tab, timeline, goal tasks in the week, mobile nav "More".
@@ -10416,6 +10445,17 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
   const [dragOverDay, setDragOverDay] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  // v5.54.0 — compact month for phones in portrait (<600px): dots + selected-day panel instead of text chips
+  const [compact, setCompact] = useState(() => !!(window.matchMedia && window.matchMedia('(max-width: 599px)').matches));
+  const [pickedDay, setPickedDay] = useState(null);
+  useEffect(() => {
+    if (!window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 599px)');
+    const h = e => setCompact(e.matches);
+    setCompact(mq.matches);
+    if (mq.addEventListener) mq.addEventListener('change', h); else mq.addListener(h);
+    return () => { if (mq.removeEventListener) mq.removeEventListener('change', h); else mq.removeListener(h); };
+  }, []);
 
   function handleDragStart(ev, eventId, fromDayKey) {
     setDragInfo({eventId, fromDayKey});
@@ -10620,6 +10660,12 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
 
   const monthEvents = getAllMonthEvents();
 
+  // v5.54.0 — which day the compact panel shows: the tapped day if it's in this month, else today, else the 1st
+  const todayDayKey = fmt(today);
+  const cellKeys = cells.filter(Boolean).map(c => fmt(c));
+  const activeDayKey = (pickedDay && cellKeys.includes(pickedDay)) ? pickedDay
+    : (cellKeys.includes(todayDayKey) ? todayDayKey : cellKeys[0]);
+
   const sidebarContent = (
     <>
       {/* Month Nav */}
@@ -10724,7 +10770,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
 
       {/* MAIN CALENDAR GRID */}
       <div className="main-panel" style={{overflowY:'auto'}}>
-        <div className="monthly-cal-wrap">
+        <div className={`monthly-cal-wrap ${compact?'compact':''}`}>
           {/* Mobile month navigation — desktop uses the sidebar nav instead */}
           <div className="mobile-month-nav">
             <button className="nav-arrow" onClick={()=>setViewDate(d=>new Date(d.getFullYear(), d.getMonth()-1, 1))}>‹</button>
@@ -10751,33 +10797,76 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
               const isDragOver = dragOverDay === dk;
               return (
                 <div key={dk}
-                  className={`monthly-cell ${isToday?'today':''} ${isDragOver?'drag-over':''}`}
-                  onClick={()=>openAddEvent(dk)}
+                  className={`monthly-cell ${isToday?'today':''} ${isDragOver?'drag-over':''} ${compact && dk===activeDayKey ? 'picked' : ''}`}
+                  onClick={()=>{ if (compact) setPickedDay(dk); else openAddEvent(dk); }}
                   onDragOver={e=>handleDragOver(e,dk)}
                   onDragLeave={()=>setDragOverDay(null)}
                   onDrop={e=>handleDrop(e,dk)}>
                   <div className="monthly-cell-dow">{['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]}</div>
                   <div className="monthly-cell-date">{d.getDate()}</div>
-                  <div className="monthly-cell-events">
-                    {dayEvents.slice(0,3).map(ev=>(
-                      <div key={ev.id} className="monthly-event-chip"
-                        style={{background: taskBg(ev.colorIndex??3), cursor:'grab', opacity: dragInfo?.eventId===ev.id ? 0.4 : 1}}
-                        draggable
-                        onDragStart={e=>{e.stopPropagation();handleDragStart(e,ev.id,dk);}}
-                        onDragEnd={()=>{setDragInfo(null);setDragOverDay(null);}}
-                        onClick={e=>{e.stopPropagation();if(!dragInfo)openEditEvent(ev);}}>
-                        {ev.eventTime && <span className="chip-time">{ev.eventTime}</span>}
-                        {ev.title||'…'}
-                      </div>
-                    ))}
-                    {dayEvents.length > 3 && (
-                      <div className="monthly-event-more">+{dayEvents.length-3} more</div>
-                    )}
-                  </div>
+                  {compact ? (
+                    <div className="monthly-cell-dots">
+                      {dayEvents.slice(0, dayEvents.length > 4 ? 3 : 4).map(ev=>(
+                        <span key={ev.id} className="monthly-dot" style={{background: taskBg(ev.colorIndex??3)}} />
+                      ))}
+                      {dayEvents.length > 4 && <span className="monthly-dot-more">+{dayEvents.length-3}</span>}
+                    </div>
+                  ) : (
+                    <div className="monthly-cell-events">
+                      {dayEvents.slice(0,3).map(ev=>(
+                        <div key={ev.id} className="monthly-event-chip"
+                          style={{background: taskBg(ev.colorIndex??3), cursor:'grab', opacity: dragInfo?.eventId===ev.id ? 0.4 : 1}}
+                          draggable
+                          onDragStart={e=>{e.stopPropagation();handleDragStart(e,ev.id,dk);}}
+                          onDragEnd={()=>{setDragInfo(null);setDragOverDay(null);}}
+                          onClick={e=>{e.stopPropagation();if(!dragInfo)openEditEvent(ev);}}>
+                          {ev.eventTime && <span className="chip-time">{ev.eventTime}</span>}
+                          {ev.title||'…'}
+                        </div>
+                      ))}
+                      {dayEvents.length > 3 && (
+                        <div className="monthly-event-more">+{dayEvents.length-3} more</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
+          {/* v5.54.0 — compact (phone portrait): selected day's events, full titles */}
+          {compact && (() => {
+            const pd = new Date(activeDayKey + 'T00:00:00');
+            const dayEvs = getEventsForDay(activeDayKey).slice()
+              .sort((a,b) => (a.eventTime||'99:99').localeCompare(b.eventTime||'99:99'));
+            return (
+              <div className="monthly-day-panel">
+                <div className="monthly-day-panel-title">
+                  {pd.toLocaleDateString(undefined, {weekday:'long', month:'short', day:'numeric'})}
+                  {activeDayKey === todayDayKey && <span className="today-tag">Today</span>}
+                </div>
+                {dayEvs.length === 0 && <div className="monthly-day-empty">No events this day</div>}
+                {dayEvs.map(ev => (
+                  <div key={ev.id} className="monthly-day-event" onClick={()=>openEditEvent(ev)}>
+                    <div className="monthly-day-event-bar" style={{background: taskBg(ev.colorIndex??3)}} />
+                    <div className="monthly-day-event-body" style={{opacity: ev.responseStatus==='declined' ? 0.45 : 1}}>
+                      {(ev.eventTime || ev.calendarInvite) && (
+                        <div style={{display:'flex',alignItems:'center',gap:6}}>
+                          {ev.eventTime && <span className="monthly-day-event-time">{ev.eventTime}</span>}
+                          {ev.calendarInvite && (
+                            <span className={`invite-badge ${ev.responseStatus||'needsAction'}`}>
+                              {ev.responseStatus==='accepted'?'✓ accepted':ev.responseStatus==='declined'?'✗ declined':ev.responseStatus==='tentative'?'? maybe':'📨 invited'}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <div className="monthly-day-event-title">{ev.title || <em style={{opacity:0.5}}>Untitled</em>}</div>
+                    </div>
+                  </div>
+                ))}
+                <button className="monthly-day-add" onClick={()=>openAddEvent(activeDayKey)}>+ Add event</button>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -14197,7 +14286,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.53.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.54.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
