@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.66.1 -->
-<!-- v5.66.1 — Projects: on desktop/iPad the milestone checkbox moves to the right of the title, a little bigger. (v5.66.0: desktop/iPad milestones get the same chevron-button caret as the phone, and the milestone title sits in a pill (still tap to edit). (v5.65.7: the ▲ ▼ move buttons now sit in the milestone's top row, between the caret and the checkbox, in the caret's style; the phone row is one notch smaller. (v5.65.6: each milestone header has ▲ ▼ buttons to move it one place (a backup for the drag grip, which on some phones did nothing for milestones below the 3rd). Also: the milestone and task drag grips now claim the touch the moment your finger lands (a native, non-passive touchstart handler), so iPhone/iPad Safari cannot hand the touch to page scrolling first. Targets milestones below the 3rd that showed no fade or drop line when pressed. -->
+<!-- LP Planner v5.67.0 -->
+<!-- v5.67.0 — Projects: a milestone can link to a Page: an expanded milestone has a Page row with a picker, Open, and + New page (creates a Page titled Project — Milestone, links it and opens it). (v5.66.1: on desktop/iPad the milestone checkbox moves to the right of the title, a little bigger. (v5.66.0: desktop/iPad milestones get the same chevron-button caret as the phone, and the milestone title sits in a pill (still tap to edit). (v5.65.7: the ▲ ▼ move buttons now sit in the milestone's top row, between the caret and the checkbox, in the caret's style; the phone row is one notch smaller. (v5.65.6: each milestone header has ▲ ▼ buttons to move it one place (a backup for the drag grip, which on some phones did nothing for milestones below the 3rd). Also: the milestone and task drag grips now claim the touch the moment your finger lands (a native, non-passive touchstart handler), so iPhone/iPad Safari cannot hand the touch to page scrolling first. Targets milestones below the 3rd that showed no fade or drop line when pressed. -->
 <!-- v5.65.4 — Projects: hardened touch dragging for milestones and tasks (the finger now stays "captured" by the grip, the page cannot scroll under it while you drag, and the scroll area is frozen until you let go) — fixes drags that would not start on a phone once the list was scrolled. Auto-scroll at the screen edges stays. -->
 <!-- v5.65.3 — Projects: dragging a milestone (or a task) now auto-scrolls when you hold it near the top or bottom edge of the screen, so you can move it past what fits on screen (before, only the first few milestones could be reordered on a phone). Phone: the caret and drag grip are a little smaller (40px) and the milestone checkbox is larger (28px) to match. -->
 <!-- v5.65.2 — Projects, phone only: in a milestone header the done checkbox moves to the right edge, the expand/collapse caret is a larger rounded chevron button, and the drag grip is bigger (44px) so it is easier to hit. Desktop and iPad are unchanged. -->
@@ -12819,7 +12819,7 @@ function glAutoScroll(e, getY, onTick) {
     try { if (pid != null && el.releasePointerCapture) el.releasePointerCapture(pid); } catch (x) {}
   };
 }
-function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete, onClone, onGripDown, onMove, dragging }) {
+function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete, onClone, onGripDown, onMove, dragging, pages, onOpenPage, onNewPage }) {
   const today = glToday();
   const [newTask, setNewTask] = useState('');
   const [focusId, setFocusId] = useState(null);
@@ -12943,6 +12943,19 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
       </div>
       {open && (
         <div ref={taskListRef}>
+          {/* v5.67.0 — link this milestone to a notes Page: pick one, open it, or create a new linked Page */}
+          {pages && (
+            <div className="gl-task" style={{ flexWrap: 'wrap', rowGap: 6, paddingLeft: 12 }}>
+              <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>📄 Page</span>
+              <select className="gl-input" style={{ flex: '1 1 140px', minWidth: 0, padding: '4px 6px', fontSize: 13 }} value={m.pageId || ''} aria-label="Linked page for this milestone"
+                onChange={e => { const v = e.target.value || null; onChange(mm => ({ ...mm, pageId: v })); }}>
+                <option value="">No page</option>
+                {pages.map(pg => <option key={pg.id} value={pg.id}>{pg.title || 'Untitled page'}</option>)}
+              </select>
+              {m.pageId && pages.some(pg => pg.id === m.pageId) && <button className="gl-btn" onClick={() => onOpenPage(m.pageId)}>Open</button>}
+              <button className="gl-btn" onClick={onNewPage}>+ New page</button>
+            </div>
+          )}
           {/* v4.8.0 — complete this milestone from my weight. v5.7.0: only offered when the goal links Weight
               (Links → Measurements) or this milestone already uses it */}
           {m.metric && (() => {
@@ -13049,7 +13062,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   );
 }
 
-function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelete, onBack, pagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
+function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelete, onBack, pagesData, setPagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const linkWeekStart = getWeekStart(new Date());
   const [openMs, setOpenMs] = useState(() => { const n = glNextMilestone(goal); return n ? { [n.id]: true } : {}; });
@@ -13093,7 +13106,17 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
     const up = ev => end(ev, false), cn = ev => end(ev, true);
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cn);
   }
-  function moveMs(id, dir) {   // v5.66.1 — button fallback for drag: nudge a milestone one place up (-1) or down (+1)
+  function newPageForMs(mid) {   // v5.67.0 — create a Page named after the project + milestone, link it, and open it
+    if (!setPagesData || !onOpenPage) return;
+    const m = ms.find(x => x.id === mid); if (!m) return;
+    const id = 'doc_' + Date.now(), now = new Date().toISOString();
+    const minOrder = (pagesData || []).filter(d => !d.folderId).reduce((o, d) => Math.min(o, d.order ?? 0), 0);
+    const title = [goal.title, m.title].filter(Boolean).join(' — ');
+    setPagesData(p => [...p, { id, title, body: '', createdAt: now, lastModified: now, folderId: null, order: minOrder - 1, tasks: [] }]);
+    setMs(mid, mm => ({ ...mm, pageId: id }));
+    onOpenPage(id);
+  }
+  function moveMs(id, dir) {   // v5.67.0 — button fallback for drag: nudge a milestone one place up (-1) or down (+1)
     onChange(g => {
       const list = [...(g.milestones || [])];
       const i = list.findIndex(x => x.id === id), j = i + dir;
@@ -13163,6 +13186,7 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
                       onToggleOpen={() => setOpenMs(o => ({ ...o, [m.id]: !o[m.id] }))}
                       onChange={fn => setMs(m.id, fn)}
                       onClone={() => cloneMs(m.id)}
+                      pages={setPagesData ? pages : null} onOpenPage={onOpenPage} onNewPage={() => newPageForMs(m.id)}
                       onMove={ms.length > 1 ? { up: i > 0 ? () => moveMs(m.id, -1) : null, down: i < ms.length - 1 ? () => moveMs(m.id, 1) : null } : null}
                       onDelete={() => onChange(g => ({ ...g, milestones: (g.milestones || []).filter(x => x.id !== m.id) }))} />
                   </div>
@@ -14001,7 +14025,7 @@ function GoalsView(props) {
   );
 }
 
-function GoalsMain({ targets, setTargets, targetLog, goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
+function GoalsMain({ targets, setTargets, targetLog, goals, setGoals, pagesData, setPagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const [statusTab, setStatusTab] = useState('active');
   const [sideCollapsed, setSideCollapsedRaw] = useState(() => lsGet('glSideCollapsed') === '1'); // desktop only; per device
@@ -14119,7 +14143,7 @@ function GoalsMain({ targets, setTargets, targetLog, goals, setGoals, pagesData,
 
       <main className="gl-main">
         {sel ? (
-          <GlDetail key={sel.id} targets={targets} setTargets={setTargets} allTags={glAllTags(list)} books={(Array.isArray(targetLog) ? targetLog : []).filter(x => x.kind === 'reading')} goal={sel} pagesData={pagesData} onOpenPage={onOpenPage}
+          <GlDetail key={sel.id} targets={targets} setTargets={setTargets} allTags={glAllTags(list)} books={(Array.isArray(targetLog) ? targetLog : []).filter(x => x.kind === 'reading')} goal={sel} pagesData={pagesData} setPagesData={setPagesData} onOpenPage={onOpenPage}
             habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
             habitCompletions={habitCompletions} fitnessLog={fitnessLog}
             onChange={fn => changeGoal(sel.id, fn)}
@@ -14775,7 +14799,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.66.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.67.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -14872,7 +14896,7 @@ function App() {
         onBack={()=>setPage('habit')} />}
       {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} foldersData={foldersData} setFoldersData={setFoldersData} weekData={weekData} setWeekData={setWeekData} selectedId={selectedPagesId} setSelectedId={setSelectedPagesId} />}
       {page==='fitness' && <FitnessView fitnessLog={fitnessLog} setFitnessLog={setFitnessLog} fitnessExercises={fitnessExercises} setFitnessExercises={setFitnessExercises} fitnessGoals={fitnessGoals} setFitnessGoals={setFitnessGoals} goals={goals} habitGoals={habitGoals} habitCompletions={habitCompletions} habitQty={habitQty} fitnessCompare={fitnessCompare} setFitnessCompare={setFitnessCompare} fitnessDotColors={fitnessDotColors} setFitnessDotColors={setFitnessDotColors} />}
-      {page==='goals' && <GoalsView goals={goals} setGoals={setGoals} pagesData={pagesData}
+      {page==='goals' && <GoalsView goals={goals} setGoals={setGoals} pagesData={pagesData} setPagesData={setPagesData}
         countdowns={countdowns} setCountdowns={setCountdowns}
         selectedId={selectedGoalId} setSelectedId={setSelectedGoalId}
         habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
