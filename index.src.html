@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.59.3 -->
+<!-- LP Planner v5.59.4 -->
+<!-- v5.59.4 — Weekly: a task moved with the "Move to" picker now arrives collapsed on its new day (previously it stayed expanded, and the old collapse didn't work when the new day was in a different week). -->
 <!-- v5.59.3 — Pages: the delete button in the page header is now a matching line-drawn trash icon (turns red on hover). -->
 <!-- v5.59.2 — Pages download button uses a line-drawn download-tray icon (inline SVG) instead of the ⬇ character, centered with the title row. -->
 <!-- v5.59.1 — Pages download button is larger and sits farther from the delete button on desktop (phone unchanged). -->
@@ -7024,7 +7025,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         onDragEnd={() => { setDragging(null); setDragOver(null); }}
         onDrop={() => {}}
         onReschedule={toDayKey => {
-          moveTaskBetweenDays(dk, toDayKey, task.id, null);
+          moveTaskBetweenDays(dk, toDayKey, task.id, null, { expanded: false });   // v5.59.4
           if (task.isProjectTask && task.projectDocId && setPagesData) {
             setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : { ...doc, tasks: (doc.tasks||[]).map(t => t.id === task.id ? { ...t, scheduledDate: toDayKey } : t) }));
           }
@@ -7275,8 +7276,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                           setDragging(null); setDragOver(null);
                         }}
                         onReschedule={(toDayKey)=>{
-                          moveTaskBetweenDays(dk,toDayKey,task.id,null);
-                          if(task.expanded) updateTask(toDayKey,task.id,{expanded:false});
+                          moveTaskBetweenDays(dk,toDayKey,task.id,null,{expanded:false});   // v5.59.4: collapse as it moves (works across weeks)
                           // If it's a project task, also update scheduledDate in pagesData
                           if(task.isProjectTask && task.projectDocId && setPagesData) {
                             setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : {
@@ -7377,8 +7377,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                     onApplyRepeat={(rule)=>requestApplyRepeat(task,mobileDayKey,rule)}
                     onStopRepeat={()=>stopRepeating(task,mobileDayKey)}
                     onReschedule={(toDayKey)=>{
-                moveTaskBetweenDays(mobileDayKey,toDayKey,task.id,null);
-                if(task.expanded) updateTask(toDayKey,task.id,{expanded:false});
+                moveTaskBetweenDays(mobileDayKey,toDayKey,task.id,null,{expanded:false});   // v5.59.4: collapse as it moves (works across weeks)
                 // If it's a project task, also update scheduledDate in pagesData
                 if(task.isProjectTask && task.projectDocId && setPagesData) {
                   setPagesData(p => p.map(doc => doc.id !== task.projectDocId ? doc : {
@@ -14380,7 +14379,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.59.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.59.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
