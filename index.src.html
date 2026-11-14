@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.61.0 -->
+<!-- LP Planner v5.62.0 -->
+<!-- v5.62.0 — Goals: (1) drag tasks to reorder them inside a milestone — grab the ⋮⋮ handle at the left of a task (finger, Pencil or mouse). Order matters for Reading-log tasks, so this is how you fix the running-total order. (2) On the Goals sub-tab, the Goals and Reading log sections now collapse: tap the section title (remembered per device). -->
 <!-- v5.61.0 — Goals › Projects: a project task can check itself off from the Reading log. In a task's ↻ editor choose "Reading log", set the pages for that task, and it is checked when the pages logged for the project's linked book reach that task's place in a running total (scheduled tasks by day, then unscheduled tasks in milestone order). Counting starts at the project's start date. Reading ahead or catching up just works; checked tasks never reopen by themselves. -->
 <!-- v5.60.0 — Projects: tags. Each project can carry several tags (Projects › open a project › the tag row under its name; suggestions come from tags already in use, matched ignoring case). Tags show as small chips on the project cards, and the Timeline has a tag filter row: tap one or more tags to show only projects with any of them (it combines with the Show menu; picking one specific project ignores it). New optional `tags: []` on each project inside the existing goals collection — no new synced key, no Worker change. -->
 <!-- v5.59.4 — Weekly: a task moved with the "Move to" picker now arrives collapsed on its new day (previously it stayed expanded, and the old collapse didn't work when the new day was in a different week). -->
@@ -2553,6 +2554,10 @@
   .gl-grip { border: none; background: none; cursor: grab; color: var(--ink-faint); font-size: 14px; letter-spacing: -2px; width: 20px; height: 28px; padding: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
   .gl-grip:hover { color: var(--ink-light); }
   .gl-ms.dragging { opacity: 0.45; }
+  .gl-tgrip { position: absolute; left: 14px; top: 5px; }
+  .gl-task.has-grip.dragging { opacity: 0.45; }
+  .gl-sec-toggle { display: inline-flex; align-items: center; gap: 8px; border: none; background: none; cursor: pointer; padding: 2px 4px 2px 0; margin: 0; color: inherit; font: inherit; text-align: left; }
+  .gl-sec-toggle .gl-sec-caret { font-size: 12px; color: var(--ink-light); width: 14px; }
   .gl-ms-drop { height: 3px; border-radius: 2px; background: var(--accent); margin: -2px 0; }
   .gl-caret { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 11px; width: 22px; height: 28px; padding: 0; }
   .gl-task { display: flex; align-items: center; gap: 8px; min-height: 38px; border-top: 1px solid var(--neutral-line); padding: 2px 10px 2px 40px; position: relative; }
@@ -2641,6 +2646,8 @@
     .gl-pop { position: fixed; left: 12px; right: 12px; top: auto; bottom: 72px; width: auto; }
     .gl-wtask-menu { position: fixed; left: 12px; right: 12px; top: auto; bottom: 72px; width: auto; padding: 12px; }
     .gl-task { padding-left: 14px; }
+    .gl-task.has-grip { padding-left: 30px; }
+    .gl-tgrip { left: 6px; }
     .gl-ms-head > input.gl-inline { flex-basis: calc(100% - 70px) !important; }
     .gl-input, .gl-inline { font-size: 16px; } /* 16px prevents iOS auto-zoom */
   }
@@ -12739,6 +12746,37 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   const setMsRuleShut = v => setMsRuleShutRaw(prev => { const next = typeof v === 'function' ? v(prev) : v; glRuleShutSet(m.id, next); return next; });
   const [ruleOpen, setRuleOpen] = useState(null);   // task id whose auto-check rule editor is open (v5.11.0)
   const tasks = m.tasks || [];
+  // v5.62.0 — drag a task by its grip to reorder it inside this milestone (pointer events: finger, Pencil or mouse)
+  const taskListRef = useRef(null);
+  const [taskDrag, setTaskDrag] = useState(null);   // { id, idx } idx = insertion slot among the current list
+  function beginTaskDrag(e, id) {
+    if (e.button !== undefined && e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const slotAt = y => {
+      const els = [...(taskListRef.current ? taskListRef.current.querySelectorAll('[data-tid]') : [])];
+      for (let i = 0; i < els.length; i++) { const r = els[i].getBoundingClientRect(); if (y < r.top + r.height / 2) return i; }
+      return els.length;
+    };
+    let idx = slotAt(e.clientY);
+    setTaskDrag({ id, idx });
+    const move = ev => { idx = slotAt(ev.clientY); setTaskDrag({ id, idx }); };
+    const end = cancel => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cn);
+      setTaskDrag(null);
+      if (cancel) return;
+      onChange(mm => {
+        const list = [...(mm.tasks || [])];
+        const from = list.findIndex(x => x.id === id);
+        if (from < 0) return mm;
+        const to = idx > from ? idx - 1 : idx;
+        if (to === from) return mm;
+        const [it] = list.splice(from, 1); list.splice(Math.max(0, Math.min(list.length, to)), 0, it);
+        return { ...mm, tasks: list };
+      });
+    };
+    const up = () => end(false), cn = () => end(true);
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cn);
+  }
   const late = glMsOverdue(m, today);
   const fctx = { fitnessLog: mctx && mctx.fitnessLog, fitnessExercises: mctx && mctx.fitnessExercises, habitGoals: mctx && mctx.habitGoals, habitCompletions: mctx && mctx.habitCompletions, habitQty: mctx && mctx.habitQty, targetLog: mctx && mctx.targetLog };
   function setTask(tid, patch) {
@@ -12811,7 +12849,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
         </div>
       </div>
       {open && (
-        <div>
+        <div ref={taskListRef}>
           {/* v4.8.0 — complete this milestone from my weight. v5.7.0: only offered when the goal links Weight
               (Links → Measurements) or this milestone already uses it */}
           {m.metric && (() => {
@@ -12865,8 +12903,11 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
                 onRemove={() => { setMsRuleShut(false); onChange(dropRule); }} />}
             </div>
           )}
-          {tasks.map(t => { const tst = t.rule ? glTaskRule(t, fctx, goal) : null; return (
-            <div key={t.id} className="gl-task" style={ruleOpen === t.id ? { flexWrap: 'wrap', rowGap: 6 } : undefined}>
+          {tasks.map((t, ti) => { const tst = t.rule ? glTaskRule(t, fctx, goal) : null; return (
+            <React.Fragment key={t.id}>
+            {taskDrag && taskDrag.idx === ti && <div className="gl-ms-drop" data-testid="task-drop" />}
+            <div data-tid={t.id} className={`gl-task${tasks.length > 1 ? ' has-grip' : ''}${taskDrag && taskDrag.id === t.id ? ' dragging' : ''}`} style={ruleOpen === t.id ? { flexWrap: 'wrap', rowGap: 6 } : undefined}>
+              {tasks.length > 1 && <button className="gl-grip gl-tgrip" aria-label="Drag to reorder task" title="Drag to reorder" onPointerDown={e => beginTaskDrag(e, t.id)}>⋮⋮</button>}
               <button className={`gl-check ${t.done ? 'on' : ''}`} aria-label={t.done ? 'Mark task not done' : 'Mark task done'}
                 onClick={() => setTask(t.id, { done: !t.done })}>{t.done ? '✓' : ''}</button>
               <input className="gl-inline" style={{ flex: 1, fontSize: 14, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? 'var(--ink-light)' : 'var(--ink)' }}
@@ -12892,7 +12933,9 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
               {ruleOpen === t.id && t.rule && <GlRuleEditor rule={t.rule} scope="task" status={tst} held={!!t.ruleHold} done={!!t.done} auto={!!t.autoDone}
                 fctx={fctx} onPatch={p => setTaskRule(t.id, p)} onRemove={() => removeTaskRule(t.id)} />}
             </div>
+            </React.Fragment>
           ); })}
+          {taskDrag && taskDrag.idx === tasks.length && <div className="gl-ms-drop" data-testid="task-drop" />}
           <div className="gl-task" style={{ flexWrap: 'wrap', rowGap: 4 }}>
             <span style={{ width: 18, textAlign: 'center', color: 'var(--ink-faint)' }}>+</span>
             <input className="gl-inline" style={{ flex: '1 1 160px', fontSize: 14 }} placeholder="Add a task — press Enter" value={newTask}
@@ -13500,6 +13543,9 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
   const [bookForm, setBookForm] = useState(null);
   const [rview, setRviewRaw] = useState(() => lsGet('glReadView') === 'chart' ? 'chart' : 'log'); // v5.53.0 — Log | Chart, per device
   const setRview = v => { lsSet('glReadView', v); setRviewRaw(v); };
+  // v5.62.0 — Goals and Reading log sections can be collapsed; remembered per device
+  const [secShut, setSecShutRaw] = useState(() => { try { const o = JSON.parse(lsGet('glSecShut') || '{}'); return { goals: !!o.goals, reading: !!o.reading }; } catch { return { goals: false, reading: false }; } });
+  const toggleSec = k => setSecShutRaw(prev => { const next = { ...prev, [k]: !prev[k] }; lsSet('glSecShut', JSON.stringify(next)); return next; });
   const [openId, setOpenId] = useState(null);
   const [pageIn, setPageIn] = useState({});
   const [logDate, setLogDate] = useState({});
@@ -13621,16 +13667,19 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
       <main className="gl-main">
         <section className="gl-card" style={{ padding: '14px 16px', flexShrink: 0, flexDirection: 'column' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-            <span className="gl-h2" style={{ fontSize: 20 }}>Goals</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <button type="button" className="gl-sec-toggle" aria-expanded={!secShut.goals} aria-label={secShut.goals ? 'Expand Goals' : 'Collapse Goals'} onClick={() => toggleSec('goals')}>
+              <span className="gl-sec-caret" aria-hidden="true">{secShut.goals ? '▸' : '▾'}</span><span className="gl-h2" style={{ fontSize: 20 }}>Goals</span>
+            </button>
+            {!secShut.goals && <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <div role="group" aria-label="Show" style={{ display: 'flex', gap: 6 }}>
                 {[['active', 'Active'], ['completed', 'Completed'], ['all', 'All']].map(([k, lbl]) => (
                   <button key={k} className={`gl-chip ${filter === k ? 'on' : ''}`} aria-pressed={filter === k} onClick={() => setFilter(k)}>{lbl}</button>
                 ))}
               </div>
               <button className="gl-btn primary" onClick={() => setAdding(a => !a)}>{adding ? 'Cancel' : '+ New goal'}</button>
-            </div>
+            </div>}
           </div>
+          {!secShut.goals && <>
           {adding && (
             <div style={{ marginBottom: 12, padding: 10, background: 'var(--cream)', borderRadius: 10 }}>
               <TgNewForm defaultYear={year} targetLog={targetLog} setTargets={setTargets} onDone={() => setAdding(false)} />
@@ -13664,19 +13713,23 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
               </div>
             );
           })}
+          </>}
         </section>
 
         <section className="gl-card" style={{ padding: '14px 16px', flexShrink: 0, flexDirection: 'column' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span className="gl-h2" style={{ fontSize: 20 }}>Reading log</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: secShut.reading ? 0 : 8 }}>
+            <button type="button" className="gl-sec-toggle" aria-expanded={!secShut.reading} aria-label={secShut.reading ? 'Expand Reading log' : 'Collapse Reading log'} onClick={() => toggleSec('reading')}>
+              <span className="gl-sec-caret" aria-hidden="true">{secShut.reading ? '▸' : '▾'}</span><span className="gl-h2" style={{ fontSize: 20 }}>Reading log</span>
+            </button>
+            {!secShut.reading && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <div className="gl-seg" role="tablist" aria-label="Reading log view">
                 <button role="tab" aria-selected={rview === 'log'} className={rview === 'log' ? 'on' : ''} onClick={() => setRview('log')}>Log</button>
                 <button role="tab" aria-selected={rview === 'chart'} className={rview === 'chart' ? 'on' : ''} onClick={() => setRview('chart')}>Chart</button>
               </div>
               {rview === 'log' && <button className="gl-btn primary" onClick={() => setBookForm(bookForm ? null : { title: '', author: '', total: '', read: '', start: '' })}>{bookForm ? 'Cancel' : '+ Add book'}</button>}
-            </div>
+            </div>}
           </div>
+          {!secShut.reading && <>
           {rview === 'chart' ? <TgPagesChart books={books} /> : <>
           {bookForm && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, padding: 10, background: 'var(--cream)', borderRadius: 10 }}>
@@ -13731,6 +13784,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
               {openId === x.id && bookEditor(x)}
             </div>
           ))}
+          </>}
           </>}
         </section>
 
@@ -14528,7 +14582,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.61.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.62.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
