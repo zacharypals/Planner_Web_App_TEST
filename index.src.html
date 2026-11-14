@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.65.0 -->
+<!-- LP Planner v5.65.1 -->
+<!-- v5.65.1 — Projects: the expand/collapse carets are bigger and easier to tap — the milestone caret in a project is now a 40px (44px on phones) tap target with a larger arrow; the project and milestone carets on the timeline are wider with a larger arrow. -->
 <!-- v5.65.0 — Goals: a General goal can be linked to a Project ("Linked project" in the goal form, or "Linked goal" on the project page). The goal tile then shows the project's progress bar (percent and tasks done) instead of a Done box, an "Open project" button, and the goal is Done as soon as the project is marked done (and reopens if the project is reopened). -->
 <!-- v5.64.0 — Goals › Reading log: pages can be logged two ways — "Pages read" (a number to add) or "Now on page" (type the page you are on; the app logs the difference from what you already logged). The choice is remembered per device. "Log pages" is now a filled button so it reads as the action that saves. -->
 <!-- v5.63.4 — Goals › Reading log: on each book the numbers are stacked (pages read / total over pages left; finished books: pages over dates), so long titles get more room on a phone. -->
@@ -2566,7 +2567,9 @@
   .gl-sec-toggle .gl-sec-caret { font-size: 20px; line-height: 1; color: var(--ink-light); width: 22px; }
   .rl-book { background: var(--cream); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin: 0 0 10px; }
   .gl-ms-drop { height: 3px; border-radius: 2px; background: var(--accent); margin: -2px 0; }
-  .gl-caret { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 11px; width: 22px; height: 28px; padding: 0; }
+  .gl-caret { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 18px; line-height: 1; width: 32px; height: 28px; padding: 0; }
+  .gl-caret.lg { font-size: 22px; width: 40px; height: 40px; }
+  @media (max-width: 767px) { .gl-caret.lg { width: 44px; height: 44px; } }
   .gl-task { display: flex; align-items: center; gap: 8px; min-height: 38px; border-top: 1px solid var(--neutral-line); padding: 2px 10px 2px 40px; position: relative; }
   .gl-x { border: none; background: none; cursor: pointer; color: var(--ink-faint); font-size: 13px; padding: 4px 6px; opacity: 0; }
   .gl-task:hover .gl-x, .gl-ms-head:hover .gl-x { opacity: 1; }
@@ -12511,7 +12514,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
                 {(r.m.tasks || []).length > 0
                   ? <button className="gl-caret" aria-expanded={!!msOpen[r.m.id]} aria-label={msOpen[r.m.id] ? 'Hide tasks' : 'Show tasks'} style={{ flexShrink: 0 }}
                       onClick={() => setMsOpen(o => ({ ...o, [r.m.id]: !o[r.m.id] }))}>{msOpen[r.m.id] ? '▾' : '▸'}</button>
-                  : <span aria-hidden="true" style={{ width: 22, flexShrink: 0 }} />}
+                  : <span aria-hidden="true" style={{ width: 32, flexShrink: 0 }} />}
                 <span aria-hidden="true" style={{ color: r.m.done ? 'var(--accent)' : glMsOverdue(r.m, today) ? 'var(--red)' : r.g.color, width: 12 }}>{r.m.done ? '✓' : '◆'}</span>
                 <span className="t" style={{ color: r.m.done ? 'var(--ink-light)' : glMsOverdue(r.m, today) ? '#b03a2e' : 'var(--ink)', textDecoration: r.m.done ? 'line-through' : 'none', cursor: 'pointer' }}
                   onClick={() => onOpenGoal(r.g.id)}>{r.m.title || 'Untitled milestone'}</span>
@@ -12829,7 +12832,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
     <div className={`gl-ms${dragging ? ' dragging' : ''}`} style={{ borderColor: open ? color : late ? '#f0c9c3' : undefined, borderWidth: open ? 2 : 1 }}>
       <div className="gl-ms-head" style={{ background: open ? glTint(color, 0.06) : late ? '#fdf3f1' : undefined }}>
         {onGripDown && <button className="gl-grip" aria-label="Drag to reorder milestone" title="Drag to reorder" onPointerDown={onGripDown}>⋮⋮</button>}
-        <button className="gl-caret" aria-label={open ? 'Collapse milestone' : 'Expand milestone'} onClick={onToggleOpen}>{open ? '▾' : '▸'}</button>
+        <button className="gl-caret lg" aria-label={open ? 'Collapse milestone' : 'Expand milestone'} onClick={onToggleOpen}>{open ? '▾' : '▸'}</button>
         <button className={`gl-check ${m.done ? 'on' : ''}`} aria-label={m.done ? 'Mark milestone not done' : 'Mark milestone done'}
           onClick={() => onChange(mm => ({ ...mm, done: !mm.done, completedAt: !mm.done ? Date.now() : null,
             // Reopening a weight milestone by hand must stick, or the next check would just re-complete it
@@ -14677,7 +14680,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
