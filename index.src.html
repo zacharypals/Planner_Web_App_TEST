@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.65.7 -->
-<!-- v5.65.7 — Projects: the ▲ ▼ move buttons now sit in the milestone's top row, between the caret and the checkbox, in the caret's style; the phone row is one notch smaller. (v5.65.6: each milestone header has ▲ ▼ buttons to move it one place (a backup for the drag grip, which on some phones did nothing for milestones below the 3rd). Also: the milestone and task drag grips now claim the touch the moment your finger lands (a native, non-passive touchstart handler), so iPhone/iPad Safari cannot hand the touch to page scrolling first. Targets milestones below the 3rd that showed no fade or drop line when pressed. -->
+<!-- LP Planner v5.66.0 -->
+<!-- v5.66.0 — Projects: desktop/iPad milestones get the same chevron-button caret as the phone, and the milestone title sits in a pill (still tap to edit). (v5.65.7: the ▲ ▼ move buttons now sit in the milestone's top row, between the caret and the checkbox, in the caret's style; the phone row is one notch smaller. (v5.65.6: each milestone header has ▲ ▼ buttons to move it one place (a backup for the drag grip, which on some phones did nothing for milestones below the 3rd). Also: the milestone and task drag grips now claim the touch the moment your finger lands (a native, non-passive touchstart handler), so iPhone/iPad Safari cannot hand the touch to page scrolling first. Targets milestones below the 3rd that showed no fade or drop line when pressed. -->
 <!-- v5.65.4 — Projects: hardened touch dragging for milestones and tasks (the finger now stays "captured" by the grip, the page cannot scroll under it while you drag, and the scroll area is frozen until you let go) — fixes drags that would not start on a phone once the list was scrolled. Auto-scroll at the screen edges stays. -->
 <!-- v5.65.3 — Projects: dragging a milestone (or a task) now auto-scrolls when you hold it near the top or bottom edge of the screen, so you can move it past what fits on screen (before, only the first few milestones could be reordered on a phone). Phone: the caret and drag grip are a little smaller (40px) and the milestone checkbox is larger (28px) to match. -->
 <!-- v5.65.2 — Projects, phone only: in a milestone header the done checkbox moves to the right edge, the expand/collapse caret is a larger rounded chevron button, and the drag grip is bigger (44px) so it is easier to hit. Desktop and iPad are unchanged. -->
@@ -2572,8 +2572,12 @@
   .rl-book { background: var(--cream); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin: 0 0 10px; }
   .gl-ms-drop { height: 3px; border-radius: 2px; background: var(--accent); margin: -2px 0; }
   .gl-caret { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 18px; line-height: 1; width: 32px; height: 28px; padding: 0; }
-  .gl-caret.lg { font-size: 22px; width: 40px; height: 40px; }
-  .gl-caret.lg .gl-caret-svg { display: none; width: 26px; height: 26px; transition: transform 0.15s; }
+  .gl-caret.lg { width: 32px; height: 32px; background: var(--cream); border-radius: 9px; color: var(--ink); }
+  .gl-caret.lg .gl-caret-glyph { display: none; }
+  .gl-caret.lg .gl-caret-svg { display: block; margin: 0 auto; width: 20px; height: 20px; transition: transform 0.15s; }
+  .gl-caret.lg:hover { background: var(--accent-light); }
+  .gl-ms-title { background: var(--cream); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; }
+  .gl-ms-title:focus { background: var(--surface); border-color: var(--accent); }
   .gl-caret.lg:not(.open) .gl-caret-svg { transform: rotate(-90deg); }
   .gl-mvpair { display: flex; gap: 4px; }
   .gl-mv { border: none; background: var(--cream); color: var(--ink); cursor: pointer; width: 28px; height: 28px; border-radius: 8px; padding: 0; display: flex; align-items: center; justify-content: center; }
@@ -2583,9 +2587,7 @@
     .gl-mvpair { margin: 0 auto; gap: 6px; }
     .gl-mv { width: 36px; height: 36px; border-radius: 10px; }
     .gl-mv svg { width: 20px; height: 20px; }
-    .gl-caret.lg { width: 36px; height: 36px; background: var(--cream); border-radius: 10px; color: var(--ink); }
-    .gl-caret.lg .gl-caret-glyph { display: none; }
-    .gl-caret.lg .gl-caret-svg { display: block; margin: 0 auto; width: 20px; height: 20px; }
+    .gl-caret.lg { width: 36px; height: 36px; border-radius: 10px; }
     .gl-ms-head .gl-grip { font-size: 20px; letter-spacing: -4px; width: 36px; height: 36px; }
     .gl-ms-head .gl-check { margin-left: auto; width: 26px; height: 26px; border-radius: 7px; font-size: 16px; }
   }
@@ -12916,7 +12918,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
             // Same for a training rule that completed it (v5.11.0); checking by hand clears the auto flag
             ...(mm.done && mm.rule && mm.autoDone ? { ruleHold: true, autoDone: false } : {}),
             ...(!mm.done ? { autoDone: false } : {}) }))}>{m.done ? '✓' : ''}</button>
-        <input className="gl-inline" style={{ flex: '1 1 160px', fontSize: 14, fontWeight: open ? 600 : 500, textDecoration: m.done ? 'line-through' : 'none', color: m.done ? 'var(--ink-light)' : late ? '#b03a2e' : 'var(--ink)' }}
+        <input className="gl-inline gl-ms-title" style={{ flex: '1 1 160px', fontSize: 14, fontWeight: open ? 600 : 500, textDecoration: m.done ? 'line-through' : 'none', color: m.done ? 'var(--ink-light)' : late ? '#b03a2e' : 'var(--ink)' }}
           placeholder="Milestone name" value={m.title} autoFocus={!m.title}
           onChange={e => onChange(mm => ({ ...mm, title: e.target.value }))} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginLeft: 'auto' }}>
@@ -13086,7 +13088,7 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
     const up = ev => end(ev, false), cn = ev => end(ev, true);
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cn);
   }
-  function moveMs(id, dir) {   // v5.65.7 — button fallback for drag: nudge a milestone one place up (-1) or down (+1)
+  function moveMs(id, dir) {   // v5.66.0 — button fallback for drag: nudge a milestone one place up (-1) or down (+1)
     onChange(g => {
       const list = [...(g.milestones || [])];
       const i = list.findIndex(x => x.id === id), j = i + dir;
@@ -14768,7 +14770,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.7</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.66.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
