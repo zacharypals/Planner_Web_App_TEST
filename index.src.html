@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.65.4 -->
+<!-- LP Planner v5.65.6 -->
+<!-- v5.65.6 — Projects: each milestone header now has ▲ ▼ buttons to move it one place (a backup for the drag grip, which on some phones did nothing for milestones below the 3rd). Also: the milestone and task drag grips now claim the touch the moment your finger lands (a native, non-passive touchstart handler), so iPhone/iPad Safari cannot hand the touch to page scrolling first. Targets milestones below the 3rd that showed no fade or drop line when pressed. -->
 <!-- v5.65.4 — Projects: hardened touch dragging for milestones and tasks (the finger now stays "captured" by the grip, the page cannot scroll under it while you drag, and the scroll area is frozen until you let go) — fixes drags that would not start on a phone once the list was scrolled. Auto-scroll at the screen edges stays. -->
 <!-- v5.65.3 — Projects: dragging a milestone (or a task) now auto-scrolls when you hold it near the top or bottom edge of the screen, so you can move it past what fits on screen (before, only the first few milestones could be reordered on a phone). Phone: the caret and drag grip are a little smaller (40px) and the milestone checkbox is larger (28px) to match. -->
 <!-- v5.65.2 — Projects, phone only: in a milestone header the done checkbox moves to the right edge, the expand/collapse caret is a larger rounded chevron button, and the drag grip is bigger (44px) so it is easier to hit. Desktop and iPad are unchanged. -->
@@ -12759,6 +12760,18 @@ function glRuleShutSet(id, shut) {
 // One milestone in the goal editor: header row plus (when open) its tasks.
 // v5.65.3 — while a drag is in progress, scroll the nearest scrollable parent (or the page) when the pointer is
 // within 80px of the top/bottom edge. getY() = latest pointer clientY; onTick() re-computes the drop slot. Returns stop().
+// A drag grip. React attaches touchstart as a passive listener, which cannot block scrolling, so the grip adds its own
+// non-passive native one: Safari then never starts scrolling the page from a touch that begins on the grip.
+function GlGrip(props) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const f = ev => { if (ev.cancelable) ev.preventDefault(); };
+    el.addEventListener('touchstart', f, { passive: false });
+    return () => el.removeEventListener('touchstart', f);
+  }, []);
+  return <button ref={ref} type="button" {...props} />;
+}
 function glScrollParent(el) {
   let n = el && el.parentElement;
   while (n && n !== document.documentElement) { const o = getComputedStyle(n).overflowY; if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight + 1) return n; n = n.parentElement; }
@@ -12792,7 +12805,7 @@ function glAutoScroll(e, getY, onTick) {
     try { if (pid != null && el.releasePointerCapture) el.releasePointerCapture(pid); } catch (x) {}
   };
 }
-function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete, onClone, onGripDown, dragging }) {
+function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete, onClone, onGripDown, onMove, dragging }) {
   const today = glToday();
   const [newTask, setNewTask] = useState('');
   const [focusId, setFocusId] = useState(null);
@@ -12879,7 +12892,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   return (
     <div className={`gl-ms${dragging ? ' dragging' : ''}`} style={{ borderColor: open ? color : late ? '#f0c9c3' : undefined, borderWidth: open ? 2 : 1 }}>
       <div className="gl-ms-head" style={{ background: open ? glTint(color, 0.06) : late ? '#fdf3f1' : undefined }}>
-        {onGripDown && <button className="gl-grip" aria-label="Drag to reorder milestone" title="Drag to reorder" onPointerDown={onGripDown}>⋮⋮</button>}
+        {onGripDown && <GlGrip className="gl-grip" aria-label="Drag to reorder milestone" title="Drag to reorder" onPointerDown={onGripDown}>⋮⋮</GlGrip>}
         <button className={`gl-caret lg${open ? ' open' : ''}`} aria-label={open ? 'Collapse milestone' : 'Expand milestone'} aria-expanded={!!open} onClick={onToggleOpen}>
           <span className="gl-caret-glyph">{open ? '▾' : '▸'}</span>
           <svg className="gl-caret-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
@@ -12901,6 +12914,8 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
           <input type="date" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, borderColor: late ? 'var(--red)' : undefined }} aria-label="Milestone due date"
             value={m.dueDate || ''} onChange={e => onChange(mm => ({ ...mm, dueDate: e.target.value || null }))} />
         <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)', minWidth: 34, textAlign: 'right' }}>{tasks.filter(t => t.done).length}/{tasks.length}</span>
+        {onMove && <><button className="gl-x" aria-label="Move milestone up" title="Move up" disabled={!onMove.up} style={{ opacity: onMove.up ? 1 : 0.25 }} onClick={() => onMove.up && onMove.up()}>▲</button>
+        <button className="gl-x" aria-label="Move milestone down" title="Move down" disabled={!onMove.down} style={{ opacity: onMove.down ? 1 : 0.25 }} onClick={() => onMove.down && onMove.down()}>▼</button></>}
         {onClone && <button className="gl-x" aria-label="Clone milestone" title="Clone this milestone and its tasks" onClick={onClone}>⧉</button>}
         <button className="gl-x" aria-label="Delete milestone" onClick={() => {
           // v5.25.1 — always confirm, even for a milestone with no tasks
@@ -12968,7 +12983,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
             <React.Fragment key={t.id}>
             {taskDrag && taskDrag.idx === ti && <div className="gl-ms-drop" data-testid="task-drop" />}
             <div data-tid={t.id} className={`gl-task${tasks.length > 1 ? ' has-grip' : ''}${taskDrag && taskDrag.id === t.id ? ' dragging' : ''}`} style={ruleOpen === t.id ? { flexWrap: 'wrap', rowGap: 6 } : undefined}>
-              {tasks.length > 1 && <button className="gl-grip gl-tgrip" aria-label="Drag to reorder task" title="Drag to reorder" onPointerDown={e => beginTaskDrag(e, t.id)}>⋮⋮</button>}
+              {tasks.length > 1 && <GlGrip className="gl-grip gl-tgrip" aria-label="Drag to reorder task" title="Drag to reorder" onPointerDown={e => beginTaskDrag(e, t.id)}>⋮⋮</GlGrip>}
               <button className={`gl-check ${t.done ? 'on' : ''}`} aria-label={t.done ? 'Mark task not done' : 'Mark task done'}
                 onClick={() => setTask(t.id, { done: !t.done })}>{t.done ? '✓' : ''}</button>
               <input className="gl-inline" style={{ flex: 1, fontSize: 14, textDecoration: t.done ? 'line-through' : 'none', color: t.done ? 'var(--ink-light)' : 'var(--ink)' }}
@@ -13061,6 +13076,15 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
     const up = ev => end(ev, false), cn = ev => end(ev, true);
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cn);
   }
+  function moveMs(id, dir) {   // v5.65.6 — button fallback for drag: nudge a milestone one place up (-1) or down (+1)
+    onChange(g => {
+      const list = [...(g.milestones || [])];
+      const i = list.findIndex(x => x.id === id), j = i + dir;
+      if (i < 0 || j < 0 || j >= list.length) return g;
+      [list[i], list[j]] = [list[j], list[i]];
+      return { ...g, milestones: list };
+    });
+  }
   function addMs() {
     const m = glNewMilestone(goal);
     onChange(g => ({ ...g, milestones: [...(g.milestones || []), m] }));
@@ -13122,6 +13146,7 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
                       onToggleOpen={() => setOpenMs(o => ({ ...o, [m.id]: !o[m.id] }))}
                       onChange={fn => setMs(m.id, fn)}
                       onClone={() => cloneMs(m.id)}
+                      onMove={ms.length > 1 ? { up: i > 0 ? () => moveMs(m.id, -1) : null, down: i < ms.length - 1 ? () => moveMs(m.id, 1) : null } : null}
                       onDelete={() => onChange(g => ({ ...g, milestones: (g.milestones || []).filter(x => x.id !== m.id) }))} />
                   </div>
                 </React.Fragment>
@@ -14733,7 +14758,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.6</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
