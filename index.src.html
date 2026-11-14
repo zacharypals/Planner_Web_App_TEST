@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.58.2 -->
+<!-- LP Planner v5.59.0 -->
+<!-- v5.59.0 — Pages: new Download button (⬇ next to the trash can) saves the open page as Text (.txt), Word (.docx) or PDF (via the print dialog → Save as PDF). -->
 <!-- v5.58.2 — The installed-app window's title bar now matches the banner color (updates when you change the light theme, banner color, or dark/light mode). -->
 <!-- v5.58.1 — Earthy and Fresh: the main banner and weekday headers lean slightly more red/purple (banner #47293c to #5e3d52). -->
 <!-- v5.58.0 — Light themes now carry through to two more places: the Pages folder colors (each theme has its own set of 8 folder colors) and the Fitness weekly weekday headers (they use the theme's header color, with a lighter "today" header and the theme's today-date color). Current theme and dark mode are unchanged. Folder color swatches are labeled Color 1–8 since the hue names no longer match every theme. -->
@@ -2017,6 +2018,32 @@
   .pages-empty-icon { font-size: 52px; opacity: 0.2; }
   .pages-empty-text { font-family: 'DM Sans', sans-serif; font-size: 15px; color: var(--ink-light); }
 
+  /* v5.59.0 — Pages download: the PDF export prints a hidden copy of the page, shown only while printing */
+  #lp-print-root { display: none; }
+  .pages-dl-menu { position: absolute; right: 0; top: 100%; z-index: 60; min-width: 200px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-md); box-shadow: var(--shadow-lg); padding: 6px; font-family: 'DM Sans', sans-serif; }
+  .pages-dl-item { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: none; text-align: left; cursor: pointer;
+    padding: 9px 10px; border-radius: var(--radius-sm); font-size: 13px; color: var(--ink); font-family: inherit; }
+  .pages-dl-item:hover { background: var(--cream); }
+  .pages-dl-hint { font-size: 10.5px; color: var(--ink-light); padding: 2px 10px 6px 36px; line-height: 1.35; }
+  @page { margin: 16mm; }
+  @media print {
+    html.lp-printing body > *:not(#lp-print-root) { display: none !important; }
+    html.lp-printing, html.lp-printing body { background: #fff !important; height: auto !important; overflow: visible !important; position: static !important; }
+    html.lp-printing #lp-print-root { display: block !important; color: #000; background: #fff; font: 11pt/1.5 'DM Sans', Calibri, Arial, sans-serif;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    #lp-print-root .lp-pr-title { font: 700 22pt/1.25 'Playfair Display', Georgia, serif; margin: 0 0 14pt; color: #000; }
+    #lp-print-root h1 { font-size: 17pt; font-weight: 700; line-height: 1.3; margin: 14pt 0 6pt; break-after: avoid; }
+    #lp-print-root h2 { font-size: 14pt; font-weight: 700; line-height: 1.3; margin: 12pt 0 5pt; break-after: avoid; }
+    #lp-print-root h3 { font-size: 12pt; font-weight: 700; line-height: 1.3; margin: 10pt 0 4pt; break-after: avoid; }
+    #lp-print-root .lp-pr-p { margin: 0 0 4pt; min-height: 1.5em; white-space: pre-wrap; }
+    #lp-print-root .lp-pr-quote { margin: 0 0 4pt 1em; padding-left: 10pt; border-left: 3pt solid #bbb; color: #444; font-style: italic; white-space: pre-wrap; }
+    #lp-print-root .lp-pr-ul, #lp-print-root .lp-pr-ol, #lp-print-root .lp-pr-check { display: flex; margin-bottom: 2pt; break-inside: avoid; }
+    #lp-print-root .lp-pr-mk { flex: 0 0 1.4em; margin-left: -1.4em; }
+    #lp-print-root .lp-pr-tx { flex: 1; min-width: 0; white-space: pre-wrap; }
+    #lp-print-root img { max-width: 100%; height: auto; break-inside: avoid; }
+    #lp-print-root a { color: #0563c1; text-decoration: underline; }
+  }
   /* Sticky title header */
   .pages-doc-header {
     flex-shrink: 0; padding: 24px 36px 8px; background: var(--surface);
@@ -14341,7 +14368,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.58.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.59.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -17074,6 +17101,382 @@ function PagesDocIcon({ className }) {
   );
 }
 
+// ── Pages export: Text / Word / PDF (v5.59.0) ──────────────────────────────────────────────
+// One neutral model of the page is built from the saved HTML, then three writers turn it into a file:
+//   .txt  – plain text   |   .docx – a real Word file (built in the browser, no library)   |   PDF – the browser's print dialog
+// Model: array of blocks { kind:'p'|'h1'|'h2'|'h3'|'quote'|'ul'|'ol'|'check', depth, align, num, listId, done, runs:[…] }
+//        run: { t, b, i, u, s, code, color, bg, px, font:'serif'|'display'|'mono', href } | { br:true } | { img:'data:…' }
+function pagesExportModel(html) {
+  const body = new DOMParser().parseFromString('<body>' + (html || '') + '</body>', 'text/html').body;
+  const BLOCK = /^(P|DIV|H[1-6]|BLOCKQUOTE|UL|OL|LI|PRE)$/;
+  const isList = n => n.nodeType === 1 && (n.tagName === 'UL' || n.tagName === 'OL');
+  const blocks = [];
+  let listSeq = 0;
+  const alignOf = el => { const a = el.style && el.style.textAlign; return (a === 'center' || a === 'right' || a === 'justify') ? a : ''; };
+  const styled = (el, st) => {
+    const s = el.style || {};
+    const out = { ...st };
+    if (s.color) out.color = s.color;
+    if (s.backgroundColor) out.bg = s.backgroundColor;
+    if (s.fontSize && /px$/.test(s.fontSize)) out.px = parseFloat(s.fontSize);
+    if (s.fontFamily) { const f = s.fontFamily.toLowerCase(); out.font = /mono/.test(f) ? 'mono' : /playfair/.test(f) ? 'display' : /georgia|serif/.test(f) ? 'serif' : out.font; }
+    if (s.fontWeight === 'bold' || +s.fontWeight >= 600) out.b = true;
+    if (s.fontStyle === 'italic') out.i = true;
+    return out;
+  };
+  const runs = (nodes, st0) => {
+    const out = [];
+    const go = (n, st) => {
+      if (n.nodeType === 3) { const t = n.nodeValue.replace(/ /g, ' ').replace(/\s*\n\s*/g, ' '); if (t) out.push({ ...st, t }); return; }
+      if (n.nodeType !== 1) return;
+      const tag = n.tagName;
+      if (tag === 'BR') { out.push({ br: true }); return; }
+      if (tag === 'IMG') { const src = n.getAttribute('src') || ''; if (src) out.push({ img: src }); return; }
+      if (tag === 'INPUT' || tag === 'SCRIPT' || tag === 'STYLE') return;
+      let s = styled(n, st);
+      if (tag === 'B' || tag === 'STRONG') s.b = true;
+      if (tag === 'I' || tag === 'EM') s.i = true;
+      if (tag === 'U') s.u = true;
+      if (tag === 'S' || tag === 'STRIKE' || tag === 'DEL') s.s = true;
+      if (tag === 'CODE') { s.code = true; s.font = 'mono'; }
+      if (tag === 'A') { const h = n.getAttribute('href') || ''; if (/^(https?:|mailto:|tel:)/i.test(h)) s.href = h; }
+      n.childNodes.forEach(c => go(c, s));
+    };
+    nodes.forEach(n => go(n, st0 || {}));
+    // a lone trailing <br> only keeps an empty line open in the editor
+    if (out.length && out[out.length - 1].br) out.pop();
+    return out;
+  };
+  const push = (kind, nodes, extra) => blocks.push({ kind, depth: 0, align: '', runs: runs(nodes), ...extra });
+  const lists = (ul, depth, inheritedCheck) => {
+    const check = inheritedCheck || ul.classList.contains('pages-checklist');
+    const listId = ++listSeq;
+    let num = 0;
+    for (const li of Array.from(ul.childNodes)) {
+      if (isList(li)) { lists(li, depth + 1, check); continue; }
+      if (li.nodeType !== 1 || li.tagName !== 'LI') continue;
+      const box = li.querySelector(':scope > input[type=checkbox]');
+      const isCheck = check || li.classList.contains('pages-chk-li') || !!box;
+      const own = Array.from(li.childNodes).filter(c => !isList(c));
+      num++;
+      if (isCheck) {
+        const done = li.getAttribute('data-checked') === 'true' || li.classList.contains('checked') || (box && box.hasAttribute('checked'));
+        push('check', own, { depth, align: alignOf(li), done: !!done });
+        const cb = blocks[blocks.length - 1];
+        if (cb.runs[0] && cb.runs[0].t) cb.runs[0].t = cb.runs[0].t.replace(/^\s+/, '');
+      } else push(ul.tagName === 'OL' ? 'ol' : 'ul', own, { depth, align: alignOf(li), num, listId });
+      for (const c of Array.from(li.childNodes)) if (isList(c)) lists(c, depth + 1, isCheck && c.classList.contains('pages-checklist') ? true : null);
+    }
+  };
+  const walk = (parent, quote) => {
+    let buf = [];
+    const flush = () => {
+      if (buf.length && (buf.some(n => n.nodeType === 1) || buf.some(n => n.textContent.trim()))) push(quote ? 'quote' : 'p', buf);
+      buf = [];
+    };
+    for (const n of Array.from(parent.childNodes)) {
+      if (n.nodeType === 1 && BLOCK.test(n.tagName)) {
+        flush();
+        const t = n.tagName, kids = Array.from(n.childNodes);
+        if (isList(n)) lists(n, 0, null);
+        else if (t === 'BLOCKQUOTE') walk(n, true);
+        else if (/^H[1-6]$/.test(t)) push('h' + Math.min(3, +t[1]), kids, { align: alignOf(n) });
+        else if (kids.some(c => c.nodeType === 1 && BLOCK.test(c.tagName))) walk(n, quote);
+        else push(quote ? 'quote' : 'p', kids, { align: alignOf(n) });
+      } else buf.push(n);
+    }
+    flush();
+  };
+  walk(body, false);
+  return blocks;
+}
+
+function pagesExportBase(title) {
+  const t = String(title || '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  return t || 'Untitled';
+}
+
+function pagesToText(title, blocks) {
+  const lines = [(title || 'Untitled').trim() || 'Untitled', ''];
+  for (const b of blocks) {
+    const txt = b.runs.map(r => {
+      if (r.br) return '\n';
+      if (r.img) return '[image]';
+      return r.href && r.href !== r.t ? r.t + ' (' + r.href + ')' : r.t;
+    }).join('');
+    const pad = '  '.repeat(b.depth || 0);
+    if (b.kind === 'ul') lines.push(pad + '• ' + txt);
+    else if (b.kind === 'ol') lines.push(pad + b.num + '. ' + txt);
+    else if (b.kind === 'check') lines.push(pad + (b.done ? '[x] ' : '[ ] ') + txt);
+    else if (b.kind === 'quote') lines.push('> ' + txt.replace(/\n/g, '\n> '));
+    else lines.push(txt);
+  }
+  return lines.join('\n') + '\n';
+}
+
+// ── minimal ZIP writer (stored, no compression) — a .docx is a zip of XML files ──
+let _lpCrcTable = null;
+function lpCrc32(u8) {
+  if (!_lpCrcTable) { _lpCrcTable = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; _lpCrcTable[n] = c >>> 0; } }
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < u8.length; i++) c = _lpCrcTable[(c ^ u8[i]) & 255] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function lpZip(files) {      // files: [{ name, data: Uint8Array }] → Uint8Array
+  const enc = new TextEncoder();
+  const d = new Date();
+  const dosTime = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  const dosDate = (((d.getFullYear() - 1980) & 127) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  const parts = [], central = [];
+  let offset = 0;
+  for (const f of files) {
+    const name = enc.encode(f.name), crc = lpCrc32(f.data), size = f.data.length;
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, dosTime, true); lh.setUint16(12, dosDate, true); lh.setUint32(14, crc, true);
+    lh.setUint32(18, size, true); lh.setUint32(22, size, true); lh.setUint16(26, name.length, true); lh.setUint16(28, 0, true);
+    parts.push(new Uint8Array(lh.buffer), name, f.data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+    ch.setUint16(12, dosTime, true); ch.setUint16(14, dosDate, true); ch.setUint32(16, crc, true);
+    ch.setUint32(20, size, true); ch.setUint32(24, size, true); ch.setUint16(28, name.length, true);
+    ch.setUint32(42, offset, true);
+    central.push(new Uint8Array(ch.buffer), name);
+    offset += 30 + name.length + size;
+  }
+  const cdSize = central.reduce((a, p) => a + p.length, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  const all = [...parts, ...central, new Uint8Array(end.buffer)];
+  const out = new Uint8Array(all.reduce((a, p) => a + p.length, 0));
+  let o = 0; for (const p of all) { out.set(p, o); o += p.length; }
+  return out;
+}
+
+function pagesXmlEsc(s) {
+  return String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Loads a data: image, returns { bytes, ext, w, h } (w/h in CSS px). Anything Word can't show (webp, svg…) is redrawn as PNG.
+function pagesLoadImage(src) {
+  return new Promise(resolve => {
+    const m = /^data:image\/([a-z0-9.+-]+);base64,(.*)$/i.exec(src || '');
+    if (!m) return resolve(null);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        let ext = m[1].toLowerCase().replace('jpg', 'jpeg'), bytes;
+        if (ext === 'png' || ext === 'jpeg' || ext === 'gif') {
+          const bin = atob(m[2]); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        } else {
+          const c = document.createElement('canvas'); c.width = img.naturalWidth || 1; c.height = img.naturalHeight || 1;
+          c.getContext('2d').drawImage(img, 0, 0);
+          const bin = atob(c.toDataURL('image/png').split(',')[1]); bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          ext = 'png';
+        }
+        resolve({ bytes, ext, w: img.naturalWidth || 300, h: img.naturalHeight || 200 });
+      } catch { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+async function pagesToDocx(title, blocks) {
+  const enc = new TextEncoder();
+  const FONT = { serif: 'Georgia', display: 'Playfair Display', mono: 'Courier New' };
+  const media = [];                 // { name, bytes }
+  const rels = [];                  // extra relationships: { id, type, target, external }
+  let relN = 10, picN = 0;
+  const addRel = (type, target, external) => { const id = 'rId' + (++relN); rels.push({ id, type, target, external }); return id; };
+  // load every distinct image once
+  const imgCache = {};
+  for (const b of blocks) for (const r of b.runs) if (r.img && !(r.img in imgCache)) imgCache[r.img] = await pagesLoadImage(r.img);
+
+  const rPr = r => {
+    let x = '';
+    const f = r.font && FONT[r.font];
+    if (f) x += '<w:rFonts w:ascii="' + f + '" w:hAnsi="' + f + '" w:cs="' + f + '"/>';
+    if (r.b) x += '<w:b/>';
+    if (r.i) x += '<w:i/>';
+    if (r.s) x += '<w:strike/>';
+    const col = pagesHex(r.color); if (col) x += '<w:color w:val="' + col + '"/>';
+    if (r.px) { const hp = Math.max(2, Math.round(r.px * 1.5)); x += '<w:sz w:val="' + hp + '"/><w:szCs w:val="' + hp + '"/>'; }
+    if (r.u) x += '<w:u w:val="single"/>';
+    const bg = pagesHex(r.bg); if (bg) x += '<w:shd w:val="clear" w:color="auto" w:fill="' + bg + '"/>';
+    return x;
+  };
+  const textRun = (r, extra) => {
+    const pr = (extra || '') + rPr(r);
+    return '<w:r>' + (pr ? '<w:rPr>' + pr + '</w:rPr>' : '') + '<w:t xml:space="preserve">' + pagesXmlEsc(r.t) + '</w:t></w:r>';
+  };
+  const imageRun = (src) => {
+    const im = imgCache[src];
+    if (!im) return '<w:r><w:t>[image]</w:t></w:r>';
+    const name = 'image' + (++picN) + '.' + im.ext;
+    media.push({ name: 'word/media/' + name, bytes: im.bytes });
+    const rid = addRel('http://schemas.openxmlformats.org/officeDocument/2006/relationships/image', 'media/' + name, false);
+    let w = im.w, h = im.h; const maxW = 576;      // 6 in at 96 px/in
+    if (w > maxW) { h = h * maxW / w; w = maxW; }
+    const cx = Math.round(w * 9525), cy = Math.round(h * 9525);
+    return '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="' + cx + '" cy="' + cy + '"/><wp:docPr id="' + picN + '" name="Picture ' + picN + '"/>' +
+      '<wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">' +
+      '<pic:pic><pic:nvPicPr><pic:cNvPr id="' + picN + '" name="' + name + '"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="' + rid + '"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>' +
+      '<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + cx + '" cy="' + cy + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';
+  };
+  const runsXml = (list) => list.map(r => {
+    if (r.br) return '<w:r><w:br/></w:r>';
+    if (r.img) return imageRun(r.img);
+    if (r.href) {
+      const rid = addRel('http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink', r.href, true);
+      return '<w:hyperlink r:id="' + rid + '" w:history="1">' + textRun(r, '<w:rStyle w:val="Hyperlink"/>') + '</w:hyperlink>';
+    }
+    return textRun(r);
+  }).join('');
+
+  const orderedIds = [];            // listIds of ordered lists, each gets its own numbering instance (so every list restarts at 1)
+  const para = b => {
+    let pPr = '', pre = '';
+    const jc = b.align === 'justify' ? 'both' : b.align;
+    if (b.kind === 'h1') pPr += '<w:pStyle w:val="Heading1"/>';
+    else if (b.kind === 'h2') pPr += '<w:pStyle w:val="Heading2"/>';
+    else if (b.kind === 'h3') pPr += '<w:pStyle w:val="Heading3"/>';
+    else if (b.kind === 'quote') pPr += '<w:pStyle w:val="Quote"/>';
+    else if (b.kind === 'ul') pPr += '<w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="' + Math.min(8, b.depth) + '"/><w:numId w:val="1"/></w:numPr>';
+    else if (b.kind === 'ol') {
+      let k = orderedIds.indexOf(b.listId); if (k < 0) { orderedIds.push(b.listId); k = orderedIds.length - 1; }
+      pPr += '<w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="' + Math.min(8, b.depth) + '"/><w:numId w:val="' + (2 + k) + '"/></w:numPr>';
+    } else if (b.kind === 'check') {
+      pPr += '<w:pStyle w:val="ListParagraph"/><w:ind w:left="' + (720 + 360 * b.depth) + '" w:hanging="360"/>';
+      pre = '<w:r><w:rPr><w:rFonts w:ascii="Segoe UI Symbol" w:hAnsi="Segoe UI Symbol"/></w:rPr><w:t xml:space="preserve">' + (b.done ? '☑' : '☐') + ' </w:t></w:r>';
+    }
+    if (jc) pPr += '<w:jc w:val="' + jc + '"/>';
+    return '<w:p>' + (pPr ? '<w:pPr>' + pPr + '</w:pPr>' : '') + pre + runsXml(b.runs) + '</w:p>';
+  };
+  const bodyXml = '<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t xml:space="preserve">' + pagesXmlEsc((title || 'Untitled').trim() || 'Untitled') + '</w:t></w:r></w:p>' + blocks.map(para).join('');
+
+  const NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"';
+  const X = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n';
+  const documentXml = X + '<w:document ' + NS + '><w:body>' + bodyXml + '<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>';
+
+  const heading = (id, name, sz, before, after) => '<w:style w:type="paragraph" w:styleId="' + id + '"><w:name w:val="' + name + '"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="' + before + '" w:after="' + after + '"/></w:pPr><w:rPr><w:b/><w:sz w:val="' + sz + '"/><w:szCs w:val="' + sz + '"/></w:rPr></w:style>';
+  const stylesXml = X + '<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+    '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="Calibri" w:cs="Calibri"/><w:sz w:val="22"/><w:szCs w:val="22"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>' +
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>' +
+    '<w:style w:type="character" w:default="1" w:styleId="DefaultParagraphFont"><w:name w:val="Default Paragraph Font"/><w:uiPriority w:val="1"/><w:semiHidden/></w:style>' +
+    '<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="240"/></w:pPr><w:rPr><w:b/><w:sz w:val="48"/><w:szCs w:val="48"/></w:rPr></w:style>' +
+    heading('Heading1', 'heading 1', 36, 240, 120) + heading('Heading2', 'heading 2', 30, 200, 100) + heading('Heading3', 'heading 3', 26, 160, 80) +
+    '<w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:pBdr><w:left w:val="single" w:sz="18" w:space="10" w:color="BBBBBB"/></w:pBdr><w:ind w:left="720"/></w:pPr><w:rPr><w:i/><w:color w:val="555555"/></w:rPr></w:style>' +
+    '<w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:qFormat/><w:pPr><w:spacing w:after="60"/></w:pPr></w:style>' +
+    '<w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:rPr><w:color w:val="0563C1"/><w:u w:val="single"/></w:rPr></w:style></w:styles>';
+
+  const lvls = (decimal) => Array.from({ length: 9 }, (_, i) =>
+    '<w:lvl w:ilvl="' + i + '"><w:start w:val="1"/><w:numFmt w:val="' + (decimal ? (i % 3 === 0 ? 'decimal' : i % 3 === 1 ? 'lowerLetter' : 'lowerRoman') : 'bullet') + '"/><w:lvlText w:val="' + (decimal ? '%' + (i + 1) + '.' : ['•', '◦', '▪'][i % 3]) + '"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="' + (720 + 360 * i) + '" w:hanging="360"/></w:pPr></w:lvl>').join('');
+  const over = Array.from({ length: 9 }, (_, i) => '<w:lvlOverride w:ilvl="' + i + '"><w:startOverride w:val="1"/></w:lvlOverride>').join('');
+  const numberingXml = X + '<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+    '<w:abstractNum w:abstractNumId="0"><w:multiLevelType w:val="hybridMultilevel"/>' + lvls(false) + '</w:abstractNum>' +
+    '<w:abstractNum w:abstractNumId="1"><w:multiLevelType w:val="hybridMultilevel"/>' + lvls(true) + '</w:abstractNum>' +
+    '<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>' +
+    orderedIds.map((_, k) => '<w:num w:numId="' + (2 + k) + '"><w:abstractNumId w:val="1"/>' + over + '</w:num>').join('') + '</w:numbering>';
+
+  const RT = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/';
+  const docRels = X + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="' + RT + 'styles" Target="styles.xml"/><Relationship Id="rId2" Type="' + RT + 'numbering" Target="numbering.xml"/>' +
+    rels.map(r => '<Relationship Id="' + r.id + '" Type="' + r.type + '" Target="' + pagesXmlEsc(r.target) + '"' + (r.external ? ' TargetMode="External"' : '') + '/>').join('') + '</Relationships>';
+  const contentTypes = X + '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+    '<Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/><Default Extension="gif" ContentType="image/gif"/>' +
+    '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+    '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>' +
+    '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/></Types>';
+  const rootRels = X + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="' + RT + 'officeDocument" Target="word/document.xml"/></Relationships>';
+
+  const files = [
+    { name: '[Content_Types].xml', data: enc.encode(contentTypes) },
+    { name: '_rels/.rels', data: enc.encode(rootRels) },
+    { name: 'word/document.xml', data: enc.encode(documentXml) },
+    { name: 'word/_rels/document.xml.rels', data: enc.encode(docRels) },
+    { name: 'word/styles.xml', data: enc.encode(stylesXml) },
+    { name: 'word/numbering.xml', data: enc.encode(numberingXml) },
+    ...media.map(m => ({ name: m.name, data: m.bytes })),
+  ];
+  return new Blob([lpZip(files)], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+}
+
+// '#aabbcc' / 'rgb(1,2,3)' / '#abc' → 'AABBCC' (or '' when it isn't a plain colour)
+function pagesHex(c) {
+  if (!c) return '';
+  let m = /^#([0-9a-f]{6})$/i.exec(c.trim()); if (m) return m[1].toUpperCase();
+  m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(c.trim()); if (m) return (m[1] + m[1] + m[2] + m[2] + m[3] + m[3]).toUpperCase();
+  m = /^rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(c.trim());
+  if (m) return [m[1], m[2], m[3]].map(n => Math.max(0, Math.min(255, +n)).toString(16).padStart(2, '0')).join('').toUpperCase();
+  return '';
+}
+
+// PDF: the browser prints a clean copy of the page (everything else on screen is hidden by CSS while printing),
+// and "Save as PDF" in the print dialog makes the file. Built from the model with DOM calls, never from raw HTML.
+function pagesPrintPdf(title, blocks) {
+  const old = document.getElementById('lp-print-root'); if (old) old.remove();
+  const root = document.createElement('div'); root.id = 'lp-print-root';
+  const h = document.createElement('h1'); h.className = 'lp-pr-title'; h.textContent = (title || 'Untitled').trim() || 'Untitled'; root.appendChild(h);
+  const fill = (el, runs) => {
+    for (const r of runs) {
+      if (r.br) { el.appendChild(document.createElement('br')); continue; }
+      if (r.img) { if (/^data:image\//i.test(r.img)) { const im = document.createElement('img'); im.src = r.img; el.appendChild(im); } continue; }
+      let node = document.createElement(r.href ? 'a' : 'span'); node.textContent = r.t;
+      if (r.href) node.setAttribute('href', r.href);
+      const st = node.style;
+      if (r.b) st.fontWeight = '700'; if (r.i) st.fontStyle = 'italic';
+      const dec = [r.u && 'underline', r.s && 'line-through'].filter(Boolean).join(' '); if (dec) st.textDecoration = dec;
+      if (r.color) st.color = r.color; if (r.bg) st.backgroundColor = r.bg; if (r.px) st.fontSize = r.px + 'px';
+      if (r.font) st.fontFamily = r.font === 'mono' ? "'DM Mono', 'Courier New', monospace" : r.font === 'display' ? "'Playfair Display', Georgia, serif" : 'Georgia, serif';
+      el.appendChild(node);
+    }
+  };
+  for (const b of blocks) {
+    const tag = /^h[123]$/.test(b.kind) ? b.kind : 'div';
+    const el = document.createElement(tag);
+    el.className = 'lp-pr-' + b.kind;
+    if (b.align) el.style.textAlign = b.align;
+    if (b.kind === 'ul' || b.kind === 'ol' || b.kind === 'check') {
+      el.style.marginLeft = (1.4 + 1.4 * (b.depth || 0)) + 'em';
+      const mk = document.createElement('span'); mk.className = 'lp-pr-mk';
+      mk.textContent = b.kind === 'ul' ? '•' : b.kind === 'ol' ? b.num + '.' : (b.done ? '☑' : '☐');
+      const tx = document.createElement('span'); tx.className = 'lp-pr-tx'; fill(tx, b.runs);
+      el.appendChild(mk); el.appendChild(tx);
+    } else {
+      fill(el, b.runs);
+      if (!el.firstChild) el.appendChild(document.createElement('br'));
+    }
+    root.appendChild(el);
+  }
+  document.body.appendChild(root);
+  const html = document.documentElement, prevTitle = document.title;
+  html.classList.add('lp-printing');
+  document.title = pagesExportBase(title);          // browsers suggest this as the PDF's file name
+  let done = false;
+  const cleanup = () => { if (done) return; done = true; html.classList.remove('lp-printing'); document.title = prevTitle; window.removeEventListener('afterprint', cleanup); };
+  window.addEventListener('afterprint', cleanup);
+  setTimeout(cleanup, 120000);                       // iOS doesn't always report afterprint
+  setTimeout(() => { try { window.print(); } catch { cleanup(); } }, 60);
+}
+
+// Hand a finished file to the person. Touch devices get the share sheet (→ "Save to Files"), which also works inside the
+// installed home-screen app; everything else gets a normal download.
+async function pagesSaveFile(blob, filename) {
+  try {
+    if (window.matchMedia && matchMedia('(pointer: coarse)').matches && navigator.canShare && typeof File === 'function') {
+      const file = new File([blob], filename, { type: blob.type });
+      if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: filename }); return; }
+    }
+  } catch (e) { if (e && e.name === 'AbortError') return; }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = filename; a.style.display = 'none';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 5000);
+}
+
 function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekData, setWeekData, selectedId, setSelectedId }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileView, setMobileView] = useState(() => selectedId ? 'editor' : 'list');
@@ -17109,6 +17512,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   const pagesRef = useRef(pagesData);   // v5.24.0: always the pages currently on screen
   pagesRef.current = pagesData;
   const [wordCount, setWordCount] = useState(0);
+  const [dlOpen, setDlOpen] = useState(false);   // v5.59.0 — Download menu in the page header
   const [tbMore, setTbMore] = useState(false);  // v5.51.0 — phones: toolbar shows everyday tools; ⋯ reveals the rest
   const [showNewMenu, setShowNewMenu] = useState(null); // null=closed, 'top'=top-level, folderId=folder menu
   const [expandedFolders, setExpandedFolders] = useState({});
@@ -17182,6 +17586,20 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   }
 
   const selectedDoc = pagesData.find(d => d.id === selectedId) || null;
+  // v5.59.0 — download the open page as Text / Word / PDF. Reads the editor's current content (not the last save) so nothing typed is missed.
+  const downloadPage = async (fmt) => {
+    setDlOpen(false);
+    if (!selectedDoc) return;
+    try {
+      const live = getBodyHtml();
+      const blocks = pagesExportModel(live !== null ? live : (selectedDoc.body || ''));
+      const title = selectedDoc.title || 'Untitled';
+      const base = pagesExportBase(title);
+      if (fmt === 'txt') await pagesSaveFile(new Blob([pagesToText(title, blocks)], { type: 'text/plain;charset=utf-8' }), base + '.txt');
+      else if (fmt === 'docx') await pagesSaveFile(await pagesToDocx(title, blocks), base + '.docx');
+      else pagesPrintPdf(title, blocks);
+    } catch (e) { window.alert('Sorry, that download failed: ' + (e && e.message ? e.message : e)); }
+  };
 
   // ── Folder helpers ───────────────────────────────────────
   function createFolder(parentFolderId) {
@@ -17818,6 +18236,20 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                   value={selectedDoc.title}
                   onChange={e=>updateDoc(selectedDoc.id, {title: e.target.value})}
                 />
+                <span style={{position:'relative',flexShrink:0,marginTop:6}}>
+                  <button onClick={()=>setDlOpen(o=>!o)}
+                    style={{background:'none',border:'none',color:'var(--ink-faint)',cursor:'pointer',fontSize:16,padding:'4px'}}
+                    title="Download this page" aria-haspopup="menu" aria-expanded={dlOpen}>⬇</button>
+                  {dlOpen && (<>
+                    <div style={{position:'fixed',inset:0,zIndex:59}} onClick={()=>setDlOpen(false)}/>
+                    <div className="pages-dl-menu" role="menu">
+                      <button className="pages-dl-item" role="menuitem" onClick={()=>downloadPage('txt')}>📄 Text (.txt)</button>
+                      <button className="pages-dl-item" role="menuitem" onClick={()=>downloadPage('docx')}>📝 Word (.docx)</button>
+                      <button className="pages-dl-item" role="menuitem" onClick={()=>downloadPage('pdf')}>🖨 PDF</button>
+                      <div className="pages-dl-hint">PDF opens your print dialog — choose “Save as PDF”.</div>
+                    </div>
+                  </>)}
+                </span>
                 <button onClick={()=>deleteDoc(selectedDoc.id)}
                   style={{background:'none',border:'none',color:'var(--ink-faint)',cursor:'pointer',fontSize:16,padding:'4px',flexShrink:0,marginTop:6}}
                   title="Delete document">🗑</button>
