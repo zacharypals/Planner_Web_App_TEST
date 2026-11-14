@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.62.1 -->
+<!-- LP Planner v5.63.0 -->
+<!-- v5.63.0 — Goals › Reading log: filter chips Active | To read | Parked | Finished | All (with counts, remembered per device; default Active). Books can now be put on a "To read" shelf (choose it when adding a book) or Parked (new Park button on a book in progress). Start reading / Resume moves them back to Active. Finished books are listed under Finished only. -->
 <!-- v5.62.1 — Goals sub-tab: the collapse caret next to the Goals and Reading log titles is larger. -->
 <!-- v5.62.0 — Goals: (1) drag tasks to reorder them inside a milestone — grab the ⋮⋮ handle at the left of a task (finger, Pencil or mouse). Order matters for Reading-log tasks, so this is how you fix the running-total order. (2) On the Goals sub-tab, the Goals and Reading log sections now collapse: tap the section title (remembered per device). -->
 <!-- v5.61.0 — Goals › Projects: a project task can check itself off from the Reading log. In a task's ↻ editor choose "Reading log", set the pages for that task, and it is checked when the pages logged for the project's linked book reach that task's place in a running total (scheduled tasks by day, then unscheduled tasks in milestone order). Counting starts at the project's start date. Reading ahead or catching up just works; checked tasks never reopen by themselves. -->
@@ -13547,6 +13548,9 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
   // v5.62.0 — Goals and Reading log sections can be collapsed; remembered per device
   const [secShut, setSecShutRaw] = useState(() => { try { const o = JSON.parse(lsGet('glSecShut') || '{}'); return { goals: !!o.goals, reading: !!o.reading }; } catch { return { goals: false, reading: false }; } });
   const toggleSec = k => setSecShutRaw(prev => { const next = { ...prev, [k]: !prev[k] }; lsSet('glSecShut', JSON.stringify(next)); return next; });
+  // v5.63.0 — Reading log filter: active | toread | parked | finished | all (remembered per device)
+  const [rfilter, setRfilterRaw] = useState(() => { const v = lsGet('glReadFilter'); return ['active', 'toread', 'parked', 'finished', 'all'].includes(v) ? v : 'active'; });
+  const setRfilter = v => { lsSet('glReadFilter', v); setRfilterRaw(v); };
   const [openId, setOpenId] = useState(null);
   const [pageIn, setPageIn] = useState({});
   const [logDate, setLogDate] = useState({});
@@ -13554,7 +13558,10 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
   const [finishDate, setFinishDate] = useState(today);
   const accent = 'var(--accent)';
   const books = L.filter(x => x.kind === 'reading');
-  const reading = books.filter(x => !x.finishedDate);
+  const reading = books.filter(x => !x.finishedDate && !x.status);
+  const toRead = books.filter(x => !x.finishedDate && x.status === 'toread');
+  const parkedBooks = books.filter(x => !x.finishedDate && x.status === 'parked');
+  const setShelf = (x, v) => patchBook(x.id, b => { const { status, ...rest } = b; return v ? { ...rest, status: v } : rest; });
   const finished = books.filter(x => x.finishedDate).sort((a, b) => b.finishedDate.localeCompare(a.finishedDate));
   const patchBook = (id, fn) => setTargetLog(l => (Array.isArray(l) ? l : []).map(x => x.id === id ? fn(x) : x));
 
@@ -13562,7 +13569,8 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
     if (!bookForm || !(bookForm.title || '').trim()) return;
     const read = parseInt(bookForm.read, 10) || 0;
     setTargetLog(l => [...(Array.isArray(l) ? l : []), { id: tgUid(), kind: 'reading', title: bookForm.title.trim(), author: (bookForm.author || '').trim(),
-      total: parseInt(bookForm.total, 10) || 0, updates: read > 0 ? [{ date: today, pages: read }] : [], finishedDate: null, notes: '', ...(bookForm.start ? { startDate: bookForm.start } : {}) }]);
+      total: parseInt(bookForm.total, 10) || 0, updates: read > 0 ? [{ date: today, pages: read }] : [], finishedDate: null, notes: '', ...(bookForm.shelf ? { status: bookForm.shelf } : {}), ...(bookForm.start ? { startDate: bookForm.start } : {}) }]);
+    setRfilter(bookForm.shelf === 'toread' ? 'toread' : 'active');
     setBookForm(null);
   }
   function logPages(x) {
@@ -13617,6 +13625,24 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
           <button className="gl-btn ghost" style={{ padding: '2px 0', fontSize: 12 }}
             onClick={() => window.confirm('Remove this goal? Your reading log is kept.') && setTargets(ts => ts.filter(x => x.id !== t.id))}>Remove</button>
         </div>
+      </div>
+    );
+  }
+  // v5.63.0 — compact row for a book that is on the To read shelf or parked
+  function shelfRow(x, kind) {
+    const rd = tgRead(x);
+    return (
+      <div key={x.id} style={{ borderTop: '1px solid var(--border)', padding: '10px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
+          <span style={{ fontWeight: 600, fontSize: 14, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
+          <span className="gl-mono" style={{ ...lab, whiteSpace: 'nowrap' }}>{rd > 0 ? `${rd}${x.total ? ` / ${x.total}` : ''} pp` : x.total ? `${x.total} pp` : ''}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+          {kind === 'toread'
+            ? <><button className="gl-btn primary" onClick={() => setShelf(x, null)}>Start reading</button><button className="gl-btn" onClick={() => setShelf(x, 'parked')}>Park</button></>
+            : <><button className="gl-btn primary" onClick={() => setShelf(x, null)}>Resume</button><button className="gl-btn" onClick={() => setShelf(x, 'toread')}>Move to To read</button></>}
+        </div>
+        {openId === x.id && bookEditor(x)}
       </div>
     );
   }
@@ -13740,12 +13766,24 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
               <input className="gl-input" style={{ width: 110 }} type="number" min="0" placeholder="Read so far" value={bookForm.read} onChange={e => setBookForm(f => ({ ...f, read: e.target.value }))} />
               <label style={{ ...lab, display: 'flex', alignItems: 'center', gap: 6 }}>Started
                 <input className="gl-input" type="date" max={today} value={bookForm.start || ''} onChange={e => setBookForm(f => ({ ...f, start: e.target.value }))} /></label>
+              <select className="gl-input" aria-label="Add to" value={bookForm.shelf || ''} onChange={e => setBookForm(f => ({ ...f, shelf: e.target.value }))}>
+                <option value="">Reading now</option><option value="toread">To read</option>
+              </select>
               <button className="gl-btn primary" onClick={addBook}>Add</button>
             </div>
           )}
           {!books.length && !bookForm && <div style={{ fontSize: 13, color: 'var(--ink-light)' }}>No books logged yet.</div>}
-          {reading.length > 0 && <div className="gl-label" style={{ margin: '4px 0' }}>Reading now</div>}
-          {reading.map(x => {
+          {books.length > 0 && (
+            <div role="group" aria-label="Show books" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '0 0 6px' }}>
+              {[['active', 'Active', reading.length], ['toread', 'To read', toRead.length], ['parked', 'Parked', parkedBooks.length], ['finished', 'Finished', finished.length], ['all', 'All', books.length]].map(([k, lbl, n]) => (
+                <button key={k} className={`gl-chip ${rfilter === k ? 'on' : ''}`} aria-pressed={rfilter === k} onClick={() => setRfilter(k)}>{lbl}{k === 'all' ? '' : ' ' + n}</button>
+              ))}
+            </div>
+          )}
+          {books.length > 0 && (() => { const n = { active: reading, toread: toRead, parked: parkedBooks, finished, all: books }[rfilter].length; return n === 0 ? (
+            <div style={{ fontSize: 13, color: 'var(--ink-light)', padding: '6px 0' }}>{{ active: 'Nothing in progress right now.', toread: 'Nothing on your To read shelf.', parked: 'Nothing parked.', finished: 'No finished books yet.', all: '' }[rfilter]}</div>) : null; })()}
+          {(rfilter === 'active' || rfilter === 'all') && reading.length > 0 && <div className="gl-label" style={{ margin: '4px 0' }}>Reading now</div>}
+          {(rfilter === 'active' || rfilter === 'all') && reading.map(x => {
             const rd = tgRead(x), p = x.total ? Math.min(1, rd / x.total) : 0;
             return (
               <div key={x.id} style={{ borderTop: '1px solid var(--border)', padding: '10px 0' }}>
@@ -13767,14 +13805,19 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
                       <button className="gl-btn primary" onClick={() => finishBook(x)}>Confirm finished</button>
                       <button className="gl-btn ghost" onClick={() => setFinishId(null)}>Cancel</button>
                     </>
-                  ) : <button className="gl-btn" onClick={() => { setFinishId(x.id); setFinishDate(today); }}>Mark finished</button>}
+                  ) : <><button className="gl-btn" onClick={() => { setFinishId(x.id); setFinishDate(today); }}>Mark finished</button>
+                    <button className="gl-btn" title="Set this book aside without losing your place" onClick={() => setShelf(x, 'parked')}>Park</button></>}
                 </div>
                 {openId === x.id && bookEditor(x)}
               </div>
             );
           })}
-          {finished.length > 0 && <div className="gl-label" style={{ margin: '10px 0 4px' }}>Finished · {finished.length}</div>}
-          {finished.map(x => (
+          {(rfilter === 'toread' || rfilter === 'all') && toRead.length > 0 && <div className="gl-label" style={{ margin: '10px 0 4px' }}>To read · {toRead.length}</div>}
+          {(rfilter === 'toread' || rfilter === 'all') && toRead.map(x => shelfRow(x, 'toread'))}
+          {(rfilter === 'parked' || rfilter === 'all') && parkedBooks.length > 0 && <div className="gl-label" style={{ margin: '10px 0 4px' }}>Parked · {parkedBooks.length}</div>}
+          {(rfilter === 'parked' || rfilter === 'all') && parkedBooks.map(x => shelfRow(x, 'parked'))}
+          {(rfilter === 'finished' || rfilter === 'all') && finished.length > 0 && <div className="gl-label" style={{ margin: '10px 0 4px' }}>Finished · {finished.length}</div>}
+          {(rfilter === 'finished' || rfilter === 'all') && finished.map(x => (
             <div key={x.id} style={{ borderTop: '1px solid var(--border)', padding: '8px 0' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
                 <span style={{ color: 'var(--accent)' }}>✓</span>
@@ -14583,7 +14626,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.62.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.63.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
