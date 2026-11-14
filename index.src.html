@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.63.4 -->
+<!-- LP Planner v5.64.0 -->
+<!-- v5.64.0 — Goals › Reading log: pages can be logged two ways — "Pages read" (a number to add) or "Now on page" (type the page you are on; the app logs the difference from what you already logged). The choice is remembered per device. "Log pages" is now a filled button so it reads as the action that saves. -->
 <!-- v5.63.4 — Goals › Reading log: on each book the numbers are stacked (pages read / total over pages left; finished books: pages over dates), so long titles get more room on a phone. -->
 <!-- v5.63.3 — Goals › Reading log: book titles are larger (16px) and each book sits in its own softly tinted card instead of being split by lines. -->
 <!-- v5.63.0 — Goals › Reading log: filter chips Active | To read | Parked | Finished | All (with counts, remembered per device; default Active). Books can now be put on a "To read" shelf (choose it when adding a book) or Parked (new Park button on a book in progress). Start reading / Resume moves them back to Active. Finished books are listed under Finished only. -->
@@ -13556,6 +13557,9 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
   const setRfilter = v => { lsSet('glReadFilter', v); setRfilterRaw(v); };
   const [openId, setOpenId] = useState(null);
   const [pageIn, setPageIn] = useState({});
+  // v5.64.0 — how pages are typed: 'read' = pages to add, 'on' = the page I am now on (remembered per device)
+  const [logMode, setLogModeRaw] = useState(() => lsGet('glLogMode') === 'on' ? 'on' : 'read');
+  const setLogMode = m => { lsSet('glLogMode', m); setLogModeRaw(m); setPageIn({}); };
   const [logDate, setLogDate] = useState({});
   const [finishId, setFinishId] = useState(null);
   const [finishDate, setFinishDate] = useState(today);
@@ -13577,8 +13581,10 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
     setBookForm(null);
   }
   function logPages(x) {
-    const n = parseInt(pageIn[x.id], 10);
-    if (!n || n < 1) return;
+    const v = parseInt(pageIn[x.id], 10);
+    if (!v || v < 1) return;
+    const n = logMode === 'on' ? v - tgRead(x) : v;   // "now on page v" logs the difference from what is already logged
+    if (n < 1) return;
     const d = logDate[x.id] || today;
     patchBook(x.id, b => ({ ...b, updates: [...(b.updates || []), { date: d, pages: n }] }));
     setPageIn(p => ({ ...p, [x.id]: '' }));
@@ -13797,11 +13803,15 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
                 {x.total > 0 && <div className="gl-bar" style={{ margin: '6px 0', background: glTint('#2d6b4a', 0.15) }}><div style={{ width: Math.round(p * 100) + '%', background: accent }} /></div>}
                 {tgStart(x) && <div style={{ ...lab, margin: '2px 0 6px' }}>Started {tgDate(tgStart(x), tgStart(x).slice(0, 4) !== today.slice(0, 4))}{!x.startDate && <span style={{ color: 'var(--ink-faint)' }}> · auto</span>}</div>}
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                  <input className="gl-input" style={{ width: 90 }} type="number" min="1" placeholder="+ pages" value={pageIn[x.id] || ''}
+                  <div role="group" aria-label="How to log pages" style={{ display: 'flex', gap: 6, flexBasis: '100%' }}>
+                    <button className={`gl-chip ${logMode === 'read' ? 'on' : ''}`} aria-pressed={logMode === 'read'} onClick={() => setLogMode('read')}>Pages read</button>
+                    <button className={`gl-chip ${logMode === 'on' ? 'on' : ''}`} aria-pressed={logMode === 'on'} onClick={() => setLogMode('on')}>Now on page</button>
+                  </div>
+                  <input className="gl-input" style={{ width: 100 }} type="number" min="1" placeholder={logMode === 'on' ? 'page #' : '+ pages'} aria-label={logMode === 'on' ? 'The page you are now on' : 'Pages read'} value={pageIn[x.id] || ''}
                     onChange={e => setPageIn(s => ({ ...s, [x.id]: e.target.value }))} onKeyDown={e => e.key === 'Enter' && logPages(x)} />
                   <input className="gl-input" type="date" style={{ width: 138 }} aria-label="Date these pages were read" title="Date these pages were read" max={today}
                     value={logDate[x.id] || today} onChange={e => setLogDate(s => ({ ...s, [x.id]: e.target.value }))} />
-                  <button className="gl-btn" onClick={() => logPages(x)}>Log pages</button>
+                  <button className="gl-btn primary" onClick={() => logPages(x)}>Log pages</button>
                   {finishId === x.id ? (
                     <>
                       <input className="gl-input" type="date" value={finishDate} onChange={e => setFinishDate(e.target.value)} />
@@ -13810,6 +13820,10 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
                     </>
                   ) : <><button className="gl-btn" onClick={() => { setFinishId(x.id); setFinishDate(today); }}>Mark finished</button>
                     <button className="gl-btn" title="Set this book aside without losing your place" onClick={() => setShelf(x, 'parked')}>Park</button></>}
+                  {logMode === 'on' && parseInt(pageIn[x.id], 10) > 0 && (() => { const v = parseInt(pageIn[x.id], 10), n = v - rd; return (
+                    <div style={{ ...lab, order: 1, flexBasis: '100%', color: n < 1 ? 'var(--red)' : 'var(--ink-light)' }}>
+                      {n < 1 ? `You are already at page ${rd} — enter a higher page.` : `Page ${v} logs ${n} ${n === 1 ? 'page' : 'pages'} (you were at page ${rd}).`}
+                    </div>); })()}
                 </div>
                 {openId === x.id && bookEditor(x)}
               </div>
@@ -14629,7 +14643,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.63.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.64.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
