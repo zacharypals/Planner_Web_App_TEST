@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.67.0 -->
-<!-- v5.67.0 — Projects: a milestone can link to a Page: an expanded milestone has a Page row with a picker, Open, and + New page (creates a Page titled Project — Milestone, links it and opens it). (v5.66.1: on desktop/iPad the milestone checkbox moves to the right of the title, a little bigger. (v5.66.0: desktop/iPad milestones get the same chevron-button caret as the phone, and the milestone title sits in a pill (still tap to edit). (v5.65.7: the ▲ ▼ move buttons now sit in the milestone's top row, between the caret and the checkbox, in the caret's style; the phone row is one notch smaller. (v5.65.6: each milestone header has ▲ ▼ buttons to move it one place (a backup for the drag grip, which on some phones did nothing for milestones below the 3rd). Also: the milestone and task drag grips now claim the touch the moment your finger lands (a native, non-passive touchstart handler), so iPhone/iPad Safari cannot hand the touch to page scrolling first. Targets milestones below the 3rd that showed no fade or drop line when pressed. -->
+<!-- LP Planner v5.67.1 -->
+<!-- v5.67.1 — Projects: the "Auto from training or habits" chip and the per-task ↻ button are hidden by default; a project's Linked card has a "Show auto-check options" switch to turn them on (rules already set stay visible). (v5.67.0: a milestone can link to a Page: an expanded milestone has a Page row with a picker, Open, and + New page (creates a Page titled Project — Milestone, links it and opens it). (v5.66.1: on desktop/iPad the milestone checkbox moves to the right of the title, a little bigger. (v5.66.0: desktop/iPad milestones get the same chevron-button caret as the phone, and the milestone title sits in a pill (still tap to edit). (v5.65.7: the ▲ ▼ move buttons now sit in the milestone's top row, between the caret and the checkbox, in the caret's style; the phone row is one notch smaller. (v5.65.6: each milestone header has ▲ ▼ buttons to move it one place (a backup for the drag grip, which on some phones did nothing for milestones below the 3rd). Also: the milestone and task drag grips now claim the touch the moment your finger lands (a native, non-passive touchstart handler), so iPhone/iPad Safari cannot hand the touch to page scrolling first. Targets milestones below the 3rd that showed no fade or drop line when pressed. -->
 <!-- v5.65.4 — Projects: hardened touch dragging for milestones and tasks (the finger now stays "captured" by the grip, the page cannot scroll under it while you drag, and the scroll area is frozen until you let go) — fixes drags that would not start on a phone once the list was scrolled. Auto-scroll at the screen edges stays. -->
 <!-- v5.65.3 — Projects: dragging a milestone (or a task) now auto-scrolls when you hold it near the top or bottom edge of the screen, so you can move it past what fits on screen (before, only the first few milestones could be reordered on a phone). Phone: the caret and drag grip are a little smaller (40px) and the milestone checkbox is larger (28px) to match. -->
 <!-- v5.65.2 — Projects, phone only: in a milestone header the done checkbox moves to the right edge, the expand/collapse caret is a larger rounded chevron button, and the drag grip is bigger (44px) so it is easier to hit. Desktop and iPad are unchanged. -->
@@ -12879,7 +12879,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   // v5.14.0 — which auto-complete links this goal offers, and how to switch each on/off for just this milestone.
   // A milestone with neither link set is a plain manual one and shows no extra rows (only the chips on the add-task line).
   const wtOffered = !!((goal && (goal.linkedMetrics || []).includes('weight')) || m.metric);
-  const trOffered = true;   // v5.15.1 — training/habits auto-check is always offered (no per-goal switch)
+  const trOffered = !!goal.showAuto || !!m.rule;   // v5.67.1 — hidden until the project's "Show auto-check options" switch is on (a rule already set stays visible)
   function enableWeight() {
     const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
     const cur = mctx ? smoothWeight(mctx.metrics, asOf, goal && goal.startDate) : { n: 0, avg: null };
@@ -12943,7 +12943,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
       </div>
       {open && (
         <div ref={taskListRef}>
-          {/* v5.67.0 — link this milestone to a notes Page: pick one, open it, or create a new linked Page */}
+          {/* v5.67.1 — link this milestone to a notes Page: pick one, open it, or create a new linked Page */}
           {pages && (
             <div className="gl-task" style={{ flexWrap: 'wrap', rowGap: 6, paddingLeft: 12 }}>
               <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>📄 Page</span>
@@ -13026,7 +13026,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
                 onClick={() => setPicker(p => p === t.id ? null : t.id)}>
                 {t.scheduledDate ? glShortDay(t.scheduledDate) : '+ Schedule'}
               </button>
-              {(
+              {(goal.showAuto || t.rule) && (
                 <button className={`gl-sched ${t.rule ? 'set' : ''}`} aria-expanded={ruleOpen === t.id} aria-label="Check off automatically from my Fitness or Reading log"
                   title="Check this off automatically from my Fitness or Reading log"
                   style={t.rule ? { background: glTint(color, 0.14), color: glInk(color) } : undefined}
@@ -13106,7 +13106,7 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
     const up = ev => end(ev, false), cn = ev => end(ev, true);
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cn);
   }
-  function newPageForMs(mid) {   // v5.67.0 — create a Page named after the project + milestone, link it, and open it
+  function newPageForMs(mid) {   // v5.67.1 — create a Page named after the project + milestone, link it, and open it
     if (!setPagesData || !onOpenPage) return;
     const m = ms.find(x => x.id === mid); if (!m) return;
     const id = 'doc_' + Date.now(), now = new Date().toISOString();
@@ -13116,7 +13116,7 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
     setMs(mid, mm => ({ ...mm, pageId: id }));
     onOpenPage(id);
   }
-  function moveMs(id, dir) {   // v5.67.0 — button fallback for drag: nudge a milestone one place up (-1) or down (+1)
+  function moveMs(id, dir) {   // v5.67.1 — button fallback for drag: nudge a milestone one place up (-1) or down (+1)
     onChange(g => {
       const list = [...(g.milestones || [])];
       const i = list.findIndex(x => x.id === id), j = i + dir;
@@ -13248,6 +13248,10 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
               </select>
               {goal.notesPageId && pages.some(p => p.id === goal.notesPageId) && <button className="gl-btn" onClick={() => onOpenPage(goal.notesPageId)}>Open</button>}
             </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink-light)', cursor: 'pointer' }}>
+              <input type="checkbox" checked={!!goal.showAuto} onChange={e => { const v = e.target.checked; onChange(g => ({ ...g, showAuto: v })); }} />
+              Show auto-check options on milestones and tasks (training, habits, reading)
+            </label>
             {((books || []).length > 0 || goal.bookId) && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <select className="gl-input" value={goal.bookId || ''} aria-label="Linked reading log book"
@@ -14799,7 +14803,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.67.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.67.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
