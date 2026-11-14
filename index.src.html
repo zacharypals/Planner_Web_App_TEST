@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.59.4 -->
+<!-- LP Planner v5.60.0 -->
+<!-- v5.60.0 — Projects: tags. Each project can carry several tags (Projects › open a project › the tag row under its name; suggestions come from tags already in use, matched ignoring case). Tags show as small chips on the project cards, and the Timeline has a tag filter row: tap one or more tags to show only projects with any of them (it combines with the Show menu; picking one specific project ignores it). New optional `tags: []` on each project inside the existing goals collection — no new synced key, no Worker change. -->
 <!-- v5.59.4 — Weekly: a task moved with the "Move to" picker now arrives collapsed on its new day (previously it stayed expanded, and the old collapse didn't work when the new day was in a different week). -->
 <!-- v5.59.3 — Pages: the delete button in the page header is now a matching line-drawn trash icon (turns red on hover). -->
 <!-- v5.59.2 — Pages download button uses a line-drawn download-tray icon (inline SVG) instead of the ⬇ character, centered with the title row. -->
@@ -2511,6 +2512,10 @@
   .gl-btn.danger { color: var(--red); }
   .gl-chip { font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-light); cursor: pointer; }
   .gl-chip.on { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 600; }
+  /* v5.60.0 — project tags */
+  .gl-tag { display: inline-flex; align-items: center; gap: 4px; font-family: 'DM Sans', sans-serif; font-size: 11.5px; line-height: 1.3; padding: 2px 8px; border-radius: 999px; background: var(--tint); color: var(--ink-light); border: 1px solid var(--border); white-space: nowrap; }
+  .gl-tag button { background: none; border: none; padding: 0 0 0 2px; margin: 0; font-size: 10px; color: var(--ink-faint); cursor: pointer; line-height: 1; }
+  .gl-tag button:hover { color: var(--red); }
   .gl-goal-card { text-align: left; width: 100%; font-family: 'DM Sans', sans-serif; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 11px 13px; cursor: pointer; display: block; color: var(--ink); }
   .gl-goal-card:hover { box-shadow: 0 2px 8px var(--shadow-md); }
   .gl-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
@@ -11875,6 +11880,48 @@ function glNewGoal(goals) {
   return { id: glId('gl'), title: '', why: '', color, status: 'active', startDate: t, targetDate: glAddDays(t, 90),
     notesPageId: null, showCountdown: false, retro: '', createdAt: Date.now(), completedAt: null, milestones: [] };
 }
+// v5.60.0 — project tags: plain strings on goal.tags, matched ignoring case/spaces (same idea as exercise subcategories)
+function glTagKey(s) { return String(s || '').trim().toLowerCase(); }
+function glTags(g) { return Array.isArray(g && g.tags) ? g.tags : []; }
+function glAllTags(goals) {
+  const seen = {}, out = [];
+  (goals || []).forEach(g => glTags(g).forEach(t => { const k = glTagKey(t); if (k && !seen[k]) { seen[k] = 1; out.push(String(t).trim()); } }));
+  return out.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+}
+function GlTagEditor({ tags, all, onChange }) {
+  const [txt, setTxt] = useState('');
+  const listId = React.useMemo(() => 'gl-tags-' + Math.random().toString(36).slice(2, 8), []);
+  const cur = Array.isArray(tags) ? tags : [];
+  const used = new Set(cur.map(glTagKey));
+  function add(raw) {
+    const parts = String(raw || '').split(',').map(x => x.trim()).filter(Boolean);
+    if (!parts.length) { setTxt(''); return; }
+    const have = new Set(used), next = [...cur];
+    parts.forEach(pt => {
+      const k = glTagKey(pt);
+      if (have.has(k)) return;
+      have.add(k);
+      next.push((all || []).find(a => glTagKey(a) === k) || pt);   // reuse the existing spelling/capitals
+    });
+    if (next.length !== cur.length) onChange(next);
+    setTxt('');
+  }
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 6 }}>
+      {cur.map(t => (
+        <span key={t} className="gl-tag">{t}
+          <button type="button" aria-label={'Remove tag ' + t} onClick={() => onChange(cur.filter(x => x !== t))}>✕</button>
+        </span>
+      ))}
+      <input className="gl-inline" list={listId} value={txt} placeholder={cur.length ? '+ tag' : '+ Add tags (e.g. Home, Writing)'}
+        style={{ fontSize: 13, width: cur.length ? 90 : 210, minWidth: 0 }}
+        onChange={e => { const v = e.target.value; if (v.includes(',')) add(v); else setTxt(v); }}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(txt); } else if (e.key === 'Backspace' && !txt && cur.length) onChange(cur.slice(0, -1)); }}
+        onBlur={() => add(txt)} />
+      <datalist id={listId}>{(all || []).filter(a => !used.has(glTagKey(a))).map(a => <option key={a} value={a} />)}</datalist>
+    </div>
+  );
+}
 function glNewMilestone(g) {
   const ms = g.milestones || [];
   const last = ms[ms.length - 1];
@@ -12200,6 +12247,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   const [zoom, setZoom] = useState(() => sessionStorage.getItem('lp_glZoom') || 'month');
   const [offset, setOffset] = useState(0);
   const [show, setShow] = useState('active');   // 'active' | 'all' | <goalId>
+  const [tagSel, setTagSel] = useState(() => { try { const v = JSON.parse(sessionStorage.getItem('lp_glTags') || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } });   // v5.60.0 — selected tag keys (any match)
   const [opened, setOpened] = useState({});   // v5.29.0 — goal ids whose milestones are showing (collapsed by default)
   const [msOpen, setMsOpen] = useState({});   // v5.15.0 — milestone ids whose tasks are showing (collapsed by default)
   const range = glRange(zoom, offset);
@@ -12287,7 +12335,16 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   const pct = (s, endOfDay) => { const d = parseLocal(s); if (!d) return null; if (endOfDay) d.setDate(d.getDate() + 1); return (d - range.start) / total * 100; };
   const clip = (a, b) => { if (a == null || b == null) return null; const l = Math.max(0, a), r = Math.min(100, b); return r > l ? { left: l, width: r - l } : null; };
 
-  const shown = goals.filter(g => show === 'active' ? g.status === 'active' : show === 'all' ? g.status !== 'done' : g.id === show);
+  const allTags = glAllTags(goals);
+  const tagKeys = tagSel.filter(k => allTags.some(t => glTagKey(t) === k));   // ignore tags nobody uses any more
+  const tagFilterOn = tagKeys.length > 0 && (show === 'active' || show === 'all');   // picking one specific project ignores the tag filter
+  function toggleTag(t) {
+    const k = glTagKey(t);
+    setTagSel(cur => { const n = cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k]; try { sessionStorage.setItem('lp_glTags', JSON.stringify(n)); } catch (e) {} return n; });
+  }
+  function clearTags() { setTagSel([]); try { sessionStorage.removeItem('lp_glTags'); } catch (e) {} }
+  const shown = goals.filter(g => show === 'active' ? g.status === 'active' : show === 'all' ? g.status !== 'done' : g.id === show)
+    .filter(g => !tagFilterOn || glTags(g).some(t => tagKeys.includes(glTagKey(t))));
   const rows = [];
   shown.forEach(g => {
     rows.push({ type: 'goal', g });
@@ -12336,6 +12393,17 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
           </div>
         </div>
       </div>
+      {allTags.length > 0 && (
+        <div role="group" aria-label="Filter by tag" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, padding: '8px 16px', borderBottom: '1px solid var(--border)' }}>
+          <span className="gl-label" style={{ marginRight: 2 }}>Tags</span>
+          {allTags.map(t => {
+            const on = tagKeys.includes(glTagKey(t));
+            return <button key={t} type="button" className={`gl-chip ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => toggleTag(t)}>{t}</button>;
+          })}
+          {tagKeys.length > 0 && <button type="button" className="gl-btn ghost" onClick={clearTags}>Clear</button>}
+          {tagKeys.length > 0 && show !== 'active' && show !== 'all' && <span style={{ fontSize: 12, color: 'var(--ink-faint)' }}>(not applied while one project is selected)</span>}
+        </div>
+      )}
       {!rows.length ? (
         <div style={{ padding: '28px 16px', fontSize: 13, color: 'var(--ink-light)', textAlign: 'center' }}>
           {goals.length ? 'No projects match this filter.' : 'Create a project to see it on the timeline.'}
@@ -12770,7 +12838,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   );
 }
 
-function GlDetail({ books, goal, onChange, onDelete, onBack, pagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
+function GlDetail({ allTags, books, goal, onChange, onDelete, onBack, pagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const linkWeekStart = getWeekStart(new Date());
   const [openMs, setOpenMs] = useState(() => { const n = glNextMilestone(goal); return n ? { [n.id]: true } : {}; });
@@ -12850,6 +12918,7 @@ function GlDetail({ books, goal, onChange, onDelete, onBack, pagesData, onOpenPa
             <textarea className="gl-inline" rows={2} placeholder="Why does this matter? (optional)" value={goal.why || ''}
               style={{ width: '100%', resize: 'vertical', fontSize: 14, fontStyle: 'italic', color: 'var(--ink-light)', marginTop: 4, boxSizing: 'border-box' }}
               onChange={e => onChange(g => ({ ...g, why: e.target.value }))} />
+            <GlTagEditor tags={goal.tags} all={allTags} onChange={t => onChange(g => ({ ...g, tags: t }))} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
               <div className="gl-bar" style={{ flex: 1, height: 8, background: glTint(c, 0.15) }}><div style={{ width: Math.round(glProgress(goal) * 100) + '%', background: c }} /></div>
               <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)' }}>{Math.round(glProgress(goal) * 100)}% · {counts.done} of {counts.total} tasks</span>
@@ -13700,6 +13769,11 @@ function GoalsMain({ targetLog, goals, setGoals, pagesData, countdowns, setCount
                 <span>{Math.round(h.p * 100)}% · {doneMs} of {(g.milestones || []).length} milestones</span>
                 <span className="gl-mono">{glShort(g.targetDate)}</span>
               </div>
+              {glTags(g).length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                  {glTags(g).map(t => <span key={t} className="gl-tag">{t}</span>)}
+                </div>
+              )}
               {g.status === 'active' && m && (
                 <div style={{ marginTop: 6, fontSize: 12, color: late ? '#b03a2e' : 'var(--ink)', fontWeight: late ? 600 : 400 }}>
                   {late ? `${m.title || 'Milestone'} · ${glDays(m.dueDate, today)} days overdue`
@@ -13723,7 +13797,7 @@ function GoalsMain({ targetLog, goals, setGoals, pagesData, countdowns, setCount
 
       <main className="gl-main">
         {sel ? (
-          <GlDetail key={sel.id} books={(Array.isArray(targetLog) ? targetLog : []).filter(x => x.kind === 'reading')} goal={sel} pagesData={pagesData} onOpenPage={onOpenPage}
+          <GlDetail key={sel.id} allTags={glAllTags(list)} books={(Array.isArray(targetLog) ? targetLog : []).filter(x => x.kind === 'reading')} goal={sel} pagesData={pagesData} onOpenPage={onOpenPage}
             habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
             habitCompletions={habitCompletions} fitnessLog={fitnessLog}
             onChange={fn => changeGoal(sel.id, fn)}
@@ -14379,7 +14453,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.59.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.60.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
