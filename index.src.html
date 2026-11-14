@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.63.0 -->
+<!-- LP Planner v5.63.1 -->
+<!-- v5.63.1 — Goals › Reading log: book titles are larger (16px) and the line between books is a soft mauve, so each book stands apart. -->
 <!-- v5.63.0 — Goals › Reading log: filter chips Active | To read | Parked | Finished | All (with counts, remembered per device; default Active). Books can now be put on a "To read" shelf (choose it when adding a book) or Parked (new Park button on a book in progress). Start reading / Resume moves them back to Active. Finished books are listed under Finished only. -->
 <!-- v5.62.1 — Goals sub-tab: the collapse caret next to the Goals and Reading log titles is larger. -->
 <!-- v5.62.0 — Goals: (1) drag tasks to reorder them inside a milestone — grab the ⋮⋮ handle at the left of a task (finger, Pencil or mouse). Order matters for Reading-log tasks, so this is how you fix the running-total order. (2) On the Goals sub-tab, the Goals and Reading log sections now collapse: tap the section title (remembered per device). -->
@@ -13632,9 +13633,9 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
   function shelfRow(x, kind) {
     const rd = tgRead(x);
     return (
-      <div key={x.id} style={{ borderTop: '1px solid var(--border)', padding: '10px 0' }}>
+      <div key={x.id} style={{ borderTop: '2px solid #d6b8ce', padding: '12px 0' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
-          <span style={{ fontWeight: 600, fontSize: 14, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
+          <span style={{ fontWeight: 600, fontSize: 16, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
           <span className="gl-mono" style={{ ...lab, whiteSpace: 'nowrap' }}>{rd > 0 ? `${rd}${x.total ? ` / ${x.total}` : ''} pp` : x.total ? `${x.total} pp` : ''}</span>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
@@ -13786,9 +13787,9 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
           {(rfilter === 'active' || rfilter === 'all') && reading.map(x => {
             const rd = tgRead(x), p = x.total ? Math.min(1, rd / x.total) : 0;
             return (
-              <div key={x.id} style={{ borderTop: '1px solid var(--border)', padding: '10px 0' }}>
+              <div key={x.id} style={{ borderTop: '2px solid #d6b8ce', padding: '12px 0' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
-                  <span style={{ fontWeight: 600, fontSize: 14, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
+                  <span style={{ fontWeight: 600, fontSize: 16, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
                   <span className="gl-mono" style={{ ...lab, whiteSpace: 'nowrap' }}>{rd}{x.total ? ` / ${x.total}` : ''} pp{x.total > rd ? ` · ${x.total - rd} left` : ''}</span>
                 </div>
                 {x.total > 0 && <div className="gl-bar" style={{ margin: '6px 0', background: glTint('#2d6b4a', 0.15) }}><div style={{ width: Math.round(p * 100) + '%', background: accent }} /></div>}
@@ -13818,10 +13819,10 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
           {(rfilter === 'parked' || rfilter === 'all') && parkedBooks.map(x => shelfRow(x, 'parked'))}
           {(rfilter === 'finished' || rfilter === 'all') && finished.length > 0 && <div className="gl-label" style={{ margin: '10px 0 4px' }}>Finished · {finished.length}</div>}
           {(rfilter === 'finished' || rfilter === 'all') && finished.map(x => (
-            <div key={x.id} style={{ borderTop: '1px solid var(--border)', padding: '8px 0' }}>
+            <div key={x.id} style={{ borderTop: '2px solid #d6b8ce', padding: '10px 0' }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
                 <span style={{ color: 'var(--accent)' }}>✓</span>
-                <span style={{ fontWeight: 600, fontSize: 14, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
+                <span style={{ fontWeight: 600, fontSize: 16, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
                 <span className="gl-mono" style={lab}>{x.total ? x.total + ' pp · ' : ''}{tgSpanLabel(x)}</span>
               </div>
               {x.notes && openId !== x.id && <div style={{ ...lab, marginTop: 4, whiteSpace: 'pre-wrap', maxHeight: 40, overflow: 'hidden' }}>{x.notes}</div>}
@@ -14626,7 +14627,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.63.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.63.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
