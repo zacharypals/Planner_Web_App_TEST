@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.64.0 -->
+<!-- LP Planner v5.65.0 -->
+<!-- v5.65.0 — Goals: a General goal can be linked to a Project ("Linked project" in the goal form, or "Linked goal" on the project page). The goal tile then shows the project's progress bar (percent and tasks done) instead of a Done box, an "Open project" button, and the goal is Done as soon as the project is marked done (and reopens if the project is reopened). -->
 <!-- v5.64.0 — Goals › Reading log: pages can be logged two ways — "Pages read" (a number to add) or "Now on page" (type the page you are on; the app logs the difference from what you already logged). The choice is remembered per device. "Log pages" is now a filled button so it reads as the action that saves. -->
 <!-- v5.63.4 — Goals › Reading log: on each book the numbers are stacked (pages read / total over pages left; finished books: pages over dates), so long titles get more room on a phone. -->
 <!-- v5.63.3 — Goals › Reading log: book titles are larger (16px) and each book sits in its own softly tinted card instead of being split by lines. -->
@@ -12962,7 +12963,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   );
 }
 
-function GlDetail({ allTags, books, goal, onChange, onDelete, onBack, pagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
+function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelete, onBack, pagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const linkWeekStart = getWeekStart(new Date());
   const [openMs, setOpenMs] = useState(() => { const n = glNextMilestone(goal); return n ? { [n.id]: true } : {}; });
@@ -13135,6 +13136,22 @@ function GlDetail({ allTags, books, goal, onChange, onDelete, onBack, pagesData,
                 {goal.bookId && <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>When this project is marked done, the book is marked finished in your reading log.</span>}
               </div>
             )}
+            {/* v5.65.0 — link this project to a General goal on the Goals sub-tab (the link is stored on the goal) */}
+            {typeof setTargets === 'function' && (() => {
+              const tl = (Array.isArray(targets) ? targets : []).filter(x => x && x.kind === 'general');
+              const linked = tl.find(x => x.projectId === goal.id) || null;
+              const opts = tl.filter(x => !x.projectId || x.projectId === goal.id);
+              if (!opts.length) return null;
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <select className="gl-input" value={linked ? linked.id : ''} aria-label="Linked goal"
+                    onChange={e => { const v = e.target.value; setTargets(ts => (Array.isArray(ts) ? ts : []).map(x => x.id === v ? { ...tgNorm(x), projectId: goal.id } : (linked && x.id === linked.id ? { ...x, projectId: '' } : x))); }}>
+                    <option value="">No linked goal</option>
+                    {opts.map(x => <option key={x.id} value={x.id}>{tgTitle(x)}</option>)}
+                  </select>
+                  {linked && <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>When this project is marked done, the goal is done too, and its tile shows this project's progress.</span>}
+                </div>);
+            })()}
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
               <input type="checkbox" checked={!!goal.showCountdown} style={{ width: 16, height: 16, accentColor: 'var(--accent)' }}
                 onChange={e => { const v = e.target.checked; onChange(g => ({ ...g, showCountdown: v })); }} />
@@ -13276,7 +13293,7 @@ function tgPace(t, st) {
   return out.join(' · ');
 }
 // One place that answers "how is this goal doing today". status: 'done' | 'ended' | 'active'
-function tgProgress(t, L, todayStr) {
+function tgProgress(t, L, todayStr, P) {   // P (optional) = the Projects list, so a goal linked to a project follows it (v5.65.0)
   const st = tgStats(t, L, todayStr);
   let met = false, label = '';
   if (t.kind === 'reading') {
@@ -13285,18 +13302,20 @@ function tgProgress(t, L, todayStr) {
     label = t.mode === 'finish' ? (bk ? `${tgRead(bk)}${bk.total ? '/' + bk.total : ''} pp${st.books ? ' · finished' : ''}` : 'book not found')
       : [t.books ? `${st.books}/${t.books} books` : '', t.pages ? `${st.pages.toLocaleString()}/${t.pages.toLocaleString()} pp` : ''].filter(Boolean).join(' · ');
   }
-  const done = met || !!t.completed;
-  return { st, met, label, done, status: done ? 'done' : st.ended ? 'ended' : 'active' };
+  const lp = t.kind === 'general' && t.projectId && Array.isArray(P) ? (P.find(g => g && g.id === t.projectId) || null) : null;
+  const done = lp ? lp.status === 'done' : (met || !!t.completed);
+  return { st, met, label, done, project: lp, status: done ? 'done' : st.ended ? 'ended' : 'active' };
 }
 const TG_KIND_ICON = { general: '◎', reading: '📖' };
 
-function TgNewForm({ existing, defaultYear, targetLog, setTargets, onDone }) {
+function TgNewForm({ existing, defaultYear, targetLog, goals, setTargets, onDone }) {
   const ex = existing ? tgNorm(existing) : null;
   const yr = defaultYear || new Date().getFullYear();
   const [f, setF] = useState({
     title: ex ? (ex.title || '') : '', kind: ex ? (ex.kind === 'reading' ? 'reading' : 'general') : 'general',
     scope: ex ? ex.scope : 'year', year: String(ex && ex.year ? ex.year : yr),
     startDate: ex && ex.startDate ? ex.startDate : glToday(), endDate: ex && ex.endDate ? ex.endDate : fmtLocal(addDays(new Date(), 30)),
+    projectId: ex ? (ex.projectId || '') : '',
     logId: ex ? (ex.logId || '') : '', measure: ex ? (ex.mode === 'books' ? 'books' : ex.mode === 'finish' ? 'finish' : 'pages') : 'pages',
     amount: ex ? String((ex.mode === 'books' ? ex.books : ex.pages) || '') : '' });
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
@@ -13313,8 +13332,8 @@ function TgNewForm({ existing, defaultYear, targetLog, setTargets, onDone }) {
     if (f.kind === 'reading') {
       const n = parseInt(f.amount, 10) || 0;
       if (measureVal !== 'finish' && !n) return;
-      rec = { ...rec, logId: f.logId || '', mode: measureVal, books: measureVal === 'books' ? n : 0, pages: measureVal === 'pages' ? n : 0 };
-    } else rec = { ...rec, logId: '', mode: '', books: 0, pages: 0 };
+      rec = { ...rec, logId: f.logId || '', mode: measureVal, books: measureVal === 'books' ? n : 0, pages: measureVal === 'pages' ? n : 0, projectId: '' };
+    } else rec = { ...rec, logId: '', mode: '', books: 0, pages: 0, projectId: f.projectId || '' };
     if (ex) setTargets(ts => ts.map(x => x.id === ex.id ? { ...x, ...rec, period: undefined, startKey: undefined, repeat: undefined } : x));
     else setTargets(ts => [...(Array.isArray(ts) ? ts : []), { id: tgUid(), ...rec }]);
     onDone(true);
@@ -13336,6 +13355,13 @@ function TgNewForm({ existing, defaultYear, targetLog, setTargets, onDone }) {
           <input style={inp} type="date" value={f.endDate} onChange={e => set('endDate', e.target.value)} />
         </>}
       </div>
+      {f.kind === 'general' && (goals || []).some(g => g && (g.status !== 'done' || g.id === f.projectId)) && (
+        <label style={{ ...small, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>Linked project
+          <select style={{ ...inp, maxWidth: '100%' }} value={f.projectId} onChange={e => set('projectId', e.target.value)} aria-label="Linked project">
+            <option value="">None (use a Done box)</option>
+            {(goals || []).filter(g => g && (g.status !== 'done' || g.id === f.projectId)).map(g => <option key={g.id} value={g.id}>{g.title || 'Untitled project'}</option>)}
+          </select>
+        </label>)}
       {f.kind === 'reading' && (
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <select style={{ ...inp, maxWidth: 200 }} value={f.logId} onChange={e => set('logId', e.target.value)}>
@@ -13537,7 +13563,7 @@ function TgPagesChart({ books }) {
   );
 }
 
-function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // the "Goals" sub-tab (called Targets until v5.34.0)
+function TargetsView({ targets, setTargets, targetLog, setTargetLog, goals, onOpenProject }) {   // the "Goals" sub-tab (called Targets until v5.34.0)
   const today = glToday();
   const T = (Array.isArray(targets) ? targets : []).map(tgNorm);
   const L = Array.isArray(targetLog) ? targetLog : [];
@@ -13603,14 +13629,14 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
   const lab = { fontSize: 12, color: 'var(--ink-light)' };
 
   // Active hides done and ended goals; Completed shows done ones; All shows everything. Another year always shows all.
-  const status = t => tgProgress(t, L, today).status;
+  const status = t => tgProgress(t, L, today, goals).status;
   const visible = (t, yearly) => filter === 'all' || (yearly && year !== curYear) || (filter === 'completed' ? status(t) === 'done' : status(t) === 'active');
   function tile(t) {
     if (editId === t.id) return (
       <div key={t.id} style={{ flex: '1 1 320px', maxWidth: 460, border: '2px solid var(--accent)', borderRadius: 12, padding: 12, background: 'var(--paper)' }}>
-        <TgNewForm existing={t} defaultYear={year} targetLog={targetLog} setTargets={setTargets} onDone={() => setEditId(null)} />
+        <TgNewForm existing={t} defaultYear={year} targetLog={targetLog} goals={goals} setTargets={setTargets} onDone={() => setEditId(null)} />
       </div>);
-    const pr = tgProgress(t, L, today);
+    const pr = tgProgress(t, L, today, goals);
     const st = pr.st;
     const pb = t.books ? Math.min(1, st.books / t.books) : 0, pp = t.pages ? Math.min(1, st.pages / t.pages) : 0;
     const tag = pr.status === 'done' ? '✓ Done' : pr.status === 'ended' ? 'Ended' : st.notStarted ? `Starts ${glShort(st.sp.s)}` : '';
@@ -13621,7 +13647,15 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
           <span className="gl-mono" style={lab}>{t.scope === 'year' ? '' : tgScopeLabel(t)}</span>
         </div>
         {tag && <div style={{ ...lab, marginTop: 2, fontWeight: 600, color: pr.status === 'done' ? 'var(--accent)' : 'var(--ink-light)' }}>{tag}</div>}
-        {t.kind === 'general' && <label style={{ ...lab, display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
+        {pr.project && (() => { const pj = pr.project, pc = Math.round(glProgress(pj) * 100), tc = glTaskCounts(pj); return (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ ...lab, display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>Project: <b style={{ color: 'var(--ink)' }}>{pj.title || 'Untitled project'}</b></span><b style={{ color: 'var(--ink)' }}>{pc}%</b></div>
+            <div className="gl-bar" style={{ margin: '4px 0', background: glTint('#2d6b4a', 0.15) }}><div style={{ width: pc + '%', background: accent }} /></div>
+            <div style={lab}>{tc.total > 0 ? `${tc.done} of ${tc.total} tasks done` : 'No tasks yet'}{pj.status === 'parked' ? ' · project parked' : ''}{pj.status !== 'done' ? ' · done when the project is marked done' : ''}</div>
+            {onOpenProject && <button className="gl-btn ghost" style={{ padding: '2px 0', fontSize: 12, marginTop: 2 }} onClick={() => onOpenProject(pj.id)}>Open project →</button>}
+          </div>); })()}
+        {t.kind === 'general' && t.projectId && !pr.project && <div style={{ ...lab, marginTop: 6 }}>Linked project not found — using the Done box.</div>}
+        {t.kind === 'general' && !pr.project && <label style={{ ...lab, display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
           <input type="checkbox" checked={!!t.completed} onChange={() => setTargets(ts => ts.map(x => x.id === t.id ? { ...tgNorm(x), completed: !t.completed } : x))} />Done</label>}
         {t.kind === 'reading' && t.mode === 'finish' && <div style={{ ...lab, marginTop: 8 }}>{pr.label}</div>}
         {t.kind === 'reading' && t.books > 0 && <><div style={{ ...lab, marginTop: 8 }}>Books: <b style={{ color: 'var(--ink)' }}>{st.books}</b> of {t.books}</div>
@@ -13718,7 +13752,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
           {!secShut.goals && <>
           {adding && (
             <div style={{ marginBottom: 12, padding: 10, background: 'var(--cream)', borderRadius: 10 }}>
-              <TgNewForm defaultYear={year} targetLog={targetLog} setTargets={setTargets} onDone={() => setAdding(false)} />
+              <TgNewForm defaultYear={year} targetLog={targetLog} goals={goals} setTargets={setTargets} onDone={() => setAdding(false)} />
             </div>
           )}
           {!T.length && !adding && <div style={{ fontSize: 13, color: 'var(--ink-light)' }}>No goals yet. Add one, such as "Read 24 books in 2026".</div>}
@@ -13864,12 +13898,12 @@ function GoalsView(props) {
         <button role="tab" aria-selected={sub === 'goals'} className={sub === 'goals' ? 'on' : ''} onClick={() => setSub('goals')}>Projects</button>
         <button role="tab" aria-selected={sub === 'targets'} className={sub === 'targets' ? 'on' : ''} onClick={() => setSub('targets')}>Goals</button>
       </div>
-      {sub === 'goals' ? <GoalsMain {...props} /> : <TargetsView targets={props.targets} setTargets={props.setTargets} targetLog={props.targetLog} setTargetLog={props.setTargetLog} />}
+      {sub === 'goals' ? <GoalsMain {...props} /> : <TargetsView targets={props.targets} setTargets={props.setTargets} targetLog={props.targetLog} setTargetLog={props.setTargetLog} goals={props.goals} onOpenProject={id => { if (props.setSelectedId) props.setSelectedId(id); setSub('goals'); }} />}
     </div>
   );
 }
 
-function GoalsMain({ targetLog, goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
+function GoalsMain({ targets, setTargets, targetLog, goals, setGoals, pagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const [statusTab, setStatusTab] = useState('active');
   const [sideCollapsed, setSideCollapsedRaw] = useState(() => lsGet('glSideCollapsed') === '1'); // desktop only; per device
@@ -13987,7 +14021,7 @@ function GoalsMain({ targetLog, goals, setGoals, pagesData, countdowns, setCount
 
       <main className="gl-main">
         {sel ? (
-          <GlDetail key={sel.id} allTags={glAllTags(list)} books={(Array.isArray(targetLog) ? targetLog : []).filter(x => x.kind === 'reading')} goal={sel} pagesData={pagesData} onOpenPage={onOpenPage}
+          <GlDetail key={sel.id} targets={targets} setTargets={setTargets} allTags={glAllTags(list)} books={(Array.isArray(targetLog) ? targetLog : []).filter(x => x.kind === 'reading')} goal={sel} pagesData={pagesData} onOpenPage={onOpenPage}
             habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
             habitCompletions={habitCompletions} fitnessLog={fitnessLog}
             onChange={fn => changeGoal(sel.id, fn)}
@@ -14643,7 +14677,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.64.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
