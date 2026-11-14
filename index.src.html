@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.63.3 -->
+<!-- LP Planner v5.63.4 -->
+<!-- v5.63.4 — Goals › Reading log: on each book the numbers are stacked (pages read / total over pages left; finished books: pages over dates), so long titles get more room on a phone. -->
 <!-- v5.63.3 — Goals › Reading log: book titles are larger (16px) and each book sits in its own softly tinted card instead of being split by lines. -->
 <!-- v5.63.0 — Goals › Reading log: filter chips Active | To read | Parked | Finished | All (with counts, remembered per device; default Active). Books can now be put on a "To read" shelf (choose it when adding a book) or Parked (new Park button on a book in progress). Start reading / Resume moves them back to Active. Finished books are listed under Finished only. -->
 <!-- v5.62.1 — Goals sub-tab: the collapse caret next to the Goals and Reading log titles is larger. -->
@@ -13791,7 +13792,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
               <div key={x.id} className="rl-book">
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
                   <span style={{ fontWeight: 600, fontSize: 16, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
-                  <span className="gl-mono" style={{ ...lab, whiteSpace: 'nowrap' }}>{rd}{x.total ? ` / ${x.total}` : ''} pp{x.total > rd ? ` · ${x.total - rd} left` : ''}</span>
+                  <span className="gl-mono" style={{ ...lab, whiteSpace: 'nowrap', textAlign: 'right', lineHeight: 1.4, flexShrink: 0 }}>{rd}{x.total ? ` / ${x.total}` : ''} pp{x.total > rd ? <><br />{x.total - rd} left</> : ''}</span>
                 </div>
                 {x.total > 0 && <div className="gl-bar" style={{ margin: '6px 0', background: glTint('#2d6b4a', 0.15) }}><div style={{ width: Math.round(p * 100) + '%', background: accent }} /></div>}
                 {tgStart(x) && <div style={{ ...lab, margin: '2px 0 6px' }}>Started {tgDate(tgStart(x), tgStart(x).slice(0, 4) !== today.slice(0, 4))}{!x.startDate && <span style={{ color: 'var(--ink-faint)' }}> · auto</span>}</div>}
@@ -13824,7 +13825,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog }) {   // th
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
                 <span style={{ color: 'var(--accent)' }}>✓</span>
                 <span style={{ fontWeight: 600, fontSize: 16, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
-                <span className="gl-mono" style={lab}>{x.total ? x.total + ' pp · ' : ''}{tgSpanLabel(x)}</span>
+                <span className="gl-mono" style={{ ...lab, textAlign: 'right', lineHeight: 1.4, flexShrink: 0 }}>{x.total ? <>{x.total} pp<br /></> : ''}{tgSpanLabel(x)}</span>
               </div>
               {x.notes && openId !== x.id && <div style={{ ...lab, marginTop: 4, whiteSpace: 'pre-wrap', maxHeight: 40, overflow: 'hidden' }}>{x.notes}</div>}
               {openId === x.id && bookEditor(x)}
@@ -14628,7 +14629,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.63.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.63.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
