@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.65.3 -->
+<!-- LP Planner v5.65.4 -->
+<!-- v5.65.4 — Projects: hardened touch dragging for milestones and tasks (the finger now stays "captured" by the grip, the page cannot scroll under it while you drag, and the scroll area is frozen until you let go) — fixes drags that would not start on a phone once the list was scrolled. Auto-scroll at the screen edges stays. -->
 <!-- v5.65.3 — Projects: dragging a milestone (or a task) now auto-scrolls when you hold it near the top or bottom edge of the screen, so you can move it past what fits on screen (before, only the first few milestones could be reordered on a phone). Phone: the caret and drag grip are a little smaller (40px) and the milestone checkbox is larger (28px) to match. -->
 <!-- v5.65.2 — Projects, phone only: in a milestone header the done checkbox moves to the right edge, the expand/collapse caret is a larger rounded chevron button, and the drag grip is bigger (44px) so it is easier to hit. Desktop and iPad are unchanged. -->
 <!-- v5.65.1 — Projects: the expand/collapse carets are bigger and easier to tap — the milestone caret in a project is now a 40px (44px on phones) tap target with a larger arrow; the project and milestone carets on the timeline are wider with a larger arrow. -->
@@ -12763,8 +12764,15 @@ function glScrollParent(el) {
   while (n && n !== document.documentElement) { const o = getComputedStyle(n).overflowY; if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight + 1) return n; n = n.parentElement; }
   return null;
 }
-function glAutoScroll(startEl, getY, onTick) {
-  const sp = glScrollParent(startEl);
+function glAutoScroll(e, getY, onTick) {
+  const el = e.currentTarget || e.target, pid = e.pointerId, sp = glScrollParent(el);
+  // Keep the finger "captured" by the grip, stop the page scrolling under it (touchmove must be non-passive for iOS),
+  // and freeze the scroll area until the drag ends. Auto-scroll below still moves it by script.
+  try { if (pid != null && el.setPointerCapture) el.setPointerCapture(pid); } catch (x) {}
+  const block = ev => { if (ev.cancelable) ev.preventDefault(); };
+  window.addEventListener('touchmove', block, { passive: false });
+  const prevOv = sp ? sp.style.overflowY : '';
+  if (sp) sp.style.overflowY = 'hidden';
   let raf = 0, stopped = false;
   const tick = () => {
     if (stopped) return;
@@ -12777,7 +12785,12 @@ function glAutoScroll(startEl, getY, onTick) {
     raf = requestAnimationFrame(tick);
   };
   raf = requestAnimationFrame(tick);
-  return () => { stopped = true; cancelAnimationFrame(raf); };
+  return () => {
+    stopped = true; cancelAnimationFrame(raf);
+    window.removeEventListener('touchmove', block);
+    if (sp) sp.style.overflowY = prevOv;
+    try { if (pid != null && el.releasePointerCapture) el.releasePointerCapture(pid); } catch (x) {}
+  };
 }
 function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange, onDelete, onClone, onGripDown, dragging }) {
   const today = glToday();
@@ -12803,7 +12816,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
     let lastY = e.clientY, idx = slotAt(lastY);
     setTaskDrag({ id, idx });
     const move = ev => { lastY = ev.clientY; idx = slotAt(lastY); setTaskDrag({ id, idx }); };
-    const stopScroll = glAutoScroll(e.currentTarget || e.target, () => lastY, () => { idx = slotAt(lastY); setTaskDrag({ id, idx }); });
+    const stopScroll = glAutoScroll(e, () => lastY, () => { idx = slotAt(lastY); setTaskDrag({ id, idx }); });
     const end = cancel => {
       stopScroll();
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cn);
@@ -13029,7 +13042,7 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
     let lastY = e.clientY, idx = slotAt(lastY);
     setMsDrag({ id, idx });
     const move = ev => { lastY = ev.clientY; idx = slotAt(lastY); setMsDrag({ id, idx }); };
-    const stopScroll = glAutoScroll(e.currentTarget || e.target, () => lastY, () => { idx = slotAt(lastY); setMsDrag({ id, idx }); });
+    const stopScroll = glAutoScroll(e, () => lastY, () => { idx = slotAt(lastY); setMsDrag({ id, idx }); });
     const end = (ev, cancel) => {
       stopScroll();
       window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', cn);
@@ -14720,7 +14733,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
