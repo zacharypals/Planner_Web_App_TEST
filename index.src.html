@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.59.2 -->
+<!-- LP Planner v5.59.3 -->
+<!-- v5.59.3 — Pages: the delete button in the page header is now a matching line-drawn trash icon (turns red on hover). -->
 <!-- v5.59.2 — Pages download button uses a line-drawn download-tray icon (inline SVG) instead of the ⬇ character, centered with the title row. -->
 <!-- v5.59.1 — Pages download button is larger and sits farther from the delete button on desktop (phone unchanged). -->
 <!-- v5.59.0 — Pages: new Download button (⬇ next to the trash can) saves the open page as Text (.txt), Word (.docx) or PDF (via the print dialog → Save as PDF). -->
@@ -2034,6 +2035,8 @@
     .pages-dl-btn { width: 34px; height: 34px; margin-right: 14px; }
     .pages-dl-btn svg { width: 22px; height: 22px; }
   }
+  .pages-dl-btn.pages-del-btn { margin-right: 0; }
+  .pages-dl-btn.pages-del-btn:hover { background: var(--bg-red, #fdecea); color: var(--red); }
   .pages-dl-hint { font-size: 10.5px; color: var(--ink-light); padding: 2px 10px 6px 36px; line-height: 1.35; }
   @page { margin: 16mm; }
   @media print {
@@ -14377,7 +14380,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.59.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.59.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -18263,9 +18266,13 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                     </div>
                   </>)}
                 </span>
-                <button onClick={()=>deleteDoc(selectedDoc.id)}
-                  style={{background:'none',border:'none',color:'var(--ink-faint)',cursor:'pointer',fontSize:16,padding:'4px',flexShrink:0,marginTop:6}}
-                  title="Delete document">🗑</button>
+                <button className="pages-dl-btn pages-del-btn" onClick={()=>deleteDoc(selectedDoc.id)}
+                  style={{background:'none',border:'none',color:'var(--ink-light)',cursor:'pointer',padding:0,flexShrink:0,marginTop:6}}
+                  title="Delete document" aria-label="Delete document">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12"/><path d="M9 7v-3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
+                  </svg>
+                </button>
               </div>
               <div className="pages-doc-meta">
                 Created {fmtDocDate(selectedDoc.createdAt)}
