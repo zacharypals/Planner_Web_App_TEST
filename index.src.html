@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.65.1 -->
+<!-- LP Planner v5.65.2 -->
+<!-- v5.65.2 — Projects, phone only: in a milestone header the done checkbox moves to the right edge, the expand/collapse caret is a larger rounded chevron button, and the drag grip is bigger (44px) so it is easier to hit. Desktop and iPad are unchanged. -->
 <!-- v5.65.1 — Projects: the expand/collapse carets are bigger and easier to tap — the milestone caret in a project is now a 40px (44px on phones) tap target with a larger arrow; the project and milestone carets on the timeline are wider with a larger arrow. -->
 <!-- v5.65.0 — Goals: a General goal can be linked to a Project ("Linked project" in the goal form, or "Linked goal" on the project page). The goal tile then shows the project's progress bar (percent and tasks done) instead of a Done box, an "Open project" button, and the goal is Done as soon as the project is marked done (and reopens if the project is reopened). -->
 <!-- v5.64.0 — Goals › Reading log: pages can be logged two ways — "Pages read" (a number to add) or "Now on page" (type the page you are on; the app logs the difference from what you already logged). The choice is remembered per device. "Log pages" is now a filled button so it reads as the action that saves. -->
@@ -2569,7 +2570,15 @@
   .gl-ms-drop { height: 3px; border-radius: 2px; background: var(--accent); margin: -2px 0; }
   .gl-caret { border: none; background: none; cursor: pointer; color: var(--ink-light); font-size: 18px; line-height: 1; width: 32px; height: 28px; padding: 0; }
   .gl-caret.lg { font-size: 22px; width: 40px; height: 40px; }
-  @media (max-width: 767px) { .gl-caret.lg { width: 44px; height: 44px; } }
+  .gl-caret.lg .gl-caret-svg { display: none; width: 26px; height: 26px; transition: transform 0.15s; }
+  .gl-caret.lg:not(.open) .gl-caret-svg { transform: rotate(-90deg); }
+  @media (max-width: 767px) {
+    .gl-caret.lg { width: 44px; height: 44px; background: var(--cream); border-radius: 12px; color: var(--ink); }
+    .gl-caret.lg .gl-caret-glyph { display: none; }
+    .gl-caret.lg .gl-caret-svg { display: block; margin: 0 auto; }
+    .gl-ms-head .gl-grip { font-size: 26px; letter-spacing: -5px; width: 44px; height: 44px; }
+    .gl-ms-head .gl-check { margin-left: auto; }
+  }
   .gl-task { display: flex; align-items: center; gap: 8px; min-height: 38px; border-top: 1px solid var(--neutral-line); padding: 2px 10px 2px 40px; position: relative; }
   .gl-x { border: none; background: none; cursor: pointer; color: var(--ink-faint); font-size: 13px; padding: 4px 6px; opacity: 0; }
   .gl-task:hover .gl-x, .gl-ms-head:hover .gl-x { opacity: 1; }
@@ -12832,7 +12841,10 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
     <div className={`gl-ms${dragging ? ' dragging' : ''}`} style={{ borderColor: open ? color : late ? '#f0c9c3' : undefined, borderWidth: open ? 2 : 1 }}>
       <div className="gl-ms-head" style={{ background: open ? glTint(color, 0.06) : late ? '#fdf3f1' : undefined }}>
         {onGripDown && <button className="gl-grip" aria-label="Drag to reorder milestone" title="Drag to reorder" onPointerDown={onGripDown}>⋮⋮</button>}
-        <button className="gl-caret lg" aria-label={open ? 'Collapse milestone' : 'Expand milestone'} onClick={onToggleOpen}>{open ? '▾' : '▸'}</button>
+        <button className={`gl-caret lg${open ? ' open' : ''}`} aria-label={open ? 'Collapse milestone' : 'Expand milestone'} aria-expanded={!!open} onClick={onToggleOpen}>
+          <span className="gl-caret-glyph">{open ? '▾' : '▸'}</span>
+          <svg className="gl-caret-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+        </button>
         <button className={`gl-check ${m.done ? 'on' : ''}`} aria-label={m.done ? 'Mark milestone not done' : 'Mark milestone done'}
           onClick={() => onChange(mm => ({ ...mm, done: !mm.done, completedAt: !mm.done ? Date.now() : null,
             // Reopening a weight milestone by hand must stick, or the next check would just re-complete it
@@ -14680,7 +14692,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
