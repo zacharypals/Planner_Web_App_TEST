@@ -1,6 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.65.6 -->
-<!-- v5.65.6 — Projects: each milestone header now has ▲ ▼ buttons to move it one place (a backup for the drag grip, which on some phones did nothing for milestones below the 3rd). Also: the milestone and task drag grips now claim the touch the moment your finger lands (a native, non-passive touchstart handler), so iPhone/iPad Safari cannot hand the touch to page scrolling first. Targets milestones below the 3rd that showed no fade or drop line when pressed. -->
+<!-- LP Planner v5.65.7 -->
+<!-- v5.65.7 — Projects: the ▲ ▼ move buttons now sit in the milestone's top row, between the caret and the checkbox, in the caret's style; the phone row is one notch smaller. (v5.65.6: each milestone header has ▲ ▼ buttons to move it one place (a backup for the drag grip, which on some phones did nothing for milestones below the 3rd). Also: the milestone and task drag grips now claim the touch the moment your finger lands (a native, non-passive touchstart handler), so iPhone/iPad Safari cannot hand the touch to page scrolling first. Targets milestones below the 3rd that showed no fade or drop line when pressed. -->
 <!-- v5.65.4 — Projects: hardened touch dragging for milestones and tasks (the finger now stays "captured" by the grip, the page cannot scroll under it while you drag, and the scroll area is frozen until you let go) — fixes drags that would not start on a phone once the list was scrolled. Auto-scroll at the screen edges stays. -->
 <!-- v5.65.3 — Projects: dragging a milestone (or a task) now auto-scrolls when you hold it near the top or bottom edge of the screen, so you can move it past what fits on screen (before, only the first few milestones could be reordered on a phone). Phone: the caret and drag grip are a little smaller (40px) and the milestone checkbox is larger (28px) to match. -->
 <!-- v5.65.2 — Projects, phone only: in a milestone header the done checkbox moves to the right edge, the expand/collapse caret is a larger rounded chevron button, and the drag grip is bigger (44px) so it is easier to hit. Desktop and iPad are unchanged. -->
@@ -2575,12 +2575,19 @@
   .gl-caret.lg { font-size: 22px; width: 40px; height: 40px; }
   .gl-caret.lg .gl-caret-svg { display: none; width: 26px; height: 26px; transition: transform 0.15s; }
   .gl-caret.lg:not(.open) .gl-caret-svg { transform: rotate(-90deg); }
+  .gl-mvpair { display: flex; gap: 4px; }
+  .gl-mv { border: none; background: var(--cream); color: var(--ink); cursor: pointer; width: 28px; height: 28px; border-radius: 8px; padding: 0; display: flex; align-items: center; justify-content: center; }
+  .gl-mv svg { width: 18px; height: 18px; }
+  .gl-mv:disabled { opacity: 0.3; cursor: default; }
   @media (max-width: 767px) {
-    .gl-caret.lg { width: 40px; height: 40px; background: var(--cream); border-radius: 11px; color: var(--ink); }
+    .gl-mvpair { margin: 0 auto; gap: 6px; }
+    .gl-mv { width: 36px; height: 36px; border-radius: 10px; }
+    .gl-mv svg { width: 20px; height: 20px; }
+    .gl-caret.lg { width: 36px; height: 36px; background: var(--cream); border-radius: 10px; color: var(--ink); }
     .gl-caret.lg .gl-caret-glyph { display: none; }
-    .gl-caret.lg .gl-caret-svg { display: block; margin: 0 auto; width: 22px; height: 22px; }
-    .gl-ms-head .gl-grip { font-size: 22px; letter-spacing: -4px; width: 40px; height: 40px; }
-    .gl-ms-head .gl-check { margin-left: auto; width: 28px; height: 28px; border-radius: 8px; font-size: 17px; }
+    .gl-caret.lg .gl-caret-svg { display: block; margin: 0 auto; width: 20px; height: 20px; }
+    .gl-ms-head .gl-grip { font-size: 20px; letter-spacing: -4px; width: 36px; height: 36px; }
+    .gl-ms-head .gl-check { margin-left: auto; width: 26px; height: 26px; border-radius: 7px; font-size: 16px; }
   }
   .gl-task { display: flex; align-items: center; gap: 8px; min-height: 38px; border-top: 1px solid var(--neutral-line); padding: 2px 10px 2px 40px; position: relative; }
   .gl-x { border: none; background: none; cursor: pointer; color: var(--ink-faint); font-size: 13px; padding: 4px 6px; opacity: 0; }
@@ -12897,6 +12904,11 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
           <span className="gl-caret-glyph">{open ? '▾' : '▸'}</span>
           <svg className="gl-caret-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
         </button>
+        {onMove && <div className="gl-mvpair">
+          {[['up', 'Move milestone up', 'M6 15l6-6 6 6'], ['down', 'Move milestone down', 'M6 9l6 6 6-6']].map(([k, lbl, d]) =>
+            <button key={k} className="gl-mv" aria-label={lbl} title={k === 'up' ? 'Move up' : 'Move down'} disabled={!onMove[k]} onClick={() => onMove[k] && onMove[k]()}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={d} /></svg></button>)}
+        </div>}
         <button className={`gl-check ${m.done ? 'on' : ''}`} aria-label={m.done ? 'Mark milestone not done' : 'Mark milestone done'}
           onClick={() => onChange(mm => ({ ...mm, done: !mm.done, completedAt: !mm.done ? Date.now() : null,
             // Reopening a weight milestone by hand must stick, or the next check would just re-complete it
@@ -12914,8 +12926,6 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
           <input type="date" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, borderColor: late ? 'var(--red)' : undefined }} aria-label="Milestone due date"
             value={m.dueDate || ''} onChange={e => onChange(mm => ({ ...mm, dueDate: e.target.value || null }))} />
         <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)', minWidth: 34, textAlign: 'right' }}>{tasks.filter(t => t.done).length}/{tasks.length}</span>
-        {onMove && <><button className="gl-x" aria-label="Move milestone up" title="Move up" disabled={!onMove.up} style={{ opacity: onMove.up ? 1 : 0.25 }} onClick={() => onMove.up && onMove.up()}>▲</button>
-        <button className="gl-x" aria-label="Move milestone down" title="Move down" disabled={!onMove.down} style={{ opacity: onMove.down ? 1 : 0.25 }} onClick={() => onMove.down && onMove.down()}>▼</button></>}
         {onClone && <button className="gl-x" aria-label="Clone milestone" title="Clone this milestone and its tasks" onClick={onClone}>⧉</button>}
         <button className="gl-x" aria-label="Delete milestone" onClick={() => {
           // v5.25.1 — always confirm, even for a milestone with no tasks
@@ -13076,7 +13086,7 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
     const up = ev => end(ev, false), cn = ev => end(ev, true);
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cn);
   }
-  function moveMs(id, dir) {   // v5.65.6 — button fallback for drag: nudge a milestone one place up (-1) or down (+1)
+  function moveMs(id, dir) {   // v5.65.7 — button fallback for drag: nudge a milestone one place up (-1) or down (+1)
     onChange(g => {
       const list = [...(g.milestones || [])];
       const i = list.findIndex(x => x.id === id), j = i + dir;
@@ -14758,7 +14768,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.6</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.65.7</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
