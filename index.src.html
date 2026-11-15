@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.69.1 -->
+<!-- LP Planner v5.70.0 -->
+<!-- v5.70.0 — Home upkeep: new Inventory (spares on hand, number) and Location (free text; locations already used on other items appear as one-tap options) fields, shown under each task in the list ("None on hand" is highlighted); History entries can now be removed (✕) and the full history is listed. -->
 <!-- v5.69.1 — Home upkeep: "Done on another date" now always responds — the Save button is never dead (a blank date shows a prompt), and a date earlier than the last completion adds to History and says why the next due date didn't move, instead of closing silently. -->
 <!-- v5.69.0 — Daily check-in: a 20-second end-of-day entry (mood, energy, last night's sleep with bed/wake times, one line, one win). New synced whole-document collection `checkins` keyed by local date (no SYNC_SPLITS/backup change). Opened from a "Check in" button at the top of Habits; Trends sub-page charts mood & energy over 7/30/90 days and shows workout-day and sleep comparisons only when each side has at least 3 days. Also: the Home upkeep tile is now at the bottom of the Monthly sidebar too. -->
 <!-- v5.68.0 — Home upkeep: recurring maintenance that repeats N weeks/months/years after it was last DONE (HVAC filter every 3 months, smoke detectors every 6, etc.). New synced collection `upkeep` (whole document, no SYNC_SPLITS/backup change). New page reached from a "Home upkeep" tile at the very bottom of the Weekly sidebar (below "Manage repeat tasks…"; no new nav tab): Overdue / Next 30 days / Later list with one-tap done, area filter (Condo, HOA, Appliances), and an editor sheet (interval stepper, next due, Done today / on another date, notes, history, delete). Optional per-task "Show in Week view" puts a card in the Weekly planner 7 days before it is due (or today if that has passed). -->
@@ -3147,7 +3148,13 @@
   .up-switch i { width:26px; height:26px; border-radius:50%; background:#fff; display:block; }
   .up-switch.on { background:var(--accent); justify-content:flex-end; }
   .up-hist { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:8px 12px; display:flex; flex-direction:column; gap:6px; }
-  .up-hist-row { font-size:15px; }
+  .up-hist { max-height:240px; overflow-y:auto; gap:0; }
+  .up-hist-row { font-size:15px; display:flex; align-items:center; justify-content:space-between; min-height:44px; }
+  .up-hist-x { width:44px; height:44px; border:0; background:transparent; color:var(--ink-light); font-size:15px; cursor:pointer; border-radius:50%; }
+  .up-hist-x:hover { color:var(--up-late-fg); }
+  .up-inv { max-width:140px; }
+  .up-row-sub { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:13px; color:var(--ink-light); }
+  .up-row-sub .none { color:var(--up-late-fg); font-weight:700; }
   .up-sheet-foot { display:flex; align-items:center; gap:8px; padding:10px 16px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); }
 
   .up-wtask { border-radius:8px; border:1px solid var(--border); background:var(--surface); padding:6px 8px; display:flex; flex-direction:column; gap:4px; margin-bottom:4px; }
@@ -14995,7 +15002,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.69.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.70.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15230,6 +15237,24 @@ function upMarkDone(item, dateStr) {
   const last = hist[0].date;
   return { ...item, history: hist, lastDone: last, dueDate: upAddInterval(last, item.every && item.every.n, item.every && item.every.unit) };
 }
+// v5.70.0 — Locations are free text; the "saved options" are just the distinct locations already used on other items (nothing extra to store or sync).
+function upLocations(list) {
+  const seen = new Map();
+  (list || []).forEach(i => { const l = ((i && i.location) || '').trim(); if (l && !seen.has(l.toLowerCase())) seen.set(l.toLowerCase(), l); });
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
+}
+function upInvLabel(it) {   // '' when no count has been entered
+  const n = it && it.inventory;
+  if (n === '' || n == null || isNaN(Number(n))) return '';
+  return Number(n) === 0 ? 'None on hand' : `${Number(n)} on hand`;
+}
+// Removing a History entry: if it was the latest, last-done falls back to the next most recent and next due is recounted from it.
+function upRemoveHistory(item, dateStr) {
+  const hist = (item.history || []).filter(h => h.date !== dateStr);
+  if (item.lastDone !== dateStr) return { ...item, history: hist };
+  const last = hist.length ? hist[0].date : '';
+  return { ...item, history: hist, lastDone: last, dueDate: last ? upAddInterval(last, item.every && item.every.n, item.every && item.every.unit) : item.dueDate };
+}
 function upSort(list, todayKey) {   // most overdue first, then soonest due; undated last
   return [...list].sort((a, b) => {
     const da = a.dueDate || '9999-12-31', db = b.dueDate || '9999-12-31';
@@ -15301,6 +15326,7 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
   const later = shown.filter(i => ['later', 'none'].includes(upStatus(i, today).kind));
   const s = upStats(shown, today);
   const editing = editId === 'new' ? null : all.find(i => i.id === editId);
+  const locOptions = upLocations(all);
 
   function saveItem(item, keepOpen) {
     setUpkeep(l => (l || []).some(i => i.id === item.id) ? l.map(i => i.id === item.id ? item : i) : [...(l || []), item]);
@@ -15319,6 +15345,12 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
             <span className={`up-chip ${st.kind}`}>{upDueLabel(it, today)}</span>
             <span className="up-row-every">{upEveryLabel(it.every)}</span>
           </span>
+          {(it.location || upInvLabel(it)) && (
+            <span className="up-row-sub">
+              {it.location && <span>{it.location}</span>}
+              {upInvLabel(it) && <span className={Number(it.inventory) === 0 ? 'none' : ''}>{upInvLabel(it)}</span>}
+            </span>
+          )}
         </button>
         <button type="button" className="up-done-btn" aria-label={`Mark ${it.name || 'task'} done today`} onClick={() => doneToday(it.id)}>
           <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
@@ -15371,18 +15403,18 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
         </div>
       </div>
       {editId && (editId === 'new' || editing) && (
-        <UpkeepEditor key={editId} item={editing} defaultArea={area === 'all' ? 'Condo' : area} onSave={saveItem} onDelete={removeItem} onClose={() => setEditId(null)} />
+        <UpkeepEditor key={editId} item={editing} locations={locOptions} defaultArea={area === 'all' ? 'Condo' : area} onSave={saveItem} onDelete={removeItem} onClose={() => setEditId(null)} />
       )}
     </div>
   );
 }
 
-function UpkeepEditor({ item, defaultArea, onSave, onDelete, onClose }) {
+function UpkeepEditor({ item, locations, defaultArea, onSave, onDelete, onClose }) {
   const today = glToday();
   const isNew = !item;
   const [d, setD] = useState(() => item ? { ...item, every: { ...item.every }, history: [...(item.history || [])] } : {
     id: 'up' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: '', area: defaultArea || 'Condo',
-    every: { n: 3, unit: 'months' }, dueDate: '', lastDone: '', history: [], notes: '', weekView: false, createdAt: today,
+    every: { n: 3, unit: 'months' }, dueDate: '', lastDone: '', history: [], notes: '', weekView: false, createdAt: today, inventory: '', location: '',
   });
   const [dueTouched, setDueTouched] = useState(false);
   const [otherDate, setOtherDate] = useState(false);
@@ -15402,7 +15434,7 @@ function UpkeepEditor({ item, defaultArea, onSave, onDelete, onClose }) {
     });
   }
   function build() {
-    let out = { ...d, name: (d.name || '').trim() };
+    let out = { ...d, name: (d.name || '').trim(), location: (d.location || '').trim(), inventory: (d.inventory === '' || d.inventory == null || isNaN(Number(d.inventory))) ? '' : Math.max(0, Math.floor(Number(d.inventory))) };
     if (isNew && newLast) out = upMarkDone(out, newLast);
     if (!out.dueDate) out.dueDate = today;
     return out;
@@ -15450,6 +15482,24 @@ function UpkeepEditor({ item, defaultArea, onSave, onDelete, onClose }) {
           <div className="up-pills">
             {UP_AREAS.map(a => <button key={a} type="button" aria-pressed={d.area === a} className={d.area === a ? 'on' : ''} onClick={() => setD(x => ({ ...x, area: a }))}>{a}</button>)}
           </div>
+
+
+          <label className="up-lbl" htmlFor="up-inv">Inventory <span className="up-opt">(spares on hand)</span></label>
+          <input id="up-inv" className="up-input up-inv" type="number" inputMode="numeric" min="0" step="1" value={d.inventory === undefined || d.inventory === null ? '' : d.inventory} placeholder="e.g. 2"
+            onChange={e => setD(x => ({ ...x, inventory: e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))) }))} />
+          {d.inventory === 0 && <div className="up-hint">None on hand, so you will need to buy one.</div>}
+
+          <label className="up-lbl" htmlFor="up-loc">Location <span className="up-opt">(where the spare or part is)</span></label>
+          <input id="up-loc" className="up-input" type="text" value={d.location || ''} placeholder="Hall closet, garage shelf…"
+            onChange={e => setD(x => ({ ...x, location: e.target.value }))} />
+          {(locations || []).length > 0 && (
+            <div className="up-pills" role="group" aria-label="Saved locations">
+              {locations.map(l => {
+                const on = (d.location || '').trim().toLowerCase() === l.toLowerCase();
+                return <button key={l} type="button" aria-pressed={on} className={on ? 'on' : ''} onClick={() => setD(x => ({ ...x, location: on ? '' : l }))}>{l}</button>;
+              })}
+            </div>
+          )}
 
           <div className="up-lbl">Repeats every</div>
           <div className="up-every">
@@ -15504,12 +15554,14 @@ function UpkeepEditor({ item, defaultArea, onSave, onDelete, onClose }) {
             <>
               <div className="up-lbl">History</div>
               <div className="up-hist">
-                {d.history.slice(0, 6).map(h => (
+                {d.history.map(h => (
                   <div key={h.date} className="up-hist-row">
                     <span>{upShort(h.date, today)}</span>
+                    <button type="button" className="up-hist-x" aria-label={`Remove ${upShort(h.date, today)} from history`} onClick={() => setD(x => upRemoveHistory(x, h.date))}>✕</button>
                   </div>
                 ))}
               </div>
+              <div className="up-hint">Removing an entry takes effect when you tap Save. If it was the latest, next due is recounted from the one before it.</div>
             </>
           )}
         </div>
