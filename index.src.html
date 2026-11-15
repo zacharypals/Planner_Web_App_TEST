@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.78.2 -->
+<!-- LP Planner v5.78.3 -->
+<!-- v5.78.3 — Bug fix: the phone Weekly Check in pill said "✓ Checked in" on every day it was swiped to, because it always showed TODAY's status. It now reflects the day being viewed, opens the check-in on that day, and is hidden for future days. (The top-bar pill on desktop/iPad still means today.) -->
 <!-- v5.78.2 — Weekly (phone): the Check in pill in the day header is now a filled gold pill with dark text so it stands out; once checked in it turns back to the quiet grey "✓ Checked in". -->
 <!-- v5.78.1 — Reading log, Finished books on phones: the pages / dates / days line is a size bigger (13px). -->
 <!-- v5.78.0 — Goals › Reading log, Finished books on phones: the page count and start → finish dates + days-to-finish now sit on one line under the title (indented past the ✓) instead of in a narrow column on the right, so titles use the full width and wrap naturally. Desktop and iPad layouts are unchanged. -->
@@ -6487,7 +6488,7 @@ function WeekTile({ kind, text, extra, onSave }) {
   );
 }
 
-function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen, repeatSeries, seriesRun, upkeep, setUpkeep, onOpenUpkeep, onOpenCheckin, checkinDone }) {
+function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen, repeatSeries, seriesRun, upkeep, setUpkeep, onOpenUpkeep, onOpenCheckin, checkinDoneFor }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
@@ -7731,12 +7732,12 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
             <div style={{textAlign:'center'}}>
               <div className="mobile-day-label">{DAYS[mobileDayDate.getDay()]}</div>
               <div className="mobile-day-date">{MONTHS[mobileDayDate.getMonth()].slice(0,3)} {mobileDayDate.getDate()}</div>
-              {onOpenCheckin && (
-                <button type="button" className={`m-ci-pill ${checkinDone?'done':''}`} onClick={onOpenCheckin}
-                  aria-label={checkinDone?'Daily check-in done for today, open it':'Open today\'s daily check-in'}>
-                  {checkinDone?'✓ Checked in':'Check in'}
+              {onOpenCheckin && fmtLocal(mobileDayDate) <= glToday() && (() => { const ck = fmtLocal(mobileDayDate), cdone = checkinDoneFor ? checkinDoneFor(ck) : false; return (
+                <button type="button" className={`m-ci-pill ${cdone?'done':''}`} onClick={()=>onOpenCheckin(ck)}
+                  aria-label={`${cdone?'Check-in done for':'Open check-in for'} ${DAYS[mobileDayDate.getDay()]}${cdone?', open it':''}`}>
+                  {cdone?'✓ Checked in':'Check in'}
                 </button>
-              )}
+              ); })()}
             </div>
             <button onClick={toggleSwipeNav} title={swipeNav ? 'Swipe navigation on — tap to disable' : 'Swipe navigation off — tap to enable'}
               style={{background:'none',border:'none',cursor:'pointer',fontSize:16,opacity:swipeNav?1:0.35,padding:'2px 4px',lineHeight:1}}>
@@ -14592,7 +14593,8 @@ function App() {
   const [checkins, setCheckins] = useSynced('checkins', {}); // v5.69.0 Daily check-in — see DAILY CHECK-IN section
   const [checkinTags, setCheckinTags] = useSynced('checkinTags', []); // v5.75.0 check-in tag & counter definitions
   const [checkinFrom, setCheckinFrom] = useState('planner'); // v5.71.0 — page the check-in was opened from (Back / Done return there)
-  const openCheckin = from => { setCheckinFrom(from); setPage('checkin'); };
+  const [checkinDay, setCheckinDay] = useState(null); // v5.78.3 — day the check-in opens on (null = today)
+  const openCheckin = (from, day) => { setCheckinFrom(from); setCheckinDay(day || null); setPage('checkin'); };
   const checkinDoneToday = ciHasData((checkins || {})[glToday()]);
   const [upkeep, setUpkeep] = useSynced('upkeep', []); // v5.68.0 Home upkeep — see HOME UPKEEP section
   const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
@@ -15113,7 +15115,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.78.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.78.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15195,8 +15197,8 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} onOpenCheckin={()=>openCheckin('planner')} checkinDone={checkinDoneToday} />}
-      {page==='checkin' && <CheckinView checkins={checkins} setCheckins={setCheckins} habitGoals={habitGoals} habitCompletions={habitCompletions} fitnessLog={fitnessLog} tagDefs={checkinTags} setTagDefs={setCheckinTags} backLabel={checkinFrom==='habit'?'Habits':'Week'} onBack={()=>setPage(checkinFrom)} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} onOpenCheckin={dk=>openCheckin('planner', dk)} checkinDoneFor={dk=>ciHasData((checkins||{})[dk])} />}
+      {page==='checkin' && <CheckinView checkins={checkins} setCheckins={setCheckins} habitGoals={habitGoals} habitCompletions={habitCompletions} fitnessLog={fitnessLog} tagDefs={checkinTags} setTagDefs={setCheckinTags} initialDay={checkinDay} backLabel={checkinFrom==='habit'?'Habits':'Week'} onBack={()=>setPage(checkinFrom)} />}
       {page==='upkeep' && <UpkeepView upkeep={upkeep} setUpkeep={setUpkeep} onBack={()=>setPage('planner')} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} upkeep={upkeep} onOpenUpkeep={()=>setPage('upkeep')} />}
       {page==='habit' && <HabitTracker
@@ -16071,12 +16073,12 @@ function CiTagTrends({ defs, all, days, pick, setPick }) {
   );
 }
 
-function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitnessLog, onBack, backLabel, tagDefs, setTagDefs }) {
+function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitnessLog, onBack, backLabel, tagDefs, setTagDefs, initialDay }) {
   const todayKey = glToday();
   const [tagSheet, setTagSheet] = useState(undefined);   // undefined = closed · null = new · def = edit
   const [trendTag, setTrendTag] = useState('');
   const [laneIds, setLaneIds] = useState(null);   // null = first three tags; otherwise the ids picked for the chart lanes
-  const [day, setDay] = useState(todayKey);
+  const [day, setDay] = useState(initialDay && initialDay <= todayKey ? initialDay : todayKey);
   const [sub, setSub] = useState('today');
   const [range, setRange] = useState(30);
   const all = checkins || {};
