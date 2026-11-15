@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.78.0 -->
+<!-- LP Planner v5.78.1 -->
+<!-- v5.78.1 — Reading log, Finished books on phones: the pages / dates / days line is a size bigger (13px). -->
 <!-- v5.78.0 — Goals › Reading log, Finished books on phones: the page count and start → finish dates + days-to-finish now sit on one line under the title (indented past the ✓) instead of in a narrow column on the right, so titles use the full width and wrap naturally. Desktop and iPad layouts are unchanged. -->
 <!-- v5.77.2 — Check-in Trends: the page is wider on desktop and iPad (up to 880px) and the Mood & energy chart now sizes itself to its card (taller when wider) instead of staying a phone-width drawing. Phones are unchanged. -->
 <!-- v5.77.1 — Pages: fixed a number showing on top of the checkbox in checklists (and doubled bullets/numbers) on Safari for Mac — the browser's own list marker is now switched off inside the editor, since Quill draws its own. -->
@@ -2613,7 +2614,7 @@
   @media (max-width: 767px) {
     .rl-fin-head { flex-wrap: wrap; row-gap: 3px; }
     .rl-fin-title { flex: 1 1 calc(100% - 24px) !important; overflow-wrap: anywhere; }
-    .rl-fin-meta { flex: 0 0 100% !important; margin-left: 22px; text-align: left !important; font-size: 12px !important; color: var(--ink-light) !important; }
+    .rl-fin-meta { flex: 0 0 100% !important; margin-left: 22px; text-align: left !important; font-size: 13px !important; color: var(--ink-light) !important; }
     .rl-fin-pp, .rl-fin-sp { display: inline; }
     .rl-fin-pp + .rl-fin-sp:not(:empty)::before { content: ' · '; }
   }
@@ -15111,7 +15112,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.78.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.78.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
