@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.78.3 -->
+<!-- LP Planner v5.79.0 -->
+<!-- v5.79.0 — Pages › Recent: now remembers the last 10 edited pages but shows 6 at a time — the list scrolls (a sliver of the next page shows as a hint), on the desktop/iPad sidebar and the phone's first screen. Each Recent page is a tinted chip in its folder's color (same hue as the folder in All Pages; pages with no folder stay neutral) with the folder name beside the date. Light and dark. -->
 <!-- v5.78.3 — Bug fix: the phone Weekly Check in pill said "✓ Checked in" on every day it was swiped to, because it always showed TODAY's status. It now reflects the day being viewed, opens the check-in on that day, and is hidden for future days. (The top-bar pill on desktop/iPad still means today.) -->
 <!-- v5.78.2 — Weekly (phone): the Check in pill in the day header is now a filled gold pill with dark text so it stands out; once checked in it turns back to the quiet grey "✓ Checked in". -->
 <!-- v5.78.1 — Reading log, Finished books on phones: the pages / dates / days line is a size bigger (13px). -->
@@ -2050,6 +2051,32 @@
   .pages-list-item.pages-doc:hover { background: var(--cream); }
   .pages-list-item.pages-doc.active { border-color: var(--accent); background: var(--doc-card); box-shadow: inset 3px 0 0 var(--accent), 0 1px 5px var(--shadow-lg); }
   .pages-list-item.pages-doc.active .pages-list-item-title { font-weight: 700; }
+
+  /* v5.79.0 — Pages › Recent: tinted chips in the page's top-level folder hue (--h set inline from the same
+     hue slot the folder uses; no --h = no folder = neutral). Last 10 are kept; the list shows ~6 and scrolls.
+     Every chip is the same fixed height so the 6-row window is exact; a sliver of row 7 is left showing as the scroll cue. */
+  .pages-recent-list { --rc-h: 50px; --rc-gap: 5px; padding: 0 8px 4px; }
+  .pages-recent-list.scrolls { max-height: calc((var(--rc-h) + var(--rc-gap)) * 6 + 18px + 4px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--ink-faint) 70%, transparent) transparent; }
+  .pages-recent-list.scrolls::-webkit-scrollbar { width: 4px; }
+  .pages-recent-list.scrolls::-webkit-scrollbar-button { display: none; }
+  .pages-recent-list.scrolls::-webkit-scrollbar-thumb { background: color-mix(in oklab, var(--ink-faint) 70%, transparent); border-radius: 2px; }
+  .pages-list-item.pages-recent-item {
+    --rc-bg: var(--cream); --rc-bd: var(--doc-card-border);
+    height: var(--rc-h); box-sizing: border-box; margin: 0 0 var(--rc-gap); padding: 0 12px;
+    flex-direction: column; justify-content: center; align-items: stretch; gap: 1px;
+    border: 1px solid var(--rc-bd); border-radius: 12px; background: var(--rc-bg);
+  }
+  .pages-list-item.pages-recent-item.hued {
+    --rc-bg: color-mix(in oklab, var(--h) 45%, var(--paper));
+    --rc-bd: color-mix(in oklab, var(--h) 75%, var(--paper));
+  }
+  [data-theme="dark"] .pages-list-item.pages-recent-item.hued { --rc-bg: var(--h); --rc-bd: rgba(255,255,255,0.2); }
+  .pages-list-item.pages-recent-item:hover { background: var(--rc-bg); filter: brightness(0.97); }
+  [data-theme="dark"] .pages-list-item.pages-recent-item:hover { filter: brightness(1.15); }
+  .pages-list-item.pages-recent-item.active { background: var(--rc-bg); border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .pages-list-item.pages-recent-item.active .pages-list-item-title { font-weight: 700; }
+  .pages-recent-item .pages-list-item-date { display: flex; gap: 4px; margin-top: 0; min-width: 0; white-space: nowrap; }
+  .pages-recent-item .pages-recent-folder { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
   .pages-hue-pop { position: absolute; z-index: 100; top: 100%; left: 0; margin-top: 4px; padding: 8px; background: var(--paper); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.18); display: grid; grid-template-columns: repeat(4, 28px); gap: 6px; }
   .pages-hue-sw { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
   .pages-hue-sw.on { border-color: var(--ink); }
@@ -15115,7 +15142,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.78.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.79.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -19638,11 +19665,42 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   // ── Computed lists ───────────────────────────────────────
   const recentDocs = [...pagesData]
     .sort((a, b) => new Date(b.lastModified || b.createdAt) - new Date(a.lastModified || a.createdAt))
-    .slice(0, 6);
+    .slice(0, 10); // v5.79.0: keep the last 10; the list shows ~6 and scrolls (see .pages-recent-list)
 
   const sortedFolders = [...foldersData]
     .filter(f => !f.parentFolderId)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  // v5.79.0: a Recent chip uses the hue slot of the page's top-level folder — the same rule renderFolderRow uses
+  function recentHueOf(doc) {
+    let f = doc.folderId ? foldersData.find(x => x.id === doc.folderId) : null;
+    if (!f) return null;
+    for (let guard = 0; f.parentFolderId && guard < 20; guard++) {
+      const p = foldersData.find(x => x.id === f.parentFolderId);
+      if (!p) break;
+      f = p;
+    }
+    const top = f;
+    return Number.isInteger(top.colorIndex)
+      ? top.colorIndex % FOLDER_HUE_NAMES.length
+      : Math.max(0, sortedFolders.findIndex(x => x.id === top.id)) % FOLDER_HUE_NAMES.length;
+  }
+  function renderRecentRow(doc) {
+    const hue = recentHueOf(doc);
+    const folder = doc.folderId ? foldersData.find(x => x.id === doc.folderId) : null;
+    return (
+      <div key={doc.id}
+        className={`pages-list-item pages-recent-item ${hue !== null ? 'hued' : ''} ${selectedId === doc.id ? 'active' : ''}`}
+        style={hue !== null ? { '--h': `var(--fhue-${hue})` } : undefined}
+        onClick={() => { setSelectedId(doc.id); setMobileView('editor'); }}
+      >
+        <div className="pages-list-item-title">{doc.title || 'Untitled'}</div>
+        <div className="pages-list-item-date">
+          <span style={{flexShrink:0}}>{fmtDocDate(doc.lastModified || doc.createdAt)}</span>
+          {folder && <span className="pages-recent-folder">· {folder.name}</span>}
+        </div>
+      </div>
+    );
+  }
   const unfolderedDocs = pagesData
     .filter(d => !d.folderId)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -19859,19 +19917,11 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
             <span>Recent</span>
             <span style={{fontSize:9,opacity:0.5,transition:'transform 0.15s',transform:recentCollapsed?'rotate(-90deg)':'rotate(0deg)'}}>▼</span>
           </div>
-          {!recentCollapsed && recentDocs.map(doc => (
-            <div key={doc.id}
-              className={`pages-list-item ${selectedId===doc.id?'active':''}`}
-              style={{paddingLeft:10}}
-              onClick={() => { setSelectedId(doc.id); setMobileView('editor'); }}
-            >
-              <PagesDocIcon className="pages-doc-ic" />
-              <div style={{flex:1, minWidth:0}}>
-                <div className="pages-list-item-title">{doc.title || 'Untitled'}</div>
-                <div className="pages-list-item-date">{fmtDocDate(doc.lastModified || doc.createdAt)}</div>
-              </div>
+          {!recentCollapsed && (
+            <div className={`pages-recent-list ${recentDocs.length > 6 ? 'scrolls' : ''}`}>
+              {recentDocs.map(renderRecentRow)}
             </div>
-          ))}
+          )}
         </div>
       )}
 
@@ -19917,19 +19967,11 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                 </div>
               )}
               {recentDocs.length > 0 && <div className="pages-section-label">Recent</div>}
-              {recentDocs.map(doc => (
-                <div key={doc.id}
-                  className={`pages-list-item ${selectedId===doc.id?'active':''}`}
-                  style={{paddingLeft:10}}
-                  onClick={() => { setSelectedId(doc.id); setMobileView('editor'); }}
-                >
-                  <PagesDocIcon className="pages-doc-ic" />
-                  <div style={{flex:1, minWidth:0}}>
-                    <div className="pages-list-item-title">{doc.title || 'Untitled'}</div>
-                    <div className="pages-list-item-date">{fmtDocDate(doc.lastModified || doc.createdAt)}</div>
-                  </div>
+              {recentDocs.length > 0 && (
+                <div className={`pages-recent-list ${recentDocs.length > 6 ? 'scrolls' : ''}`} style={{padding:'0 0 4px'}}>
+                  {recentDocs.map(renderRecentRow)}
                 </div>
-              ))}
+              )}
               {(pagesData.length > 0 || foldersData.length > 0) && <div className="pages-section-label">All Pages</div>}
               {sortedFolders.map(folder => renderFolderRow(folder, 0))}
               {unfolderedDocs.map(doc => renderDocRow(doc, false))}
