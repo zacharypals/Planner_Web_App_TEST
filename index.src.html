@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.70.0 -->
+<!-- LP Planner v5.70.1 -->
+<!-- v5.70.1 — Home upkeep: History list looks like it did before (plain list, latest 6, no inner scroll box); each entry just has a small ✕ to remove it. -->
 <!-- v5.70.0 — Home upkeep: new Inventory (spares on hand, number) and Location (free text; locations already used on other items appear as one-tap options) fields, shown under each task in the list ("None on hand" is highlighted); History entries can now be removed (✕) and the full history is listed. -->
 <!-- v5.69.1 — Home upkeep: "Done on another date" now always responds — the Save button is never dead (a blank date shows a prompt), and a date earlier than the last completion adds to History and says why the next due date didn't move, instead of closing silently. -->
 <!-- v5.69.0 — Daily check-in: a 20-second end-of-day entry (mood, energy, last night's sleep with bed/wake times, one line, one win). New synced whole-document collection `checkins` keyed by local date (no SYNC_SPLITS/backup change). Opened from a "Check in" button at the top of Habits; Trends sub-page charts mood & energy over 7/30/90 days and shows workout-day and sleep comparisons only when each side has at least 3 days. Also: the Home upkeep tile is now at the bottom of the Monthly sidebar too. -->
@@ -3148,9 +3149,8 @@
   .up-switch i { width:26px; height:26px; border-radius:50%; background:#fff; display:block; }
   .up-switch.on { background:var(--accent); justify-content:flex-end; }
   .up-hist { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:8px 12px; display:flex; flex-direction:column; gap:6px; }
-  .up-hist { max-height:240px; overflow-y:auto; gap:0; }
-  .up-hist-row { font-size:15px; display:flex; align-items:center; justify-content:space-between; min-height:44px; }
-  .up-hist-x { width:44px; height:44px; border:0; background:transparent; color:var(--ink-light); font-size:15px; cursor:pointer; border-radius:50%; }
+  .up-hist-row { font-size:15px; display:flex; align-items:center; justify-content:space-between; }
+  .up-hist-x { width:36px; height:36px; margin:-6px -8px -6px 0; border:0; background:transparent; color:var(--ink-light); font-size:15px; cursor:pointer; border-radius:50%; flex:none; }
   .up-hist-x:hover { color:var(--up-late-fg); }
   .up-inv { max-width:140px; }
   .up-row-sub { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:13px; color:var(--ink-light); }
@@ -15002,7 +15002,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.70.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.70.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15554,7 +15554,7 @@ function UpkeepEditor({ item, locations, defaultArea, onSave, onDelete, onClose 
             <>
               <div className="up-lbl">History</div>
               <div className="up-hist">
-                {d.history.map(h => (
+                {d.history.slice(0, 6).map(h => (
                   <div key={h.date} className="up-hist-row">
                     <span>{upShort(h.date, today)}</span>
                     <button type="button" className="up-hist-x" aria-label={`Remove ${upShort(h.date, today)} from history`} onClick={() => setD(x => upRemoveHistory(x, h.date))}>✕</button>
