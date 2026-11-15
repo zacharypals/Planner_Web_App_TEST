@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.77.1 -->
+<!-- LP Planner v5.77.2 -->
+<!-- v5.77.2 — Check-in Trends: the page is wider on desktop and iPad (up to 880px) and the Mood & energy chart now sizes itself to its card (taller when wider) instead of staying a phone-width drawing. Phones are unchanged. -->
 <!-- v5.77.1 — Pages: fixed a number showing on top of the checkbox in checklists (and doubled bullets/numbers) on Safari for Mac — the browser's own list marker is now switched off inside the editor, since Quill draws its own. -->
 <!-- v5.77.0 — Check-in Trends: tags and counters now appear on the Mood & energy chart as lanes beneath it, on the same date axis — a bar on each day a tag was on, and bars sized to the amount (scaled to its own max, shown beside the name) for counters. Pick which ones to show with the pills under the chart (first three by default, up to five drawn). -->
 <!-- v5.76.0 — Check-in counters: tap the number to type an amount by hand (up to 99,999, decimals allowed), and each counter has a Step setting (what + and − add, default 1) in its edit sheet — e.g. step 50 for milligrams of caffeine. -->
@@ -3046,6 +3047,7 @@
   :root[data-theme="dark"] { --ci-energy:#e0b04a; --ci-lane:#b6a4f2; }
   .ci-page { flex:1; overflow-y:auto; overflow-x:hidden; background:var(--cream); }
   .ci-inner { max-width:560px; margin:0 auto; padding:14px 16px 40px; display:flex; flex-direction:column; gap:12px; }
+  .ci-inner.wide { max-width:880px; }
   .ci-top { display:flex; align-items:center; gap:10px; }
   .ci-title { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
   .ci-title h1 { margin:0; font-family:'Playfair Display',serif; font-size:24px; font-weight:700; color:var(--ink); }
@@ -15099,7 +15101,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.77.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.77.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15822,8 +15824,21 @@ function CiScale({ label, words, value, onPick }) {
 }
 
 function CiChart({ days, mood, energy, lanes }) {
-  const W = 326, PH = 160, L = 28, R = 8, T = 24, B = 24;
-  const LANE_TOP = 144, LANE_H = 30, LANE_BAR = 16;
+  // Width follows the card (measured), so the chart is crisp and roomy on desktop / iPad; text stays the same size.
+  const wrapRef = useRef(null);
+  const [W, setW] = useState(326);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const measure = () => { const w = Math.round(el.getBoundingClientRect().width); if (w >= 200) setW(w); };
+    measure();
+    if (typeof ResizeObserver === 'undefined') { window.addEventListener('resize', measure); return () => window.removeEventListener('resize', measure); }
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const PH = Math.max(160, Math.min(280, Math.round(W * 0.3))), L = 28, R = 8, T = 24, B = 24;
+  const LANE_TOP = PH - 16, LANE_H = 30, LANE_BAR = 16;
   const ln = lanes || [];
   const H = ln.length ? LANE_TOP + ln.length * LANE_H + 22 : PH;
   const m = ciSegments(days, mood, W, PH, L, R, T, B), e = ciSegments(days, energy, W, PH, L, R, T, B);
@@ -15832,6 +15847,7 @@ function CiChart({ days, mood, energy, lanes }) {
   const bw = Math.max(2.5, Math.min(10, (innerW / Math.max(nD, 1)) * 0.7));
   const tickIdx = days.length > 1 ? [0, Math.floor((days.length - 1) / 2), days.length - 1] : [0];
   return (
+    <div ref={wrapRef} style={{ width: '100%' }}>
     <svg role="img" aria-label={`Line chart of daily mood and energy ratings on a scale of 1 to 5${ln.length ? ', with a bar lane for ' + ln.map(x => x.name).join(', ') : ''}`} width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
       {[1, 2, 3, 4, 5].map(v => (
         <g key={v}>
@@ -15866,6 +15882,7 @@ function CiChart({ days, mood, energy, lanes }) {
         </text>
       ))}
     </svg>
+    </div>
   );
 }
 
@@ -16089,7 +16106,7 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
     const recent = Object.keys(all).filter(dk => ciHasData(all[dk])).sort().reverse().slice(0, 5);
     return (
       <div className="main-content">
-        <div className="ci-page"><div className="ci-inner">
+        <div className="ci-page"><div className="ci-inner wide">
           <div className="ci-top">
             <button type="button" className="ci-btn" onClick={() => setSub('today')} aria-label="Back to check-in">‹ Check-in</button>
             <div className="ci-title"><h1>Trends</h1><span>{withData.length} {withData.length === 1 ? 'check-in' : 'check-ins'} in the last {range} days</span></div>
