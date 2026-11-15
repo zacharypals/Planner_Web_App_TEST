@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.67.4 -->
+<!-- LP Planner v5.68.0 -->
+<!-- v5.68.0 — Home upkeep: recurring maintenance that repeats N weeks/months/years after it was last DONE (HVAC filter every 3 months, smoke detectors every 6, etc.). New synced collection `upkeep` (whole document, no SYNC_SPLITS/backup change). New page reached from a "Home upkeep" tile at the very bottom of the Weekly sidebar (below "Manage repeat tasks…"; no new nav tab): Overdue / Next 30 days / Later list with one-tap done, area filter (Condo, HOA, Appliances), and an editor sheet (interval stepper, next due, Done today / on another date, notes, history, delete). Optional per-task "Show in Week view" puts a card in the Weekly planner 7 days before it is due (or today if that has passed). -->
 <!-- v5.67.4 — Reading log: page box 4px wider on phones, Log button exactly 60px wide. (v5.67.3: the Log button is taller and wider to match the boxes beside it. (v5.67.2: the "Log pages" button is now just "Log", and on phones the page box, date and Log button share one row. (v5.67.1: the "Auto from training or habits" chip and the per-task ↻ button are hidden by default; a project's Linked card has a "Show auto-check options" switch to turn them on (rules already set stay visible). (v5.67.0: a milestone can link to a Page: an expanded milestone has a Page row with a picker, Open, and + New page (creates a Page titled Project — Milestone, links it and opens it). (v5.66.1: on desktop/iPad the milestone checkbox moves to the right of the title, a little bigger. (v5.66.0: desktop/iPad milestones get the same chevron-button caret as the phone, and the milestone title sits in a pill (still tap to edit). (v5.65.7: the ▲ ▼ move buttons now sit in the milestone's top row, between the caret and the checkbox, in the caret's style; the phone row is one notch smaller. (v5.65.6: each milestone header has ▲ ▼ buttons to move it one place (a backup for the drag grip, which on some phones did nothing for milestones below the 3rd). Also: the milestone and task drag grips now claim the touch the moment your finger lands (a native, non-passive touchstart handler), so iPhone/iPad Safari cannot hand the touch to page scrolling first. Targets milestones below the 3rd that showed no fade or drop line when pressed. -->
 <!-- v5.65.4 — Projects: hardened touch dragging for milestones and tasks (the finger now stays "captured" by the grip, the page cannot scroll under it while you drag, and the scroll area is frozen until you let go) — fixes drags that would not start on a phone once the list was scrolled. Auto-scroll at the screen edges stays. -->
 <!-- v5.65.3 — Projects: dragging a milestone (or a task) now auto-scrolls when you hold it near the top or bottom edge of the screen, so you can move it past what fits on screen (before, only the first few milestones could be reordered on a phone). Phone: the caret and drag grip are a little smaller (40px) and the milestone checkbox is larger (28px) to match. -->
@@ -3002,6 +3003,107 @@
   [data-theme="dark"] .wk-be::after { content: ''; position: absolute; bottom: -30px; right: -20px; width: 90px; height: 90px; border-radius: 50%; background: rgba(229,177,91,.09); pointer-events: none; }
   [data-theme="dark"] .wk-quote > *:not(.wk-tile-edit), [data-theme="dark"] .wk-be > *:not(.wk-tile-edit) { position: relative; z-index: 1; }
   [data-theme="dark"] .wk-tile-edit { z-index: 2; }
+
+  /* ═══ v5.68.0 HOME UPKEEP ═══ */
+  :root { --up-late-bg:#fbe4df; --up-late-fg:#9a3324; --up-soon-bg:#fdf0d2; --up-soon-fg:#7a5200; --up-ok-bg:#e6f3ef; --up-ok-fg:#1d6652; }
+  :root[data-theme="dark"] { --up-late-bg:#4a2420; --up-late-fg:#f2a99e; --up-soon-bg:#3d2f0f; --up-soon-fg:#f0c878; --up-ok-bg:#16382f; --up-ok-fg:#8fd6bd; }
+  .up-link { width:100%; box-sizing:border-box; display:flex; align-items:center; gap:10px; min-height:48px; padding:9px 12px; border-radius:14px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-family:'DM Sans',sans-serif; text-align:left; cursor:pointer; }
+  .up-link:hover { border-color:var(--accent); }
+  .up-link.empty, .up-link.clear { background:transparent; border-style:dashed; }
+  .up-link-ic { width:34px; height:34px; flex:none; border-radius:50%; display:flex; align-items:center; justify-content:center; background:var(--up-ok-bg); color:var(--up-ok-fg); }
+  .up-link.late .up-link-ic { background:var(--up-late-bg); color:var(--up-late-fg); }
+  .up-link.soon .up-link-ic { background:var(--up-soon-bg); color:var(--up-soon-fg); }
+  .up-link.empty .up-link-ic { background:var(--accent-light); color:var(--accent); }
+  .up-link-txt { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  .up-link-txt b { font-size:14px; font-weight:700; }
+  .up-link-txt span { font-size:12px; line-height:1.3; color:var(--ink-light); }
+  .up-badge { min-width:22px; height:22px; box-sizing:border-box; padding:0 7px; border-radius:11px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; color:#fff; background:var(--up-late-fg); flex:none; }
+  .up-link.soon .up-badge { background:var(--up-soon-fg); }
+  [data-theme="dark"] .up-badge { color:#1d1b25; }
+
+  .up-page { flex:1; overflow-y:auto; overflow-x:hidden; background:var(--cream); }
+  .up-inner { max-width:720px; margin:0 auto; padding:14px 16px 40px; display:flex; flex-direction:column; gap:12px; }
+  .up-top { display:flex; align-items:center; gap:10px; }
+  .up-title { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  .up-title h1 { margin:0; font-family:'Playfair Display',serif; font-size:24px; font-weight:700; color:var(--ink); }
+  .up-title span { font-size:13px; color:var(--ink-light); }
+  .up-back, .up-add { min-height:44px; padding:0 14px; border-radius:22px; border:1px solid var(--border); background:var(--surface); color:var(--accent); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:700; cursor:pointer; }
+  .up-add { background:var(--accent); border-color:var(--accent); color:#fff; }
+  [data-theme="dark"] .up-add { color:#14121b; }
+  .up-filters { display:flex; gap:8px; flex-wrap:wrap; }
+  .up-filters button, .up-pills button { min-height:36px; padding:0 14px; border-radius:18px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; }
+  .up-filters button.on, .up-pills button.on { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700; }
+  [data-theme="dark"] .up-filters button.on, [data-theme="dark"] .up-pills button.on { color:#14121b; }
+  .up-tiles { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+  .up-tile { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:10px 12px; display:flex; flex-direction:column; }
+  .up-tile b { font-size:24px; font-weight:700; line-height:1.15; }
+  .up-tile span { font-size:13px; color:var(--ink-light); }
+  .up-tile.late b { color:var(--up-late-fg); } .up-tile.soon b { color:var(--up-soon-fg); } .up-tile.ok b { color:var(--up-ok-fg); }
+  .up-section { display:flex; flex-direction:column; gap:8px; }
+  .up-section-title { font-size:13px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; margin-top:4px; }
+  .up-section-title.late { color:var(--up-late-fg); } .up-section-title.soon { color:var(--up-soon-fg); } .up-section-title.ok { color:var(--up-ok-fg); }
+  .up-row { display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:6px 8px 6px 4px; }
+  .up-row-main { flex:1; min-width:0; display:flex; flex-direction:column; align-items:flex-start; gap:6px; min-height:56px; justify-content:center; padding:4px 10px; border:0; background:transparent; font-family:'DM Sans',sans-serif; text-align:left; color:var(--ink); cursor:pointer; }
+  .up-row-name { font-size:16px; font-weight:700; }
+  .up-row-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .up-row-every { font-size:13px; color:var(--ink-light); }
+  .up-chip { font-size:12px; font-weight:700; padding:3px 9px; border-radius:99px; background:var(--up-ok-bg); color:var(--up-ok-fg); }
+  .up-chip.late { background:var(--up-late-bg); color:var(--up-late-fg); } .up-chip.soon { background:var(--up-soon-bg); color:var(--up-soon-fg); }
+  .up-chip.none { background:var(--accent-light); color:var(--accent); }
+  .up-done-btn { width:44px; height:44px; flex:none; border-radius:50%; border:2px solid var(--accent); background:var(--surface); color:var(--accent); display:flex; align-items:center; justify-content:center; padding:0; cursor:pointer; }
+  .up-done-btn:hover { background:var(--accent); color:#fff; }
+  .up-empty { background:var(--surface); border:1px dashed var(--border); border-radius:14px; padding:20px 16px; display:flex; flex-direction:column; gap:8px; align-items:flex-start; color:var(--ink-light); font-size:14px; }
+  .up-empty b { color:var(--ink); font-size:16px; }
+
+  .up-overlay { position:fixed; inset:0; z-index:300; background:rgba(20,16,32,.45); display:flex; align-items:flex-end; justify-content:center; }
+  .up-sheet { width:100%; max-width:480px; max-height:92vh; display:flex; flex-direction:column; background:var(--paper); color:var(--ink); border-radius:20px 20px 0 0; box-shadow:0 -8px 28px rgba(20,16,32,.25); font-family:'DM Sans',sans-serif; }
+  .up-sheet-handle { width:40px; height:5px; border-radius:3px; background:var(--border); margin:8px auto 0; }
+  .up-sheet-head { display:flex; align-items:center; gap:8px; padding:8px 16px 4px; }
+  .up-sheet-head h2 { flex:1; margin:0; font-size:18px; font-weight:700; }
+  .up-x { width:44px; height:44px; border:0; background:transparent; color:var(--ink-light); font-size:18px; cursor:pointer; }
+  .up-sheet-body { flex:1; min-height:0; overflow-y:auto; padding:4px 16px 12px; display:flex; flex-direction:column; gap:8px; }
+  .up-lbl { font-size:13px; font-weight:700; color:var(--ink-light); margin-top:6px; }
+  .up-opt { font-weight:400; }
+  .up-input { width:100%; box-sizing:border-box; min-height:44px; padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-family:'DM Sans',sans-serif; font-size:16px; }
+  textarea.up-input { resize:vertical; }
+  .up-err { color:var(--up-late-fg); font-size:13px; font-weight:700; }
+  .up-hint { font-size:13px; color:var(--ink-light); }
+  .up-pills { display:flex; gap:8px; flex-wrap:wrap; }
+  .up-every { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .up-step { width:44px; height:44px; border-radius:50%; border:1px solid var(--border); background:var(--surface); color:var(--accent); font-size:22px; cursor:pointer; }
+  .up-every-n { min-width:28px; text-align:center; font-size:20px; font-weight:700; }
+  .up-last { font-size:15px; margin-top:6px; }
+  .up-actions { display:flex; flex-direction:column; gap:8px; margin:8px 0 4px; }
+  .up-other { display:flex; gap:8px; }
+  .up-primary { flex:1; min-height:48px; border-radius:24px; border:0; background:var(--accent); color:#fff; font-family:'DM Sans',sans-serif; font-size:16px; font-weight:700; cursor:pointer; }
+  [data-theme="dark"] .up-primary { color:#14121b; }
+  .up-secondary { min-height:44px; padding:0 16px; border-radius:22px; border:2px solid var(--accent); background:var(--surface); color:var(--accent); font-family:'DM Sans',sans-serif; font-size:15px; font-weight:700; cursor:pointer; }
+  .up-secondary:disabled { opacity:.5; }
+  .up-ghost, .up-danger { min-height:44px; padding:0 12px; border:0; background:transparent; color:var(--ink-light); font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; }
+  .up-danger { color:var(--up-late-fg); font-weight:700; }
+  .up-toggle-row { display:flex; align-items:center; gap:12px; justify-content:space-between; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:10px 12px; margin-top:8px; }
+  .up-toggle-row div { display:flex; flex-direction:column; gap:2px; min-width:0; }
+  .up-toggle-row b { font-size:15px; } .up-toggle-row span { font-size:13px; color:var(--ink-light); }
+  .up-switch { width:52px; height:32px; flex:none; border-radius:16px; border:0; padding:3px; background:var(--border); display:flex; justify-content:flex-start; cursor:pointer; }
+  .up-switch i { width:26px; height:26px; border-radius:50%; background:#fff; display:block; }
+  .up-switch.on { background:var(--accent); justify-content:flex-end; }
+  .up-hist { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:8px 12px; display:flex; flex-direction:column; gap:6px; }
+  .up-hist-row { font-size:15px; }
+  .up-sheet-foot { display:flex; align-items:center; gap:8px; padding:10px 16px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); }
+
+  .up-wtask { border-radius:8px; border:1px solid var(--border); background:var(--surface); padding:6px 8px; display:flex; flex-direction:column; gap:4px; margin-bottom:4px; }
+  .up-wtask.late { border-color:var(--up-late-fg); }
+  .up-wtask-row { display:flex; align-items:flex-start; gap:6px; }
+  .up-wtask-title { flex:1; min-width:0; border:0; background:transparent; padding:0; text-align:left; font-family:'DM Sans',sans-serif; font-size:12.5px; font-weight:600; color:var(--ink); cursor:pointer; }
+  .up-wtask-pill { align-self:flex-start; display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; background:var(--up-ok-bg); color:var(--up-ok-fg); }
+  .up-wtask.late .up-wtask-pill { background:var(--up-late-bg); color:var(--up-late-fg); }
+  .up-wtask.soon .up-wtask-pill { background:var(--up-soon-bg); color:var(--up-soon-fg); }
+  @media (min-width: 768px) {
+    .up-overlay { align-items:center; }
+    .up-sheet { border-radius:20px; max-height:88vh; }
+    .up-sheet-handle { display:none; }
+  }
+  @media (max-width: 767px) { .up-page { overflow:visible; } }
 </style>
 </head>
 <body>
@@ -6218,7 +6320,7 @@ function WeekTile({ kind, text, extra, onSave }) {
   );
 }
 
-function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen, repeatSeries, seriesRun }) {
+function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen, repeatSeries, seriesRun, upkeep, setUpkeep, onOpenUpkeep }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
@@ -6899,6 +7001,18 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   // Goal tasks (v4.2.0): read from `goals`, never copied into weekData. Keys are local dates.
   const [dragGoal, setDragGoal] = useState(null); // {goalId, msId, taskId} while dragging a goal task
   const goalTasksByDay = React.useMemo(() => glTasksByDay(goals), [goals]);
+  // Home upkeep (v5.68.0): items with "Show in Week view" appear 7 days before due (or today if that has passed). Read from `upkeep`, never copied.
+  const upkeepByDay = React.useMemo(() => upWeekMap(upkeep, glToday()), [upkeep]);
+  function renderUpkeepTasks(localKey) {
+    const list = upkeepByDay[localKey] || [];
+    if (!list.length || !setUpkeep) return null;
+    const todayKey = glToday();
+    return list.map(it => (
+      <UpWeekTask key={'up-'+it.id} item={it} todayKey={todayKey}
+        onDone={()=>setUpkeep(l => (l||[]).map(x => x.id === it.id ? upMarkDone(x, glToday()) : x))}
+        onOpen={()=>onOpenUpkeep && onOpenUpkeep()} />
+    ));
+  }
   function setGoalTask(it, patch) { if (setGoals) setGoals(gs => glPatchTask(gs, it.goalId, it.msId, it.taskId, patch)); }
   function renderGoalTasks(localKey, desktop) {
     const list = goalTasksByDay[localKey] || [];
@@ -7282,6 +7396,11 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           🔁 Manage repeat tasks…
         </button>
       </div>
+      {onOpenUpkeep && (
+        <div className="sidebar-section" style={{paddingTop:0}}>
+          <UpkeepLink upkeep={upkeep} onOpen={onOpenUpkeep} />
+        </div>
+      )}
     </>
   );
 
@@ -7349,6 +7468,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                       habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
                       habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />
                     {renderGoalTasks(fmtLocal(d), true)}
+                    {renderUpkeepTasks(fmtLocal(d))}
                     {tasks.map(task=>(
                       <TaskCard key={task.id} task={task}
                         onUpdate={p=>updateTask(dk,task.id,p)}
@@ -7467,6 +7587,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
             habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
             habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />
           {renderGoalTasks(fmtLocal(mobileDayDate), false)}
+          {renderUpkeepTasks(fmtLocal(mobileDayDate))}
           {mobileDayTasks.map(task=>(
             <div key={task.id} data-task-id={task.id}
               style={{
@@ -14287,6 +14408,7 @@ function App() {
   const [targets, setTargets] = useSynced('targets', []); // v5.30.0 [{id,kind,period,books,pages}] — see TARGETS section
   const [targetLog, setTargetLog] = useSynced('targetLog', []); // v5.30.0 [{id,kind,title,author,total,updates:[{date,pages}],finishedDate,notes}]
   const [countdowns, setCountdowns] = useSynced('countdowns', []); // [{id, title, startDate, endDate, color}]
+  const [upkeep, setUpkeep] = useSynced('upkeep', []); // v5.68.0 Home upkeep — see HOME UPKEEP section
   const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
   // v5.35.0 — a Project linked to a reading-log book finishes that book when the project is marked done.
   // b.autoDone[projectId] remembers it fired, so reopening the book by hand is not undone; it clears when the project is reopened.
@@ -14805,7 +14927,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.67.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.68.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -14883,7 +15005,8 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} />}
+      {page==='upkeep' && <UpkeepView upkeep={upkeep} setUpkeep={setUpkeep} onBack={()=>setPage('planner')} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
@@ -14950,7 +15073,7 @@ function App() {
         <button className={`mobile-bottom-nav-btn ${page==='habit'||page==='metrics'?'active':''}`} onClick={()=>{setPage('habit');setMoreOpen(false);}}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg>Habits
         </button>
-        <button className={`mobile-bottom-nav-btn ${page==='planner'?'active':''}`} onClick={()=>{setPage('planner');setMoreOpen(false);}}>
+        <button className={`mobile-bottom-nav-btn ${page==='planner'||page==='upkeep'?'active':''}`} onClick={()=>{setPage('planner');setMoreOpen(false);}}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M7.5 4v17M12 4v17M16.5 4v17"/></svg>Week
         </button>
         <button className={`mobile-bottom-nav-btn ${moreOpen||page==='monthly'||page==='pages'?'active':''}`} aria-expanded={moreOpen} onClick={()=>setMoreOpen(o=>!o)}>
@@ -14961,6 +15084,360 @@ function App() {
   );
 }
 
+
+// ─────────────────────────────────────────────
+// HOME UPKEEP (v5.68.0)
+// Recurring maintenance that repeats N weeks/months/years after it was last DONE (not on a fixed calendar day).
+// One small synced collection `upkeep` (whole document, so no SYNC_SPLITS / backup.js entry is needed):
+//   [{ id, name, area:'Condo'|'HOA'|'Appliances', every:{n, unit:'weeks'|'months'|'years'},
+//      dueDate:'YYYY-MM-DD', lastDone:'YYYY-MM-DD'|'', history:[{date}] newest first, notes, weekView:bool, createdAt }]
+// `dueDate` is always stored; marking done sets lastDone = newest history date and dueDate = lastDone + every.
+// With weekView on, the task also shows in the Weekly planner on (dueDate − 7 days) — or today, if that has passed.
+// ─────────────────────────────────────────────
+const UP_AREAS = ['Condo', 'HOA', 'Appliances'];
+const UP_UNITS = [['weeks', 'Weeks'], ['months', 'Months'], ['years', 'Years']];
+
+function upAddInterval(dateStr, n, unit) {
+  const d = parseLocal(dateStr);
+  if (!d) return '';
+  n = Math.max(1, Math.round(n) || 1);
+  if (unit === 'weeks') d.setDate(d.getDate() + 7 * n);
+  else {
+    const day = d.getDate();
+    d.setDate(1);
+    d.setMonth(d.getMonth() + (unit === 'years' ? 12 * n : n));
+    d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+  }
+  return fmtLocal(d);
+}
+function upDays(fromStr, toStr) {   // whole days from → to (negative when `to` is earlier)
+  const a = parseLocal(fromStr), b = parseLocal(toStr);
+  if (!a || !b) return 0;
+  return Math.round((Date.UTC(b.getFullYear(), b.getMonth(), b.getDate()) - Date.UTC(a.getFullYear(), a.getMonth(), a.getDate())) / 86400000);
+}
+function upEveryLabel(every) {
+  const n = (every && every.n) || 1, u = (every && every.unit) || 'months';
+  if (n === 1) return u === 'weeks' ? 'Weekly' : u === 'months' ? 'Monthly' : 'Yearly';
+  return `Every ${n} ${u}`;
+}
+function upShort(dateStr, todayKey) {   // "Dec 2" (adds the year when it is not this year)
+  const d = parseLocal(dateStr), t = parseLocal(todayKey);
+  if (!d) return '';
+  const base = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return t && d.getFullYear() !== t.getFullYear() ? base + ', ' + d.getFullYear() : base;
+}
+// kind: 'late' (past due) · 'soon' (due within 30 days) · 'later' · 'none' (no date)
+function upStatus(item, todayKey) {
+  if (!item || !item.dueDate) return { kind: 'none', days: 0 };
+  const days = upDays(todayKey, item.dueDate);
+  return { kind: days < 0 ? 'late' : days <= 30 ? 'soon' : 'later', days };
+}
+function upDueLabel(item, todayKey) {
+  const st = upStatus(item, todayKey);
+  if (st.kind === 'none') return 'No date';
+  if (st.kind === 'late') {
+    const n = -st.days;
+    return n >= 60 ? `${Math.round(n / 30)} months overdue` : n === 1 ? '1 day overdue' : `${n} days overdue`;
+  }
+  if (st.days === 0) return 'Due today';
+  if (st.days === 1) return 'Due tomorrow';
+  return 'Due ' + upShort(item.dueDate, todayKey);
+}
+function upStats(list, todayKey) {
+  const out = { late: 0, soon: 0, later: 0, next: null };
+  (list || []).forEach(it => {
+    const st = upStatus(it, todayKey);
+    if (st.kind === 'late') out.late++;
+    else if (st.kind === 'soon') out.soon++;
+    else if (st.kind === 'later') out.later++;
+    if (st.kind !== 'late' && st.kind !== 'none' && (!out.next || it.dueDate < out.next.dueDate)) out.next = it;
+  });
+  return out;
+}
+// Record a completion on `dateStr`; lastDone follows the newest history date, and the next due date is counted from it.
+function upMarkDone(item, dateStr) {
+  const hist = [{ date: dateStr }, ...((item.history || []).filter(h => h.date !== dateStr))].sort((a, b) => (a.date < b.date ? 1 : -1));
+  const last = hist[0].date;
+  return { ...item, history: hist, lastDone: last, dueDate: upAddInterval(last, item.every && item.every.n, item.every && item.every.unit) };
+}
+function upSort(list, todayKey) {   // most overdue first, then soonest due; undated last
+  return [...list].sort((a, b) => {
+    const da = a.dueDate || '9999-12-31', db = b.dueDate || '9999-12-31';
+    return da === db ? (a.name || '').localeCompare(b.name || '') : da < db ? -1 : 1;
+  });
+}
+// Weekly-planner placement: dueDate − 7 days, or today when that day has already passed (so overdue items stay visible).
+function upWeekMap(list, todayKey) {
+  const map = {};
+  (list || []).forEach(it => {
+    if (!it.weekView || !it.dueDate) return;
+    let show = fmtLocal(addDays(parseLocal(it.dueDate), -7));
+    if (show < todayKey) show = todayKey;
+    (map[show] = map[show] || []).push(it);
+  });
+  return map;
+}
+function UpHouse({ size }) {
+  return (
+    <svg aria-hidden="true" width={size || 20} height={size || 20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 11l8-7 8 7v9a1 1 0 01-1 1h-4v-6H9v6H5a1 1 0 01-1-1z" /></svg>
+  );
+}
+
+// ── Link tile at the bottom of the Weekly sidebar ──
+function UpkeepLink({ upkeep, onOpen }) {
+  const today = glToday();
+  const list = upkeep || [];
+  const s = upStats(list, today);
+  let kind = 'clear', sub = 'All caught up', badge = 0;
+  if (!list.length) { kind = 'empty'; sub = 'Add your first task'; }
+  else if (s.late > 0) { kind = 'late'; badge = s.late; sub = `${s.late} overdue` + (s.soon ? ` · ${s.soon} soon` : ''); }
+  else if (s.soon > 0) { kind = 'soon'; badge = s.soon; sub = s.next ? `Next: ${s.next.name || 'Untitled'} · ${upShort(s.next.dueDate, today)}` : `${s.soon} due soon`; }
+  else if (s.next) sub = `All caught up · next ${upShort(s.next.dueDate, today)}`;
+  return (
+    <button type="button" className={`up-link ${kind}`} onClick={onOpen}>
+      <span className="up-link-ic" aria-hidden="true">{kind === 'clear' ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : <UpHouse />}</span>
+      <span className="up-link-txt"><b>Home upkeep</b><span>{sub}</span></span>
+      {badge > 0 && <span className="up-badge">{badge}</span>}
+      <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--ink-light)', flex: 'none' }}><path d="M9 5l7 7-7 7" /></svg>
+    </button>
+  );
+}
+
+// ── Card shown in the Weekly planner for items with "Show in Week view" on ──
+function UpWeekTask({ item, todayKey, onDone, onOpen }) {
+  const st = upStatus(item, todayKey);
+  return (
+    <div className={`up-wtask ${st.kind}`}>
+      <div className="up-wtask-row">
+        <div className="task-check" role="checkbox" aria-checked="false" aria-label={`Mark ${item.name || 'task'} done`}
+          style={{ color: 'var(--accent)', borderColor: 'var(--accent)' }}
+          onClick={e => { e.stopPropagation(); onDone(); }} />
+        <button type="button" className="up-wtask-title" onClick={onOpen}>{item.name || 'Untitled'}</button>
+      </div>
+      <span className="up-wtask-pill"><UpHouse size={12} /> Home upkeep · {upDueLabel(item, todayKey)}</span>
+    </div>
+  );
+}
+
+// ── The Home upkeep page ──
+function UpkeepView({ upkeep, setUpkeep, onBack }) {
+  const [area, setArea] = useState('all');
+  const [editId, setEditId] = useState(null);   // null | 'new' | item id
+  const today = glToday();
+  const all = upkeep || [];
+  const shown = upSort(all.filter(i => area === 'all' || i.area === area), today);
+  const late = shown.filter(i => upStatus(i, today).kind === 'late');
+  const soon = shown.filter(i => upStatus(i, today).kind === 'soon');
+  const later = shown.filter(i => ['later', 'none'].includes(upStatus(i, today).kind));
+  const s = upStats(shown, today);
+  const editing = editId === 'new' ? null : all.find(i => i.id === editId);
+
+  function saveItem(item) {
+    setUpkeep(l => (l || []).some(i => i.id === item.id) ? l.map(i => i.id === item.id ? item : i) : [...(l || []), item]);
+    setEditId(null);
+  }
+  function removeItem(id) { setUpkeep(l => (l || []).filter(i => i.id !== id)); setEditId(null); }
+  function doneToday(id) { setUpkeep(l => (l || []).map(i => i.id === id ? upMarkDone(i, glToday()) : i)); }
+
+  function Row({ it }) {
+    const st = upStatus(it, today);
+    return (
+      <div className="up-row">
+        <button type="button" className="up-row-main" onClick={() => setEditId(it.id)}>
+          <span className="up-row-name">{it.name || 'Untitled'}</span>
+          <span className="up-row-meta">
+            <span className={`up-chip ${st.kind}`}>{upDueLabel(it, today)}</span>
+            <span className="up-row-every">{upEveryLabel(it.every)}</span>
+          </span>
+        </button>
+        <button type="button" className="up-done-btn" aria-label={`Mark ${it.name || 'task'} done today`} onClick={() => doneToday(it.id)}>
+          <svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+        </button>
+      </div>
+    );
+  }
+  function Section({ kind, title, items }) {
+    if (!items.length) return null;
+    return (
+      <div className="up-section">
+        <div className={`up-section-title ${kind}`}>{title}</div>
+        {items.map(it => <Row key={it.id} it={it} />)}
+      </div>
+    );
+  }
+
+  return (
+    <div className="main-content">
+      <div className="up-page">
+        <div className="up-inner">
+          <div className="up-top">
+            <button type="button" className="up-back" onClick={onBack} aria-label="Back to Weekly planner">‹ Week</button>
+            <div className="up-title"><h1>Home upkeep</h1><span>Maintenance &amp; upkeep</span></div>
+            <button type="button" className="up-add" onClick={() => setEditId('new')}>+ Add</button>
+          </div>
+          <div className="up-filters" role="tablist" aria-label="Filter by area">
+            {['all', ...UP_AREAS].map(a => (
+              <button key={a} type="button" role="tab" aria-selected={area === a} className={area === a ? 'on' : ''} onClick={() => setArea(a)}>{a === 'all' ? 'All' : a}</button>
+            ))}
+          </div>
+          {all.length > 0 && (
+            <div className="up-tiles">
+              <div className="up-tile late"><b>{late.length}</b><span>Overdue</span></div>
+              <div className="up-tile soon"><b>{soon.length}</b><span>Next 30 days</span></div>
+              <div className="up-tile ok"><b>{later.length}</b><span>Later</span></div>
+            </div>
+          )}
+          {all.length === 0 && (
+            <div className="up-empty">
+              <b>Nothing here yet</b>
+              <span>Add things like “Replace HVAC filter — every 3 months”. Each one counts from the day you finish it.</span>
+              <button type="button" className="up-add" onClick={() => setEditId('new')}>+ Add your first task</button>
+            </div>
+          )}
+          {all.length > 0 && shown.length === 0 && <div className="up-empty"><span>Nothing in {area} yet.</span></div>}
+          <Section kind="late" title="Overdue" items={late} />
+          <Section kind="soon" title="Due in the next 30 days" items={soon} />
+          <Section kind="ok" title="Later" items={later} />
+        </div>
+      </div>
+      {editId && (editId === 'new' || editing) && (
+        <UpkeepEditor key={editId} item={editing} defaultArea={area === 'all' ? 'Condo' : area} onSave={saveItem} onDelete={removeItem} onClose={() => setEditId(null)} />
+      )}
+    </div>
+  );
+}
+
+function UpkeepEditor({ item, defaultArea, onSave, onDelete, onClose }) {
+  const today = glToday();
+  const isNew = !item;
+  const [d, setD] = useState(() => item ? { ...item, every: { ...item.every }, history: [...(item.history || [])] } : {
+    id: 'up' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: '', area: defaultArea || 'Condo',
+    every: { n: 3, unit: 'months' }, dueDate: '', lastDone: '', history: [], notes: '', weekView: false, createdAt: today,
+  });
+  const [dueTouched, setDueTouched] = useState(false);
+  const [otherDate, setOtherDate] = useState(false);
+  const [otherVal, setOtherVal] = useState(today);
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [newLast, setNewLast] = useState('');   // new items only: optional "last done" date
+  const [err, setErr] = useState('');
+
+  function setEvery(patch) {
+    setD(x => {
+      const every = { ...x.every, ...patch };
+      let due = x.dueDate;
+      const basis = isNew ? newLast : x.lastDone;
+      if (basis && !dueTouched) due = upAddInterval(basis, every.n, every.unit);
+      return { ...x, every, dueDate: due };
+    });
+  }
+  function build() {
+    let out = { ...d, name: (d.name || '').trim() };
+    if (isNew && newLast) out = upMarkDone(out, newLast);
+    if (!out.dueDate) out.dueDate = today;
+    return out;
+  }
+  function save() {
+    if (!(d.name || '').trim()) { setErr('Give it a name first.'); return; }
+    onSave(build());
+  }
+  function done(dateStr) {
+    if (!(d.name || '').trim()) { setErr('Give it a name first.'); return; }
+    onSave(upMarkDone(build(), dateStr));
+  }
+  const dueShown = isNew && newLast && !dueTouched ? upAddInterval(newLast, d.every.n, d.every.unit) : d.dueDate;
+
+  return (
+    <div className="up-overlay" onClick={onClose}>
+      <div className="up-sheet" role="dialog" aria-label={isNew ? 'Add upkeep task' : 'Edit upkeep task'} onClick={e => e.stopPropagation()}>
+        <div className="up-sheet-handle" />
+        <div className="up-sheet-head">
+          <h2>{isNew ? 'New upkeep task' : (d.name || 'Upkeep task')}</h2>
+          <button type="button" className="up-x" aria-label="Close" onClick={onClose}>✕</button>
+        </div>
+        <div className="up-sheet-body">
+          <label className="up-lbl" htmlFor="up-name">Name</label>
+          <input id="up-name" className="up-input" type="text" value={d.name} placeholder="Replace HVAC filter" autoFocus={isNew}
+            onChange={e => { setErr(''); setD(x => ({ ...x, name: e.target.value })); }} />
+          {err && <div className="up-err">{err}</div>}
+
+          <div className="up-lbl">Area</div>
+          <div className="up-pills">
+            {UP_AREAS.map(a => <button key={a} type="button" aria-pressed={d.area === a} className={d.area === a ? 'on' : ''} onClick={() => setD(x => ({ ...x, area: a }))}>{a}</button>)}
+          </div>
+
+          <div className="up-lbl">Repeats every</div>
+          <div className="up-every">
+            <button type="button" className="up-step" aria-label="Decrease" onClick={() => setEvery({ n: Math.max(1, d.every.n - 1) })}>−</button>
+            <span className="up-every-n">{d.every.n}</span>
+            <button type="button" className="up-step" aria-label="Increase" onClick={() => setEvery({ n: Math.min(60, d.every.n + 1) })}>+</button>
+            <div className="up-pills">
+              {UP_UNITS.map(([u, label]) => <button key={u} type="button" aria-pressed={d.every.unit === u} className={d.every.unit === u ? 'on' : ''} onClick={() => setEvery({ unit: u })}>{label}</button>)}
+            </div>
+          </div>
+
+          {isNew ? (
+            <>
+              <label className="up-lbl" htmlFor="up-last">Last done <span className="up-opt">(optional)</span></label>
+              <input id="up-last" className="up-input" type="date" max={today} value={newLast}
+                onChange={e => { const v = e.target.value; setNewLast(v); if (v && !dueTouched) setD(x => ({ ...x, dueDate: upAddInterval(v, x.every.n, x.every.unit) })); }} />
+            </>
+          ) : (
+            <div className="up-last">Last done: <b>{d.lastDone ? upShort(d.lastDone, today) : 'not yet'}</b></div>
+          )}
+
+          <label className="up-lbl" htmlFor="up-due">Next due</label>
+          <input id="up-due" className="up-input" type="date" value={dueShown || ''}
+            onChange={e => { setDueTouched(true); setD(x => ({ ...x, dueDate: e.target.value })); }} />
+          {!dueShown && <div className="up-hint">Leave blank to make it due today.</div>}
+
+          {!isNew && (
+            <div className="up-actions">
+              <button type="button" className="up-primary" onClick={() => done(today)}>Done today</button>
+              {!otherDate
+                ? <button type="button" className="up-secondary" onClick={() => setOtherDate(true)}>Done on another date…</button>
+                : (
+                  <div className="up-other">
+                    <input className="up-input" type="date" max={today} value={otherVal} aria-label="Date it was done" onChange={e => setOtherVal(e.target.value)} />
+                    <button type="button" className="up-secondary" disabled={!otherVal} onClick={() => done(otherVal)}>Save</button>
+                  </div>
+                )}
+              <div className="up-hint" style={{ textAlign: 'center' }}>Next due is counted from the day you finish it.</div>
+            </div>
+          )}
+
+          <div className="up-toggle-row">
+            <div><b>Show in Week view</b><span>Adds it as a task 7 days before it is due</span></div>
+            <button type="button" role="switch" aria-checked={!!d.weekView} aria-label="Show in Week view" className={`up-switch ${d.weekView ? 'on' : ''}`} onClick={() => setD(x => ({ ...x, weekView: !x.weekView }))}><i /></button>
+          </div>
+
+          <label className="up-lbl" htmlFor="up-notes">Notes</label>
+          <textarea id="up-notes" className="up-input" rows={3} value={d.notes || ''} placeholder="Filter size, where the spare is, who to call…" onChange={e => setD(x => ({ ...x, notes: e.target.value }))} />
+
+          {!isNew && (d.history || []).length > 0 && (
+            <>
+              <div className="up-lbl">History</div>
+              <div className="up-hist">
+                {d.history.slice(0, 6).map(h => (
+                  <div key={h.date} className="up-hist-row">
+                    <span>{upShort(h.date, today)}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <div className="up-sheet-foot">
+          {!isNew && (confirmDel
+            ? <button type="button" className="up-danger" onClick={() => onDelete(d.id)}>Tap again to delete</button>
+            : <button type="button" className="up-ghost" onClick={() => setConfirmDel(true)}>Delete</button>)}
+          <div style={{ flex: 1 }} />
+          <button type="button" className="up-secondary" onClick={onClose}>Cancel</button>
+          <button type="button" className="up-primary" style={{ flex: 'none', minWidth: 96 }} onClick={save}>Save</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────
 // FITNESS VIEW
