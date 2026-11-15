@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.79.2 -->
+<!-- LP Planner v5.79.3 -->
+<!-- v5.79.3 — Project page: "Mark goal done" is now "Mark Project Done" (and "Reopen project"); it and Park/Unpark moved from the bottom of the right column to the top, above Start / Target / Status / Color. On phones and narrow iPads (where that column drops below the milestones) the same buttons sit in the title card under the progress bar instead. -->
 <!-- v5.79.2 — Pages › Recent: chips are now a "dusty" version of the folder color — less saturated, paler fill and a softer border (light and dark), so they sit quieter than the folders in All Pages while still matching them. -->
 <!-- v5.79.1 — Pages › Recent: the list window is shorter — it now shows 5 and a half chips (half of the next one peeks out as the scroll hint) instead of 6 and a bit, since the new chips are taller than the old rows. Still keeps the last 10; scrolls whenever there are more than 5. -->
 <!-- v5.79.0 — Pages › Recent: now remembers the last 10 edited pages but shows 6 at a time — the list scrolls (a sliver of the next page shows as a hint), on the desktop/iPad sidebar and the phone's first screen. Each Recent page is a tinted chip in its folder's color (same hue as the folder in All Pages; pages with no folder stay neutral) with the folder name beside the date. Light and dark. -->
@@ -2586,6 +2587,10 @@
   .gl-btn.primary:hover { filter: brightness(1.08); }
   .gl-btn.ghost { border-color: transparent; background: transparent; color: var(--ink-light); }
   .gl-btn.danger { color: var(--red); }
+  /* v5.79.3 — project page action row (Mark Project Done / Park). Side copy tops the right column; the head copy sits in the title card and replaces it when that column wraps below the milestones. */
+  .gl-pa { display: flex; gap: 8px; flex-wrap: wrap; }
+  .gl-pa-head { display: none; margin-top: 12px; }
+  @media (max-width: 900px) { .gl-pa-head { display: flex; } .gl-pa-side { display: none; } }
   .gl-chip { font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-light); cursor: pointer; }
   .gl-chip.on { background: var(--ink); color: #fff; border-color: var(--ink); font-weight: 600; }
   /* v5.60.0 — project tags */
@@ -13477,6 +13482,14 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
     });
     setOpenMs(o => ({ ...o, [copy.id]: true }));
   }
+  const projActions = cls => (   // v5.79.3 — same buttons rendered in two spots; CSS shows one
+    <div className={'gl-pa ' + cls}>
+      {goal.status !== 'done'
+        ? <button className="gl-btn primary" style={{ flex: 1, minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'done', completedAt: Date.now() }))}>Mark Project Done</button>
+        : <button className="gl-btn" style={{ flex: 1, minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'active', completedAt: null }))}>Reopen project</button>}
+      {goal.status === 'active' && <button className="gl-btn" style={{ minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'parked' }))}>Park</button>}
+      {goal.status === 'parked' && <button className="gl-btn" style={{ minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'active' }))}>Unpark</button>}
+    </div>);
   const healthText = h.key === 'done' ? 'Goal complete.'
     : h.key === 'parked' ? 'Parked — not counted against your active goals.'
     : h.key === 'upcoming' ? `Starts ${glShort(goal.startDate)}.`
@@ -13503,6 +13516,7 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
               <div className="gl-bar" style={{ flex: 1, height: 8, background: glTint(c, 0.15) }}><div style={{ width: Math.round(glProgress(goal) * 100) + '%', background: c }} /></div>
               <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)' }}>{Math.round(glProgress(goal) * 100)}% · {counts.done} of {counts.total} tasks</span>
             </div>
+            {projActions('gl-pa-head')}
           </div>
           <div style={{ padding: '14px 20px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -13534,6 +13548,7 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
         </div>
 
         <div style={{ flex: '1 1 280px', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {projActions('gl-pa-side')}
           <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--ink-light)' }}>Start
@@ -13650,17 +13665,10 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
               <textarea className="gl-input" rows={4} placeholder="What worked? What would you change next time?" value={goal.retro || ''}
                 style={{ resize: 'vertical' }} onChange={e => onChange(g => ({ ...g, retro: e.target.value }))} />
             ) : (
-              <span style={{ fontSize: 13, color: 'var(--ink-light)' }}>Opens when you mark this goal done: what worked, what you'd change.</span>
+              <span style={{ fontSize: 13, color: 'var(--ink-light)' }}>Opens when you mark this project done: what worked, what you'd change.</span>
             )}
           </div>
 
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {goal.status !== 'done'
-              ? <button className="gl-btn primary" style={{ flex: 1, minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'done', completedAt: Date.now() }))}>Mark goal done</button>
-              : <button className="gl-btn" style={{ flex: 1, minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'active', completedAt: null }))}>Reopen goal</button>}
-            {goal.status === 'active' && <button className="gl-btn" style={{ minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'parked' }))}>Park</button>}
-            {goal.status === 'parked' && <button className="gl-btn" style={{ minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'active' }))}>Unpark</button>}
-          </div>
           <button className="gl-btn ghost danger" style={{ alignSelf: 'flex-start' }} onClick={() => {
             if (window.confirm(`Delete "${goal.title || 'this goal'}" with all its milestones and tasks? This can't be undone.`)) onDelete();
           }}>Delete goal</button>
@@ -15145,7 +15153,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.79.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.79.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
