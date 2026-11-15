@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.75.0 -->
+<!-- LP Planner v5.76.0 -->
+<!-- v5.76.0 — Check-in counters: tap the number to type an amount by hand (up to 99,999, decimals allowed), and each counter has a Step setting (what + and − add, default 1) in its edit sheet — e.g. step 50 for milligrams of caffeine. -->
 <!-- v5.75.0 — Check-in: Tags & counters. A new Tags card lets you create your own tags (on/off for the day) and counters (a number, − / +) — nothing is pre-named. Tap a tag or counter to log it for the viewed day; Edit renames, deletes or lets you add more. Definitions sync as `checkinTags`; each day stores `tg`. Trends gets a Tag effects card: mood same day, mood next day and energy next day, with vs without the chosen tag (needs 3+ days each side). -->
 <!-- v5.74.0 — Check-in: three more always-visible lines under "One win" — Grateful for today, Looking forward to, and Do differently (stored as grat / look / diff on the day's entry; an entry with only these still counts as a check-in). -->
 <!-- v5.73.0 — Fitness tab: the left sidebar can be collapsed on desktop and iPad with a slim toggle strip (‹ / ›) on its edge, like the Weekly sidebar; the choice is remembered on each device. Phones unchanged. -->
@@ -3120,7 +3121,12 @@
   .ci-ctr button { width:36px; height:36px; border-radius:50%; border:0; background:transparent; color:var(--accent); font-size:20px; line-height:1; cursor:pointer; }
   .ci-ctr button:disabled { opacity:.3; cursor:default; }
   .ci-ctr .nm { font-size:14px; font-weight:600; padding:0 4px; }
-  .ci-ctr b { min-width:22px; text-align:center; font-size:15px; color:var(--accent); }
+  .ci-ctr b, .ci-num { min-width:22px; text-align:center; font-size:15px; font-weight:700; color:var(--accent); }
+  .ci-ctr button.ci-num { width:auto; height:36px; padding:0 6px; border-radius:18px; font-size:15px; }
+  .ci-ctr button.ci-num:hover { background:var(--cream); }
+  .ci-num-in { box-sizing:border-box; height:34px; margin:0 2px; padding:0 6px; border-radius:17px; border:1.5px solid var(--accent); background:var(--paper); color:var(--ink); font-family:'DM Sans',sans-serif; font-size:16px; font-weight:700; text-align:center; -moz-appearance:textfield; }
+  .ci-num-in::-webkit-outer-spin-button, .ci-num-in::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+  .ci-step { max-width:140px; }
   .ci-ctr.edit { padding:0 16px; gap:6px; cursor:pointer; }
   .ci-edit .ci-tag:not(.add), .ci-edit .ci-ctr { outline:1.5px dashed var(--ink-faint); outline-offset:1px; }
   .ci-pen { font-size:12px; color:var(--ink-light); }
@@ -15087,7 +15093,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.75.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.76.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15881,6 +15887,7 @@ function CiTagSheet({ def, defs, onSave, onDelete, onClose }) {
   const isNew = !def;
   const [name, setName] = useState(def ? def.name : '');
   const [kind, setKind] = useState(def ? def.kind : 'tag');
+  const [step, setStep] = useState(def && def.step ? String(def.step) : '1');
   const [err, setErr] = useState('');
   const [confirmDel, setConfirmDel] = useState(false);
   useEffect(() => {
@@ -15892,7 +15899,10 @@ function CiTagSheet({ def, defs, onSave, onDelete, onClose }) {
     const nm = name.trim();
     if (!nm) { setErr('Give it a name.'); return; }
     if ((defs || []).some(d => d.id !== (def && def.id) && d.name.toLowerCase() === nm.toLowerCase())) { setErr('You already have one with that name.'); return; }
-    onSave({ id: def ? def.id : 'tg' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4), name: nm, kind });
+    const st = parseFloat(step);
+    const out = { id: def ? def.id : 'tg' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4), name: nm, kind };
+    if (kind === 'count') out.step = isFinite(st) && st > 0 ? Math.min(Math.round(st * 100) / 100, 99999) : 1;
+    onSave(out);
   }
   return (
     <div className="ci-tp-overlay" onClick={onClose}>
@@ -15910,6 +15920,13 @@ function CiTagSheet({ def, defs, onSave, onDelete, onClose }) {
           ))}
         </div>
         <div className="ci-hint">{kind === 'tag' ? 'A tag is on or off for the day.' : 'A counter keeps a number for the day, like cups or drinks.'}{!isNew ? ' The type can’t change after it is created.' : ''}</div>
+        {kind === 'count' && (
+          <>
+            <label className="ci-tp-lbl" htmlFor="ci-tag-step">Step <span style={{ fontWeight: 400 }}>(what + and − add)</span></label>
+            <input id="ci-tag-step" className="ci-input ci-step" type="number" inputMode="decimal" min="0.01" step="any" value={step} onChange={ev => setStep(ev.target.value)} />
+            <div className="ci-hint">Use 1 for cups or drinks, or something like 50 for milligrams. You can also tap the number and type it.</div>
+          </>
+        )}
         {!isNew && <div className="ci-hint">Deleting only removes it from the list; days you already logged keep their data.</div>}
         <div className="ci-tp-foot">
           {!isNew ? (confirmDel
@@ -15923,9 +15940,17 @@ function CiTagSheet({ def, defs, onSave, onDelete, onClose }) {
   );
 }
 
+function ciRound(n) { return Math.round(n * 100) / 100; }
 function CiTags({ defs, tg, onSet, onOpenSheet }) {
   const [editing, setEditing] = useState(false);
+  const [numEdit, setNumEdit] = useState(null);   // { id, draft } while typing a counter value by hand
   const list = defs || [];
+  function commitNum() {
+    if (!numEdit) return;
+    const v = parseFloat(numEdit.draft);
+    if (isFinite(v) && v >= 0) onSet(numEdit.id, Math.min(ciRound(v), 99999));
+    setNumEdit(null);
+  }
   return (
     <div className={`ci-card ci-tags ${editing ? 'ci-edit' : ''}`}>
       <div className="ci-tags-head">
@@ -15941,10 +15966,17 @@ function CiTags({ defs, tg, onSet, onOpenSheet }) {
               <button key={d.id} type="button" className="ci-ctr edit" aria-label={`Edit ${d.name}`} onClick={() => onOpenSheet(d)}><span className="nm">{d.name}</span><span className="ci-pen" aria-hidden="true">✎</span></button>
             ) : (
               <span key={d.id} className={`ci-ctr ${n > 0 ? 'has' : ''}`} role="group" aria-label={`${d.name} counter`}>
-                <button type="button" aria-label={`Decrease ${d.name}`} disabled={n <= 0} onClick={() => onSet(d.id, n - 1)}>−</button>
+                <button type="button" aria-label={`Decrease ${d.name}`} disabled={n <= 0} onClick={() => onSet(d.id, Math.max(0, ciRound(n - (d.step || 1))))}>−</button>
                 <span className="nm">{d.name}</span>
-                <b aria-live="polite">{n}</b>
-                <button type="button" aria-label={`Increase ${d.name}`} disabled={n >= 99} onClick={() => onSet(d.id, n + 1)}>+</button>
+                {numEdit && numEdit.id === d.id ? (
+                  <input className="ci-num-in" type="number" inputMode="decimal" min="0" step="any" autoFocus aria-label={`${d.name} amount`} value={numEdit.draft}
+                    style={{ width: Math.max(3, String(numEdit.draft).length + 2) + 'ch' }}
+                    onFocus={ev => ev.target.select()} onChange={ev => setNumEdit({ id: d.id, draft: ev.target.value })} onBlur={commitNum}
+                    onKeyDown={ev => { if (ev.key === 'Enter') ev.target.blur(); else if (ev.key === 'Escape') setNumEdit(null); }} />
+                ) : (
+                  <button type="button" className="ci-num" aria-label={`${d.name}: ${n}. Tap to type an amount`} onClick={() => setNumEdit({ id: d.id, draft: String(n) })}>{n}</button>
+                )}
+                <button type="button" aria-label={`Increase ${d.name}`} disabled={n >= 99999} onClick={() => onSet(d.id, Math.min(99999, ciRound(n + (d.step || 1))))}>+</button>
               </span>
             );
           }
@@ -15973,7 +16005,7 @@ function CiTagTrends({ defs, all, days, pick, setPick }) {
       <div className="ci-pills" role="tablist" aria-label="Tag" style={{ flexWrap: 'wrap' }}>
         {list.map(x => <button key={x.id} type="button" role="tab" aria-selected={x.id === d.id} className={x.id === d.id ? 'on' : ''} onClick={() => setPick(x.id)}>{x.name}</button>)}
       </div>
-      <div className="ci-hint">{fx.used} of {fx.seen} check-in days{d.kind === 'count' ? ` · ${fx.total} total` : ''}</div>
+      <div className="ci-hint">{fx.used} of {fx.seen} check-in days{d.kind === 'count' ? ` · ${ciRound(fx.total)} total` : ''}</div>
       <CiCompare title="Mood the same day" rows={[{ label: w, vals: fx.same.wm }, { label: wo, vals: fx.same.om, alt: true }]} />
       <CiCompare title="Mood the next day" rows={[{ label: w, vals: fx.next.wm }, { label: wo, vals: fx.next.om, alt: true }]} />
       <CiCompare title="Energy the next day" rows={[{ label: w, vals: fx.next.we }, { label: wo, vals: fx.next.oe, alt: true }]} />
