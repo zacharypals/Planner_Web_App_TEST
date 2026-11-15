@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.76.0 -->
+<!-- LP Planner v5.77.0 -->
+<!-- v5.77.0 — Check-in Trends: tags and counters now appear on the Mood & energy chart as lanes beneath it, on the same date axis — a bar on each day a tag was on, and bars sized to the amount (scaled to its own max, shown beside the name) for counters. Pick which ones to show with the pills under the chart (first three by default, up to five drawn). -->
 <!-- v5.76.0 — Check-in counters: tap the number to type an amount by hand (up to 99,999, decimals allowed), and each counter has a Step setting (what + and − add, default 1) in its edit sheet — e.g. step 50 for milligrams of caffeine. -->
 <!-- v5.75.0 — Check-in: Tags & counters. A new Tags card lets you create your own tags (on/off for the day) and counters (a number, − / +) — nothing is pre-named. Tap a tag or counter to log it for the viewed day; Edit renames, deletes or lets you add more. Definitions sync as `checkinTags`; each day stores `tg`. Trends gets a Tag effects card: mood same day, mood next day and energy next day, with vs without the chosen tag (needs 3+ days each side). -->
 <!-- v5.74.0 — Check-in: three more always-visible lines under "One win" — Grateful for today, Looking forward to, and Do differently (stored as grat / look / diff on the day's entry; an entry with only these still counts as a check-in). -->
@@ -3036,8 +3037,8 @@
 
 
   /* ═══ v5.69.0 DAILY CHECK-IN ═══ */
-  :root { --ci-energy:#b07a0c; }
-  :root[data-theme="dark"] { --ci-energy:#e0b04a; }
+  :root { --ci-energy:#b07a0c; --ci-lane:#7a63b8; }
+  :root[data-theme="dark"] { --ci-energy:#e0b04a; --ci-lane:#b6a4f2; }
   .ci-page { flex:1; overflow-y:auto; overflow-x:hidden; background:var(--cream); }
   .ci-inner { max-width:560px; margin:0 auto; padding:14px 16px 40px; display:flex; flex-direction:column; gap:12px; }
   .ci-top { display:flex; align-items:center; gap:10px; }
@@ -15093,7 +15094,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.76.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.77.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15815,12 +15816,18 @@ function CiScale({ label, words, value, onPick }) {
   );
 }
 
-function CiChart({ days, mood, energy }) {
-  const W = 326, H = 160, L = 28, R = 8, T = 24, B = 24;
-  const m = ciSegments(days, mood, W, H, L, R, T, B), e = ciSegments(days, energy, W, H, L, R, T, B);
+function CiChart({ days, mood, energy, lanes }) {
+  const W = 326, PH = 160, L = 28, R = 8, T = 24, B = 24;
+  const LANE_TOP = 144, LANE_H = 30, LANE_BAR = 16;
+  const ln = lanes || [];
+  const H = ln.length ? LANE_TOP + ln.length * LANE_H + 22 : PH;
+  const m = ciSegments(days, mood, W, PH, L, R, T, B), e = ciSegments(days, energy, W, PH, L, R, T, B);
+  const innerW = W - L - R, nD = days.length;
+  const xOf = i => L + (nD === 1 ? innerW / 2 : (i / (nD - 1)) * innerW);
+  const bw = Math.max(2.5, Math.min(10, (innerW / Math.max(nD, 1)) * 0.7));
   const tickIdx = days.length > 1 ? [0, Math.floor((days.length - 1) / 2), days.length - 1] : [0];
   return (
-    <svg role="img" aria-label="Line chart of daily mood and energy ratings on a scale of 1 to 5" width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
+    <svg role="img" aria-label={`Line chart of daily mood and energy ratings on a scale of 1 to 5${ln.length ? ', with a bar lane for ' + ln.map(x => x.name).join(', ') : ''}`} width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
       {[1, 2, 3, 4, 5].map(v => (
         <g key={v}>
           <line x1={L} x2={W - R} y1={m.yOf(v)} y2={m.yOf(v)} stroke="var(--border)" strokeWidth="1" />
@@ -15831,6 +15838,23 @@ function CiChart({ days, mood, energy }) {
       {m.segs.map((p, i) => <polyline key={'m' + i} points={p} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />)}
       {e.dots.map((p, i) => <circle key={'ed' + i} cx={p[0]} cy={p[1]} r="2.5" fill="var(--ci-energy)" />)}
       {m.dots.map((p, i) => <circle key={'md' + i} cx={p[0]} cy={p[1]} r="2.5" fill="var(--accent)" />)}
+      {ln.map((l, li) => {
+        const y0 = LANE_TOP + li * LANE_H;
+        const vals = Object.values(l.vals);
+        const mx = l.kind === 'count' ? Math.max(1, ...vals) : 1;
+        return (
+          <g key={l.id}>
+            <text x={L} y={y0 + 9} fontSize="10" fontWeight="600" fill="var(--ink-light)">{l.name}{l.kind === 'count' && vals.length ? ` · max ${ciRound(mx)}` : ''}</text>
+            <line x1={L} x2={W - R} y1={y0 + LANE_H - 2} y2={y0 + LANE_H - 2} stroke="var(--border)" strokeWidth="1" />
+            {days.map((dk, i) => {
+              const v = l.vals[dk];
+              if (!v) return null;
+              const h = l.kind === 'count' ? Math.max(2, (v / mx) * LANE_BAR) : LANE_BAR;
+              return <rect key={dk} x={xOf(i) - bw / 2} y={y0 + LANE_H - 2 - h} width={bw} height={h} rx="1.5" fill="var(--ci-lane)"><title>{`${parseLocal(dk).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${l.name}${l.kind === 'count' ? ' ' + ciRound(v) : ''}`}</title></rect>;
+            })}
+          </g>
+        );
+      })}
       {tickIdx.map((idx, k) => (
         <text key={idx} x={L + (days.length === 1 ? (W - L - R) / 2 : (idx / (days.length - 1)) * (W - L - R))} y={H - 6} fontSize="10" fill="var(--ink-light)" textAnchor={k === 0 && days.length > 1 ? 'start' : k === tickIdx.length - 1 && days.length > 1 ? 'end' : 'middle'}>
           {parseLocal(days[idx]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -16017,6 +16041,7 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
   const todayKey = glToday();
   const [tagSheet, setTagSheet] = useState(undefined);   // undefined = closed · null = new · def = edit
   const [trendTag, setTrendTag] = useState('');
+  const [laneIds, setLaneIds] = useState(null);   // null = first three tags; otherwise the ids picked for the chart lanes
   const [day, setDay] = useState(todayKey);
   const [sub, setSub] = useState('today');
   const [range, setRange] = useState(30);
@@ -16050,6 +16075,12 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
     const moodMap = {}, energyMap = {};
     days.forEach(dk => { if (all[dk]) { moodMap[dk] = all[dk].mood; energyMap[dk] = all[dk].energy; } });
     const g = ciPatterns(all, fitnessLog, days);
+    const laneDefs = laneIds === null ? (tagDefs || []).slice(0, 3) : (tagDefs || []).filter(d => laneIds.includes(d.id));
+    const lanes = laneDefs.slice(0, 5).map(d => {
+      const vals = {};
+      days.forEach(dk => { const n = ciTagCount(all[dk], d.id); if (n > 0) vals[dk] = n; });
+      return { id: d.id, name: d.name, kind: d.kind, vals };
+    });
     const recent = Object.keys(all).filter(dk => ciHasData(all[dk])).sort().reverse().slice(0, 5);
     return (
       <div className="main-content">
@@ -16067,11 +16098,23 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
             <>
               <div className="ci-card">
                 <div className="ci-card-title">Mood &amp; energy</div>
-                <CiChart days={days} mood={moodMap} energy={energyMap} />
+                <CiChart days={days} mood={moodMap} energy={energyMap} lanes={lanes} />
                 <div className="ci-legend">
                   <span><svg aria-hidden="true" width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="var(--accent)" strokeWidth="3" /></svg>Mood</span>
                   <span><svg aria-hidden="true" width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="var(--ci-energy)" strokeWidth="3" strokeDasharray="5 3" /></svg>Energy</span>
                 </div>
+                {(tagDefs || []).length > 0 && (
+                  <>
+                    <div className="ci-hint" style={{ marginTop: 4 }}>Show on chart (bars mark the days a tag was on or a counter&rsquo;s amount)</div>
+                    <div className="ci-pills" role="group" aria-label="Tags to show on the chart" style={{ flexWrap: 'wrap' }}>
+                      {tagDefs.map(d => {
+                        const on = laneDefs.some(x => x.id === d.id);
+                        return <button key={d.id} type="button" aria-pressed={on} className={on ? 'on' : ''}
+                          onClick={() => setLaneIds(on ? laneDefs.filter(x => x.id !== d.id).map(x => x.id) : [...laneDefs.map(x => x.id), d.id])}>{d.name}</button>;
+                      })}
+                    </div>
+                  </>
+                )}
               </div>
               <div className="ci-card">
                 <div className="ci-card-title">Patterns</div>
