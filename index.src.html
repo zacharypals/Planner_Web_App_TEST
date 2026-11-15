@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.79.0 -->
+<!-- LP Planner v5.79.1 -->
+<!-- v5.79.1 — Pages › Recent: the list window is shorter — it now shows 5 and a half chips (half of the next one peeks out as the scroll hint) instead of 6 and a bit, since the new chips are taller than the old rows. Still keeps the last 10; scrolls whenever there are more than 5. -->
 <!-- v5.79.0 — Pages › Recent: now remembers the last 10 edited pages but shows 6 at a time — the list scrolls (a sliver of the next page shows as a hint), on the desktop/iPad sidebar and the phone's first screen. Each Recent page is a tinted chip in its folder's color (same hue as the folder in All Pages; pages with no folder stay neutral) with the folder name beside the date. Light and dark. -->
 <!-- v5.78.3 — Bug fix: the phone Weekly Check in pill said "✓ Checked in" on every day it was swiped to, because it always showed TODAY's status. It now reflects the day being viewed, opens the check-in on that day, and is hidden for future days. (The top-bar pill on desktop/iPad still means today.) -->
 <!-- v5.78.2 — Weekly (phone): the Check in pill in the day header is now a filled gold pill with dark text so it stands out; once checked in it turns back to the quiet grey "✓ Checked in". -->
@@ -2056,7 +2057,7 @@
      hue slot the folder uses; no --h = no folder = neutral). Last 10 are kept; the list shows ~6 and scrolls.
      Every chip is the same fixed height so the 6-row window is exact; a sliver of row 7 is left showing as the scroll cue. */
   .pages-recent-list { --rc-h: 50px; --rc-gap: 5px; padding: 0 8px 4px; }
-  .pages-recent-list.scrolls { max-height: calc((var(--rc-h) + var(--rc-gap)) * 6 + 18px + 4px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--ink-faint) 70%, transparent) transparent; }
+  .pages-recent-list.scrolls { max-height: calc((var(--rc-h) + var(--rc-gap)) * 5 + var(--rc-h) * 0.5 + 4px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: color-mix(in oklab, var(--ink-faint) 70%, transparent) transparent; }
   .pages-recent-list.scrolls::-webkit-scrollbar { width: 4px; }
   .pages-recent-list.scrolls::-webkit-scrollbar-button { display: none; }
   .pages-recent-list.scrolls::-webkit-scrollbar-thumb { background: color-mix(in oklab, var(--ink-faint) 70%, transparent); border-radius: 2px; }
@@ -15142,7 +15143,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.79.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.79.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -19918,7 +19919,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
             <span style={{fontSize:9,opacity:0.5,transition:'transform 0.15s',transform:recentCollapsed?'rotate(-90deg)':'rotate(0deg)'}}>▼</span>
           </div>
           {!recentCollapsed && (
-            <div className={`pages-recent-list ${recentDocs.length > 6 ? 'scrolls' : ''}`}>
+            <div className={`pages-recent-list ${recentDocs.length > 5 ? 'scrolls' : ''}`}>
               {recentDocs.map(renderRecentRow)}
             </div>
           )}
@@ -19968,7 +19969,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
               )}
               {recentDocs.length > 0 && <div className="pages-section-label">Recent</div>}
               {recentDocs.length > 0 && (
-                <div className={`pages-recent-list ${recentDocs.length > 6 ? 'scrolls' : ''}`} style={{padding:'0 0 4px'}}>
+                <div className={`pages-recent-list ${recentDocs.length > 5 ? 'scrolls' : ''}`} style={{padding:'0 0 4px'}}>
                   {recentDocs.map(renderRecentRow)}
                 </div>
               )}
