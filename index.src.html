@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.78.1 -->
+<!-- LP Planner v5.78.2 -->
+<!-- v5.78.2 — Weekly (phone): the Check in pill in the day header is now a filled gold pill with dark text so it stands out; once checked in it turns back to the quiet grey "✓ Checked in". -->
 <!-- v5.78.1 — Reading log, Finished books on phones: the pages / dates / days line is a size bigger (13px). -->
 <!-- v5.78.0 — Goals › Reading log, Finished books on phones: the page count and start → finish dates + days-to-finish now sit on one line under the title (indented past the ✓) instead of in a narrow column on the right, so titles use the full width and wrap naturally. Desktop and iPad layouts are unchanged. -->
 <!-- v5.77.2 — Check-in Trends: the page is wider on desktop and iPad (up to 880px) and the Mood & energy chart now sizes itself to its card (taller when wider) instead of staying a phone-width drawing. Phones are unchanged. -->
@@ -3161,9 +3162,9 @@
   .nav-tabs .nav-pill.active .nav-pill-dot { border-color:#3a2960; }
   .nav-tabs .nav-pill.active.done .nav-pill-dot { background:#3a2960; color:#fff; }
   @media (min-width:768px) and (max-width:1100px) { .nav-tabs .nav-pill { margin-left:6px; padding:0 11px; font-size:12px; gap:5px; } }
-  .m-ci-pill { position:relative; margin-top:4px; min-height:26px; padding:0 14px; border-radius:999px; border:1.5px solid var(--accent); background:transparent; color:var(--accent); font-family:'DM Sans',sans-serif; font-size:12px; font-weight:700; cursor:pointer; }
+  .m-ci-pill { position:relative; margin-top:4px; min-height:26px; padding:0 14px; border-radius:999px; border:0; background:linear-gradient(135deg,#f6d067,#e3a92c); color:#3b2700; box-shadow:0 1px 4px rgba(176,122,12,.35); font-family:'DM Sans',sans-serif; font-size:12px; font-weight:800; cursor:pointer; }
   .m-ci-pill::after { content:''; position:absolute; inset:-10px -6px; }
-  .m-ci-pill.done { border-color:var(--border); background:var(--cream); color:var(--ink-light); font-weight:600; }
+  .m-ci-pill.done { border:1px solid var(--border); background:var(--cream); color:var(--ink-light); box-shadow:none; font-weight:600; }
 
   /* ═══ v5.68.0 HOME UPKEEP ═══ */
   :root { --up-late-bg:#fbe4df; --up-late-fg:#9a3324; --up-soon-bg:#fdf0d2; --up-soon-fg:#7a5200; --up-ok-bg:#e6f3ef; --up-ok-fg:#1d6652; }
@@ -15112,7 +15113,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.78.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.78.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
