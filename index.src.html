@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.69.0 -->
+<!-- LP Planner v5.69.1 -->
+<!-- v5.69.1 — Home upkeep: "Done on another date" now always responds — the Save button is never dead (a blank date shows a prompt), and a date earlier than the last completion adds to History and says why the next due date didn't move, instead of closing silently. -->
 <!-- v5.69.0 — Daily check-in: a 20-second end-of-day entry (mood, energy, last night's sleep with bed/wake times, one line, one win). New synced whole-document collection `checkins` keyed by local date (no SYNC_SPLITS/backup change). Opened from a "Check in" button at the top of Habits; Trends sub-page charts mood & energy over 7/30/90 days and shows workout-day and sleep comparisons only when each side has at least 3 days. Also: the Home upkeep tile is now at the bottom of the Monthly sidebar too. -->
 <!-- v5.68.0 — Home upkeep: recurring maintenance that repeats N weeks/months/years after it was last DONE (HVAC filter every 3 months, smoke detectors every 6, etc.). New synced collection `upkeep` (whole document, no SYNC_SPLITS/backup change). New page reached from a "Home upkeep" tile at the very bottom of the Weekly sidebar (below "Manage repeat tasks…"; no new nav tab): Overdue / Next 30 days / Later list with one-tap done, area filter (Condo, HOA, Appliances), and an editor sheet (interval stepper, next due, Done today / on another date, notes, history, delete). Optional per-task "Show in Week view" puts a card in the Weekly planner 7 days before it is due (or today if that has passed). -->
 <!-- v5.67.4 — Reading log: page box 4px wider on phones, Log button exactly 60px wide. (v5.67.3: the Log button is taller and wider to match the boxes beside it. (v5.67.2: the "Log pages" button is now just "Log", and on phones the page box, date and Log button share one row. (v5.67.1: the "Auto from training or habits" chip and the per-task ↻ button are hidden by default; a project's Linked card has a "Show auto-check options" switch to turn them on (rules already set stay visible). (v5.67.0: a milestone can link to a Page: an expanded milestone has a Page row with a picker, Open, and + New page (creates a Page titled Project — Milestone, links it and opens it). (v5.66.1: on desktop/iPad the milestone checkbox moves to the right of the title, a little bigger. (v5.66.0: desktop/iPad milestones get the same chevron-button caret as the phone, and the milestone title sits in a pill (still tap to edit). (v5.65.7: the ▲ ▼ move buttons now sit in the milestone's top row, between the caret and the checkbox, in the caret's style; the phone row is one notch smaller. (v5.65.6: each milestone header has ▲ ▼ buttons to move it one place (a backup for the drag grip, which on some phones did nothing for milestones below the 3rd). Also: the milestone and task drag grips now claim the touch the moment your finger lands (a native, non-passive touchstart handler), so iPhone/iPad Safari cannot hand the touch to page scrolling first. Targets milestones below the 3rd that showed no fade or drop line when pressed. -->
@@ -14994,7 +14995,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.69.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.69.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15301,9 +15302,9 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
   const s = upStats(shown, today);
   const editing = editId === 'new' ? null : all.find(i => i.id === editId);
 
-  function saveItem(item) {
+  function saveItem(item, keepOpen) {
     setUpkeep(l => (l || []).some(i => i.id === item.id) ? l.map(i => i.id === item.id ? item : i) : [...(l || []), item]);
-    setEditId(null);
+    if (!keepOpen) setEditId(null);
   }
   function removeItem(id) { setUpkeep(l => (l || []).filter(i => i.id !== id)); setEditId(null); }
   function doneToday(id) { setUpkeep(l => (l || []).map(i => i.id === id ? upMarkDone(i, glToday()) : i)); }
@@ -15386,6 +15387,7 @@ function UpkeepEditor({ item, defaultArea, onSave, onDelete, onClose }) {
   const [dueTouched, setDueTouched] = useState(false);
   const [otherDate, setOtherDate] = useState(false);
   const [otherVal, setOtherVal] = useState(today);
+  const [otherMsg, setOtherMsg] = useState('');
   const [confirmDel, setConfirmDel] = useState(false);
   const [newLast, setNewLast] = useState('');   // new items only: optional "last done" date
   const [err, setErr] = useState('');
@@ -15411,7 +15413,22 @@ function UpkeepEditor({ item, defaultArea, onSave, onDelete, onClose }) {
   }
   function done(dateStr) {
     if (!(d.name || '').trim()) { setErr('Give it a name first.'); return; }
+    if (!dateStr) { setErr('Pick the date it was done.'); return; }
     onSave(upMarkDone(build(), dateStr));
+  }
+  // v5.69.1: a date earlier than the last completion only adds to History (next due can't move backwards) — say so instead of closing silently
+  function doneOther() {
+    setOtherMsg('');
+    if (!otherVal) { setOtherMsg('Pick the date it was done.'); return; }
+    const ld = d.lastDone;
+    if (ld && otherVal < ld) {
+      const next = upMarkDone(build(), otherVal);
+      setD(x => ({ ...x, history: next.history }));
+      onSave(next, true);
+      setOtherMsg(`Added to History. Next due stays based on ${upShort(ld, today)}, your most recent completion.`);
+      return;
+    }
+    done(otherVal);
   }
   const dueShown = isNew && newLast && !dueTouched ? upAddInterval(newLast, d.every.n, d.every.unit) : d.dueDate;
 
@@ -15466,10 +15483,11 @@ function UpkeepEditor({ item, defaultArea, onSave, onDelete, onClose }) {
                 ? <button type="button" className="up-secondary" onClick={() => setOtherDate(true)}>Done on another date…</button>
                 : (
                   <div className="up-other">
-                    <input className="up-input" type="date" max={today} value={otherVal} aria-label="Date it was done" onChange={e => setOtherVal(e.target.value)} />
-                    <button type="button" className="up-secondary" disabled={!otherVal} onClick={() => done(otherVal)}>Save</button>
+                    <input className="up-input" type="date" max={today} value={otherVal} aria-label="Date it was done" onChange={e => { setOtherMsg(''); setOtherVal(e.target.value); }} />
+                    <button type="button" className="up-secondary" onClick={doneOther}>Save</button>
                   </div>
                 )}
+              {otherMsg && <div className="up-err" role="status">{otherMsg}</div>}
               <div className="up-hint" style={{ textAlign: 'center' }}>Next due is counted from the day you finish it.</div>
             </div>
           )}
