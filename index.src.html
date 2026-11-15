@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.71.2 -->
+<!-- LP Planner v5.72.0 -->
+<!-- v5.72.0 — Check-in: bedtime / wake-up use a custom time picker instead of the browser's — rounded pill buttons for hour, minute (5-minute steps) and AM/PM in a bottom sheet (centered on desktop), so there is nothing to scroll. Times are still stored as 24-hour HH:MM; an old time that isn't on a 5-minute mark still shows and can be reselected. -->
 <!-- v5.71.2 — Goals sub-tab: the Goals and Reading log accordion carets now use the same rounded chevron button as milestones. -->
 <!-- v5.71.1 — Phone only: the milestone title row (drag grip, caret, ▲ ▼ move buttons, checkbox) is a notch smaller (36px → 32px controls, checkbox 26px → 24px). Desktop and iPad unchanged. -->
 <!-- v5.71.0 — Daily check-in is now front and centre: a "Check in" pill in the desktop top bar (after Goals, styled apart from the tabs; becomes "✓ Checked in" once today has an entry) and a matching pill under the date in the mobile Weekly day header. Back / Done return to wherever it was opened from (Week or Habits); the Habits button still works. -->
@@ -3070,6 +3071,25 @@
   .ci-recent-top { display:flex; justify-content:space-between; gap:8px; font-size:13px; }
   .ci-recent-top span { color:var(--ink-light); }
   .ci-recent-line { font-size:13px; color:var(--ink-light); }
+  /* v5.72.0 time picker */
+  .ci-time { width:100%; box-sizing:border-box; min-height:48px; padding:0 16px; border-radius:999px; border:1px solid var(--border); background:var(--paper); color:var(--ink); font-family:'DM Sans',sans-serif; font-size:16px; font-weight:600; display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer; }
+  .ci-time.empty { color:var(--ink-light); font-weight:400; }
+  .ci-time svg { color:var(--accent); flex:none; }
+  .ci-tp-overlay { position:fixed; inset:0; z-index:400; background:rgba(20,16,32,.45); display:flex; align-items:flex-end; justify-content:center; }
+  .ci-tp { width:100%; max-width:420px; box-sizing:border-box; background:var(--surface); color:var(--ink); border-radius:24px 24px 0 0; padding:10px 18px calc(18px + env(safe-area-inset-bottom, 0px)); box-shadow:0 -8px 28px rgba(20,16,32,.25); font-family:'DM Sans',sans-serif; display:flex; flex-direction:column; gap:8px; max-height:94vh; overflow-y:auto; }
+  .ci-tp-handle { width:40px; height:4px; border-radius:2px; background:var(--border); align-self:center; margin-bottom:4px; }
+  .ci-tp-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .ci-tp-head span { font-size:15px; font-weight:700; }
+  .ci-tp-head b { font-family:'Playfair Display',serif; font-size:28px; color:var(--accent); }
+  .ci-tp-lbl { font-size:12px; color:var(--ink-light); margin-top:4px; }
+  .ci-tp-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+  .ci-tp-grid button, .ci-tp-ampm button { min-height:44px; border-radius:999px; border:1px solid var(--border); background:var(--cream); color:var(--ink); font-family:'DM Sans',sans-serif; font-size:16px; font-weight:600; cursor:pointer; }
+  .ci-tp-ampm { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px; }
+  .ci-tp-grid button.on, .ci-tp-ampm button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  [data-theme="dark"] .ci-tp-grid button.on, [data-theme="dark"] .ci-tp-ampm button.on { color:#14121b; }
+  .ci-tp-foot { display:flex; align-items:center; gap:10px; margin-top:8px; }
+  .ci-tp-foot > :first-child { margin-right:auto; }
+  @media (min-width:768px) { .ci-tp-overlay { align-items:center; } .ci-tp { border-radius:24px; padding-bottom:18px; } .ci-tp-handle { display:none; } }
   @media (max-width: 767px) { .ci-page { overflow:visible; } }
   /* v5.71.0 — Check-in entry points: desktop top-bar pill (set apart from the tabs) and a pill in the mobile day header */
   .nav-tabs .nav-pill { margin-left:14px; display:inline-flex; align-items:center; gap:7px; padding:0 16px; min-height:34px; border-radius:999px; border:1.5px solid rgba(255,255,255,0.55); background:transparent; color:#fff; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; letter-spacing:0.01em; cursor:pointer; align-self:center; transition:background .15s, border-color .15s; }
@@ -15031,7 +15051,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.71.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.72.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15675,6 +15695,69 @@ function ciSegments(days, vals, W, H, padL, padR, padT, padB) {
   return { segs, dots, yOf };
 }
 
+// v5.72.0 — Custom time picker (replaces the browser's <input type="time">): hour / minute (5-minute steps) / AM-PM as tappable pills, so nothing needs scrolling.
+function ciParseTime(v) {   // 'HH:MM' (24h) → { h:1-12, m, pm } | null
+  const mt = /^(\d{1,2}):(\d{2})$/.exec(v || '');
+  if (!mt) return null;
+  const H = Number(mt[1]), m = Number(mt[2]);
+  if (H > 23 || m > 59) return null;
+  return { h: H % 12 === 0 ? 12 : H % 12, m, pm: H >= 12 };
+}
+function ciTo24({ h, m, pm }) { return String((h % 12) + (pm ? 12 : 0)).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }
+function ciFmt12(v) { const t = ciParseTime(v); return t ? `${t.h}:${String(t.m).padStart(2, '0')} ${t.pm ? 'PM' : 'AM'}` : ''; }
+
+function CiTimeField({ id, label, value, onChange, fallback }) {
+  const [open, setOpen] = useState(false);
+  const [dr, setDr] = useState({ h: 10, m: 30, pm: true });
+  function openIt() { setDr(ciParseTime(value) || ciParseTime(fallback) || { h: 10, m: 0, pm: true }); setOpen(true); }
+  useEffect(() => {
+    if (!open) return;
+    const k = ev => { if (ev.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [open]);
+  const mins = [...new Set([...Array.from({ length: 12 }, (_, i) => i * 5), dr.m])].sort((a, b) => a - b);
+  return (
+    <>
+      <button type="button" id={id} className={`ci-time ${value ? '' : 'empty'}`} onClick={openIt} aria-haspopup="dialog"
+        aria-label={`${label}, ${value ? ciFmt12(value) : 'not set'}. Change`}>
+        <span>{value ? ciFmt12(value) : 'Set time'}</span>
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+      </button>
+      {open && (
+        <div className="ci-tp-overlay" onClick={() => setOpen(false)}>
+          <div className="ci-tp" role="dialog" aria-modal="true" aria-label={label} onClick={ev => ev.stopPropagation()}>
+            <div className="ci-tp-handle" />
+            <div className="ci-tp-head"><span>{label}</span><b aria-live="polite">{ciFmt12(ciTo24(dr))}</b></div>
+            <div className="ci-tp-lbl">Hour</div>
+            <div className="ci-tp-grid h" role="group" aria-label="Hour">
+              {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                <button key={h} type="button" aria-pressed={dr.h === h} className={dr.h === h ? 'on' : ''} onClick={() => setDr(x => ({ ...x, h }))}>{h}</button>
+              ))}
+            </div>
+            <div className="ci-tp-lbl">Minute</div>
+            <div className="ci-tp-grid m" role="group" aria-label="Minute">
+              {mins.map(m => (
+                <button key={m} type="button" aria-pressed={dr.m === m} className={dr.m === m ? 'on' : ''} onClick={() => setDr(x => ({ ...x, m }))}>{String(m).padStart(2, '0')}</button>
+              ))}
+            </div>
+            <div className="ci-tp-ampm" role="group" aria-label="AM or PM">
+              {[['AM', false], ['PM', true]].map(([t, pm]) => (
+                <button key={t} type="button" aria-pressed={dr.pm === pm} className={dr.pm === pm ? 'on' : ''} onClick={() => setDr(x => ({ ...x, pm }))}>{t}</button>
+              ))}
+            </div>
+            <div className="ci-tp-foot">
+              {value ? <button type="button" className="ci-link" onClick={() => { onChange(''); setOpen(false); }}>Clear</button> : <span />}
+              <button type="button" className="ci-btn" onClick={() => setOpen(false)}>Cancel</button>
+              <button type="button" className="ci-primary" onClick={() => { onChange(ciTo24(dr)); setOpen(false); }}>Set</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function CiScale({ label, words, value, onPick }) {
   return (
     <div className="ci-card">
@@ -15831,8 +15914,8 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
         <div className="ci-card">
           <div className="ci-card-title">Last night&rsquo;s sleep</div>
           <div className="ci-two">
-            <div><label className="ci-lbl" htmlFor="ci-bed">Bedtime</label><input id="ci-bed" className="ci-input" type="time" value={e.bed || ''} onChange={ev => patch({ bed: ev.target.value })} /></div>
-            <div><label className="ci-lbl" htmlFor="ci-wake">Woke up</label><input id="ci-wake" className="ci-input" type="time" value={e.wake || ''} onChange={ev => patch({ wake: ev.target.value })} /></div>
+            <div><label className="ci-lbl" htmlFor="ci-bed">Bedtime</label><CiTimeField id="ci-bed" label="Bedtime" value={e.bed || ''} fallback="22:30" onChange={v => patch({ bed: v })} /></div>
+            <div><label className="ci-lbl" htmlFor="ci-wake">Woke up</label><CiTimeField id="ci-wake" label="Woke up" value={e.wake || ''} fallback="06:30" onChange={v => patch({ wake: v })} /></div>
           </div>
           <div className="ci-hint">{sleepMins != null ? `${ciSleepLabel(sleepMins)} in bed · ` : ''}How did it feel?</div>
           <div className="ci-scale" role="group" aria-label="Sleep quality">
