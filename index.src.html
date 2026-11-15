@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.68.0 -->
+<!-- LP Planner v5.69.0 -->
+<!-- v5.69.0 — Daily check-in: a 20-second end-of-day entry (mood, energy, last night's sleep with bed/wake times, one line, one win). New synced whole-document collection `checkins` keyed by local date (no SYNC_SPLITS/backup change). Opened from a "Check in" button at the top of Habits; Trends sub-page charts mood & energy over 7/30/90 days and shows workout-day and sleep comparisons only when each side has at least 3 days. Also: the Home upkeep tile is now at the bottom of the Monthly sidebar too. -->
 <!-- v5.68.0 — Home upkeep: recurring maintenance that repeats N weeks/months/years after it was last DONE (HVAC filter every 3 months, smoke detectors every 6, etc.). New synced collection `upkeep` (whole document, no SYNC_SPLITS/backup change). New page reached from a "Home upkeep" tile at the very bottom of the Weekly sidebar (below "Manage repeat tasks…"; no new nav tab): Overdue / Next 30 days / Later list with one-tap done, area filter (Condo, HOA, Appliances), and an editor sheet (interval stepper, next due, Done today / on another date, notes, history, delete). Optional per-task "Show in Week view" puts a card in the Weekly planner 7 days before it is due (or today if that has passed). -->
 <!-- v5.67.4 — Reading log: page box 4px wider on phones, Log button exactly 60px wide. (v5.67.3: the Log button is taller and wider to match the boxes beside it. (v5.67.2: the "Log pages" button is now just "Log", and on phones the page box, date and Log button share one row. (v5.67.1: the "Auto from training or habits" chip and the per-task ↻ button are hidden by default; a project's Linked card has a "Show auto-check options" switch to turn them on (rules already set stay visible). (v5.67.0: a milestone can link to a Page: an expanded milestone has a Page row with a picker, Open, and + New page (creates a Page titled Project — Milestone, links it and opens it). (v5.66.1: on desktop/iPad the milestone checkbox moves to the right of the title, a little bigger. (v5.66.0: desktop/iPad milestones get the same chevron-button caret as the phone, and the milestone title sits in a pill (still tap to edit). (v5.65.7: the ▲ ▼ move buttons now sit in the milestone's top row, between the caret and the checkbox, in the caret's style; the phone row is one notch smaller. (v5.65.6: each milestone header has ▲ ▼ buttons to move it one place (a backup for the drag grip, which on some phones did nothing for milestones below the 3rd). Also: the milestone and task drag grips now claim the touch the moment your finger lands (a native, non-passive touchstart handler), so iPhone/iPad Safari cannot hand the touch to page scrolling first. Targets milestones below the 3rd that showed no fade or drop line when pressed. -->
 <!-- v5.65.4 — Projects: hardened touch dragging for milestones and tasks (the finger now stays "captured" by the grip, the page cannot scroll under it while you drag, and the scroll area is frozen until you let go) — fixes drags that would not start on a phone once the list was scrolled. Auto-scroll at the screen edges stays. -->
@@ -3003,6 +3004,63 @@
   [data-theme="dark"] .wk-be::after { content: ''; position: absolute; bottom: -30px; right: -20px; width: 90px; height: 90px; border-radius: 50%; background: rgba(229,177,91,.09); pointer-events: none; }
   [data-theme="dark"] .wk-quote > *:not(.wk-tile-edit), [data-theme="dark"] .wk-be > *:not(.wk-tile-edit) { position: relative; z-index: 1; }
   [data-theme="dark"] .wk-tile-edit { z-index: 2; }
+
+
+  /* ═══ v5.69.0 DAILY CHECK-IN ═══ */
+  :root { --ci-energy:#b07a0c; }
+  :root[data-theme="dark"] { --ci-energy:#e0b04a; }
+  .ci-page { flex:1; overflow-y:auto; overflow-x:hidden; background:var(--cream); }
+  .ci-inner { max-width:560px; margin:0 auto; padding:14px 16px 40px; display:flex; flex-direction:column; gap:12px; }
+  .ci-top { display:flex; align-items:center; gap:10px; }
+  .ci-title { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  .ci-title h1 { margin:0; font-family:'Playfair Display',serif; font-size:24px; font-weight:700; color:var(--ink); }
+  .ci-title span { font-size:13px; color:var(--ink-light); }
+  .ci-btn { min-height:44px; padding:0 14px; border-radius:22px; border:1px solid var(--border); background:var(--surface); color:var(--accent); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:700; cursor:pointer; }
+  .ci-primary { min-height:44px; padding:0 22px; border-radius:22px; border:1px solid var(--accent); background:var(--accent); color:#fff; font-family:'DM Sans',sans-serif; font-size:14px; font-weight:700; cursor:pointer; }
+  [data-theme="dark"] .ci-primary { color:#14121b; }
+  .ci-link { background:none; border:none; color:var(--accent); font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; cursor:pointer; min-height:44px; padding:0 6px; }
+  .ci-daynav { display:flex; align-items:center; justify-content:center; gap:10px; font-size:14px; font-weight:700; color:var(--ink); }
+  .ci-nav { width:44px; height:44px; border-radius:50%; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-size:20px; cursor:pointer; }
+  .ci-nav:disabled { opacity:.35; cursor:default; }
+  .ci-card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+  .ci-card-title { font-family:'DM Sans',sans-serif; font-size:15px; font-weight:700; color:var(--ink); }
+  .ci-scale { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+  .ci-scale button { min-height:52px; border-radius:12px; border:1px solid var(--border); background:var(--paper); color:var(--ink); font-family:'DM Sans',sans-serif; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1px; cursor:pointer; padding:4px 2px; }
+  .ci-scale button b { font-size:16px; }
+  .ci-scale button span { font-size:11px; color:var(--ink-light); }
+  .ci-scale button.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .ci-scale button.on span { color:#fff; }
+  [data-theme="dark"] .ci-scale button.on, [data-theme="dark"] .ci-scale button.on span { color:#14121b; }
+  .ci-two { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .ci-lbl { display:block; font-size:12px; color:var(--ink-light); margin-bottom:3px; }
+  .ci-input { width:100%; box-sizing:border-box; min-height:44px; padding:0 12px; border-radius:10px; border:1px solid var(--border); background:var(--paper); color:var(--ink); font-family:'DM Sans',sans-serif; font-size:16px; }
+  .ci-hint { font-size:12px; color:var(--ink-light); }
+  .ci-chips { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .ci-chip { font-size:12px; font-weight:700; padding:4px 10px; border-radius:99px; background:var(--cream); color:var(--ink-light); border:1px solid var(--border); }
+  .ci-chip.ok { background:var(--up-ok-bg); color:var(--up-ok-fg); border-color:transparent; }
+  .ci-chip.habit { background:var(--up-soon-bg); color:var(--up-soon-fg); border-color:transparent; }
+  .ci-foot { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .ci-saved { font-size:13px; color:var(--ink-light); }
+  .ci-pills { display:flex; gap:8px; }
+  .ci-pills button { min-height:36px; padding:0 14px; border-radius:18px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-family:'DM Sans',sans-serif; font-size:14px; cursor:pointer; }
+  .ci-pills button.on { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700; }
+  [data-theme="dark"] .ci-pills button.on { color:#14121b; }
+  .ci-legend { display:flex; gap:16px; font-size:12px; color:var(--ink-light); }
+  .ci-legend span { display:flex; align-items:center; gap:6px; }
+  .ci-cmp { display:flex; flex-direction:column; gap:6px; }
+  .ci-cmp-title { font-size:13px; font-weight:700; color:var(--ink); }
+  .ci-cmp-row { display:grid; grid-template-columns:110px 1fr 32px; align-items:center; gap:8px; }
+  .ci-cmp-lbl { font-size:13px; color:var(--ink); display:flex; flex-direction:column; }
+  .ci-cmp-lbl small { font-size:11px; color:var(--ink-light); }
+  .ci-bar { height:10px; border-radius:5px; background:var(--cream); overflow:hidden; }
+  .ci-bar div { height:100%; background:var(--accent); border-radius:5px; }
+  .ci-bar div.alt { background:var(--ci-energy); }
+  .ci-cmp-val { font-size:13px; font-weight:700; color:var(--ink); text-align:right; }
+  .ci-recent { text-align:left; display:flex; flex-direction:column; gap:2px; min-height:44px; padding:8px 4px; border:none; border-top:1px solid var(--border); background:none; color:var(--ink); font-family:'DM Sans',sans-serif; cursor:pointer; }
+  .ci-recent-top { display:flex; justify-content:space-between; gap:8px; font-size:13px; }
+  .ci-recent-top span { color:var(--ink-light); }
+  .ci-recent-line { font-size:13px; color:var(--ink-light); }
+  @media (max-width: 767px) { .ci-page { overflow:visible; } }
 
   /* ═══ v5.68.0 HOME UPKEEP ═══ */
   :root { --up-late-bg:#fbe4df; --up-late-fg:#9a3324; --up-soon-bg:#fdf0d2; --up-soon-fg:#7a5200; --up-ok-bg:#e6f3ef; --up-ok-fg:#1d6652; }
@@ -9145,7 +9203,7 @@ function HabitFreqEditor({ goal, onChange, dayKey }) {
 // ─────────────────────────────────────────────
 // HABIT TRACKER
 // ─────────────────────────────────────────────
-function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completions, setCompletions, metrics, setMetrics, qty, setQty, notes, setNotes, fitnessLog, fitnessExercises, countdowns, setCountdowns }) {
+function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completions, setCompletions, metrics, setMetrics, qty, setQty, notes, setNotes, fitnessLog, fitnessExercises, countdowns, setCountdowns, onOpenCheckin, checkins }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDateRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_habitDate'));
@@ -9617,6 +9675,9 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
             ))}
           </div>
           <div style={{flex:1}}/>
+          {onOpenCheckin && (()=>{ const done = ciHasData((checkins||{})[glToday()]); return (
+            <button type="button" className="ci-btn" onClick={onOpenCheckin} aria-label={done?'Check-in done for today, open it':'Open today\'s check-in'}>{done?'✓ Checked in':'Check in'}</button>
+          ); })()}
         </div>
 
         {/* GOAL FILTER CHIPS */}
@@ -10737,7 +10798,7 @@ function TimeSelect({ value, onChange }) {
   );
 }
 
-function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals }) {
+function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals, upkeep, onOpenUpkeep }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(null);
@@ -11058,6 +11119,11 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals 
           );
         })}
       </div>
+      {onOpenUpkeep && (
+        <div className="sidebar-section" style={{paddingTop:0}}>
+          <UpkeepLink upkeep={upkeep} onOpen={onOpenUpkeep} />
+        </div>
+      )}
     </>
   );
 
@@ -14408,6 +14474,7 @@ function App() {
   const [targets, setTargets] = useSynced('targets', []); // v5.30.0 [{id,kind,period,books,pages}] — see TARGETS section
   const [targetLog, setTargetLog] = useSynced('targetLog', []); // v5.30.0 [{id,kind,title,author,total,updates:[{date,pages}],finishedDate,notes}]
   const [countdowns, setCountdowns] = useSynced('countdowns', []); // [{id, title, startDate, endDate, color}]
+  const [checkins, setCheckins] = useSynced('checkins', {}); // v5.69.0 Daily check-in — see DAILY CHECK-IN section
   const [upkeep, setUpkeep] = useSynced('upkeep', []); // v5.68.0 Home upkeep — see HOME UPKEEP section
   const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
   // v5.35.0 — a Project linked to a reading-log book finishes that book when the project is marked done.
@@ -14927,13 +14994,13 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.68.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.69.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
           <button className={`nav-tab ${page==='planner'?'active':''}`} onClick={()=>setPage('planner')}>Weekly</button>
           <button className={`nav-tab ${page==='monthly'?'active':''}`} onClick={()=>setPage('monthly')}>Monthly</button>
-          <button className={`nav-tab ${page==='habit'?'active':''}`} onClick={()=>setPage('habit')}>Habit Tracker</button>
+          <button className={`nav-tab ${page==='habit'||page==='checkin'?'active':''}`} onClick={()=>setPage('habit')}>Habit Tracker</button>
           <button className={`nav-tab ${page==='pages'?'active':''}`} onClick={()=>setPage('pages')}>Pages</button>
           <button className={`nav-tab ${page==='fitness'?'active':''}`} onClick={()=>setPage('fitness')}>Fitness</button>
           <button className={`nav-tab ${page==='goals'?'active':''}`} onClick={()=>setPage('goals')}>Goals</button>
@@ -15006,8 +15073,9 @@ function App() {
           pullActive.current = false;
         }}>
       {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} />}
+      {page==='checkin' && <CheckinView checkins={checkins} setCheckins={setCheckins} habitGoals={habitGoals} habitCompletions={habitCompletions} fitnessLog={fitnessLog} onBack={()=>setPage('habit')} />}
       {page==='upkeep' && <UpkeepView upkeep={upkeep} setUpkeep={setUpkeep} onBack={()=>setPage('planner')} />}
-      {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} />}
+      {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} upkeep={upkeep} onOpenUpkeep={()=>setPage('upkeep')} />}
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
         completions={habitCompletions} setCompletions={setHabitCompletions}
@@ -15017,7 +15085,8 @@ function App() {
         fitnessLog={fitnessLog} fitnessExercises={fitnessExercises}
         countdowns={countdowns} setCountdowns={setCountdowns}
         onGoToPlanner={()=>setPage('planner')}
-        onGoToMetrics={()=>setPage('metrics')} />}
+        onGoToMetrics={()=>setPage('metrics')}
+        onOpenCheckin={()=>setPage('checkin')} checkins={checkins} />}
       {page==='metrics' && <MetricsView
         metrics={habitMetrics}
         weightTarget={weightTarget} setWeightTarget={setWeightTarget}
@@ -15070,7 +15139,7 @@ function App() {
         <button className={`mobile-bottom-nav-btn ${page==='goals'?'active':''}`} onClick={()=>{setPage('goals');setMoreOpen(false);}}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h12l-2.5 4 2.5 4H5"/></svg>Goals
         </button>
-        <button className={`mobile-bottom-nav-btn ${page==='habit'||page==='metrics'?'active':''}`} onClick={()=>{setPage('habit');setMoreOpen(false);}}>
+        <button className={`mobile-bottom-nav-btn ${page==='habit'||page==='metrics'||page==='checkin'?'active':''}`} onClick={()=>{setPage('habit');setMoreOpen(false);}}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg>Habits
         </button>
         <button className={`mobile-bottom-nav-btn ${page==='planner'||page==='upkeep'?'active':''}`} onClick={()=>{setPage('planner');setMoreOpen(false);}}>
@@ -15435,6 +15504,258 @@ function UpkeepEditor({ item, defaultArea, onSave, onDelete, onClose }) {
           <button type="button" className="up-primary" style={{ flex: 'none', minWidth: 96 }} onClick={save}>Save</button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// DAILY CHECK-IN (v5.69.0)
+// A 20-second end-of-day entry: mood, energy, last night's sleep (bed/wake times + how it felt), one line, one win.
+// One small synced collection `checkins` (a whole document keyed by local date, so no SYNC_SPLITS / backup.js entry):
+//   { 'YYYY-MM-DD': { mood:1-5|0, energy:1-5|0, sleepQ:1-5|0, bed:'HH:MM', wake:'HH:MM', line, win, savedAt } }
+// Autosaves on every change; an entry with nothing in it is removed. Workout / habit chips are read from fitnessLog and
+// habitCompletions at display time — never copied. Trends are computed from what was entered; nothing is estimated.
+// ─────────────────────────────────────────────
+const CI_MOOD = ['Low', 'Meh', 'Okay', 'Good', 'Great'];
+const CI_ENERGY = ['Drained', 'Low', 'Steady', 'Good', 'Charged'];
+const CI_SLEEP = ['Poor', 'Light', 'Okay', 'Solid', 'Great'];
+const CI_MIN_GROUP = 3;   // a comparison in Trends needs at least this many days on each side
+
+function ciHasData(e) {
+  return !!e && (e.mood > 0 || e.energy > 0 || e.sleepQ > 0 || !!e.bed || !!e.wake || !!(e.line || '').trim() || !!(e.win || '').trim());
+}
+function ciSleepMins(bed, wake) {   // minutes in bed; wake is the next morning when it is earlier than bed
+  if (!bed || !wake) return null;
+  const [bh, bm] = bed.split(':').map(Number), [wh, wm] = wake.split(':').map(Number);
+  if ([bh, bm, wh, wm].some(x => isNaN(x))) return null;
+  let m = (wh * 60 + wm) - (bh * 60 + bm);
+  if (m < 0) m += 1440;
+  return m === 0 ? null : m;
+}
+function ciSleepLabel(mins) { return mins == null ? '' : `${Math.floor(mins / 60)}h ${mins % 60}m`; }
+function ciAvg(a) { return a.length ? a.reduce((s, x) => s + x, 0) / a.length : null; }
+function ciDays(todayKey, n) {   // oldest → today
+  const out = [];
+  for (let i = n - 1; i >= 0; i--) out.push(fmtLocal(addDays(parseLocal(todayKey), -i)));
+  return out;
+}
+function ciDayLabel(dk, withWeekday) {
+  const d = parseLocal(dk);
+  return d ? d.toLocaleDateString('en-US', withWeekday ? { weekday: 'long', month: 'short', day: 'numeric' } : { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+}
+function ciWorkedOut(fitnessLog, dk) { return ((fitnessLog || {})[fmt(parseLocal(dk))] || []).length > 0; }
+// Groups for the Trends comparisons (only days that have a check-in).
+function ciPatterns(checkins, fitnessLog, days) {
+  const g = { workMood: [], restMood: [], longSleepEnergy: [], shortSleepEnergy: [] };
+  days.forEach(dk => {
+    const e = (checkins || {})[dk];
+    if (!e) return;
+    if (e.mood > 0) (ciWorkedOut(fitnessLog, dk) ? g.workMood : g.restMood).push(e.mood);
+    const sm = ciSleepMins(e.bed, e.wake);
+    if (sm != null && e.energy > 0) { if (sm >= 420) g.longSleepEnergy.push(e.energy); else if (sm < 360) g.shortSleepEnergy.push(e.energy); }
+  });
+  return g;
+}
+// Polyline segments for a 1–5 series: days without a value break the line instead of being joined across.
+function ciSegments(days, vals, W, H, padL, padR, padT, padB) {
+  const n = days.length, innerW = W - padL - padR, innerH = H - padT - padB;
+  const xOf = i => padL + (n === 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+  const yOf = v => padT + innerH - ((v - 1) / 4) * innerH;
+  const segs = [], dots = [];
+  let cur = [];
+  days.forEach((dk, i) => {
+    const v = vals[dk];
+    if (v > 0) { cur.push(xOf(i).toFixed(1) + ',' + yOf(v).toFixed(1)); dots.push([xOf(i), yOf(v)]); }
+    else { if (cur.length > 1) segs.push(cur.join(' ')); cur = []; }
+  });
+  if (cur.length > 1) segs.push(cur.join(' '));
+  return { segs, dots, yOf };
+}
+
+function CiScale({ label, words, value, onPick }) {
+  return (
+    <div className="ci-card">
+      <div className="ci-card-title" id={'ci-' + label.replace(/\W/g, '')}>{label}</div>
+      <div className="ci-scale" role="group" aria-labelledby={'ci-' + label.replace(/\W/g, '')}>
+        {words.map((w, i) => (
+          <button key={w} type="button" aria-pressed={value === i + 1} className={value === i + 1 ? 'on' : ''} onClick={() => onPick(value === i + 1 ? 0 : i + 1)}>
+            <b>{i + 1}</b><span>{w}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CiChart({ days, mood, energy }) {
+  const W = 326, H = 160, L = 28, R = 8, T = 24, B = 24;
+  const m = ciSegments(days, mood, W, H, L, R, T, B), e = ciSegments(days, energy, W, H, L, R, T, B);
+  const tickIdx = days.length > 1 ? [0, Math.floor((days.length - 1) / 2), days.length - 1] : [0];
+  return (
+    <svg role="img" aria-label="Line chart of daily mood and energy ratings on a scale of 1 to 5" width="100%" viewBox={`0 0 ${W} ${H}`} style={{ display: 'block' }}>
+      {[1, 2, 3, 4, 5].map(v => (
+        <g key={v}>
+          <line x1={L} x2={W - R} y1={m.yOf(v)} y2={m.yOf(v)} stroke="var(--border)" strokeWidth="1" />
+          <text x={L - 8} y={m.yOf(v) + 4} textAnchor="end" fontSize="11" fill="var(--ink-light)">{v}</text>
+        </g>
+      ))}
+      {e.segs.map((p, i) => <polyline key={'e' + i} points={p} fill="none" stroke="var(--ci-energy)" strokeWidth="2.5" strokeDasharray="6 4" strokeLinejoin="round" strokeLinecap="round" />)}
+      {m.segs.map((p, i) => <polyline key={'m' + i} points={p} fill="none" stroke="var(--accent)" strokeWidth="2.5" strokeLinejoin="round" strokeLinecap="round" />)}
+      {e.dots.map((p, i) => <circle key={'ed' + i} cx={p[0]} cy={p[1]} r="2.5" fill="var(--ci-energy)" />)}
+      {m.dots.map((p, i) => <circle key={'md' + i} cx={p[0]} cy={p[1]} r="2.5" fill="var(--accent)" />)}
+      {tickIdx.map((idx, k) => (
+        <text key={idx} x={L + (days.length === 1 ? (W - L - R) / 2 : (idx / (days.length - 1)) * (W - L - R))} y={H - 6} fontSize="10" fill="var(--ink-light)" textAnchor={k === 0 && days.length > 1 ? 'start' : k === tickIdx.length - 1 && days.length > 1 ? 'end' : 'middle'}>
+          {parseLocal(days[idx]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </text>
+      ))}
+    </svg>
+  );
+}
+
+function CiCompare({ title, rows }) {   // rows: [{label, vals}] — bar per row, only shown when every row has enough days
+  const ok = rows.every(r => r.vals.length >= CI_MIN_GROUP);
+  return (
+    <div className="ci-cmp">
+      <div className="ci-cmp-title">{title}</div>
+      {ok ? rows.map(r => {
+        const a = ciAvg(r.vals);
+        return (
+          <div key={r.label} className="ci-cmp-row">
+            <div className="ci-cmp-lbl">{r.label}<small>{r.vals.length} days</small></div>
+            <div className="ci-bar"><div style={{ width: Math.round((a / 5) * 100) + '%' }} className={r.alt ? 'alt' : ''} /></div>
+            <div className="ci-cmp-val">{a.toFixed(1)}</div>
+          </div>
+        );
+      }) : <div className="ci-hint">Needs at least {CI_MIN_GROUP} days on each side. {rows.map(r => `${r.label}: ${r.vals.length}`).join(' · ')}.</div>}
+    </div>
+  );
+}
+
+function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitnessLog, onBack }) {
+  const todayKey = glToday();
+  const [day, setDay] = useState(todayKey);
+  const [sub, setSub] = useState('today');
+  const [range, setRange] = useState(30);
+  const all = checkins || {};
+  const e = all[day] || {};
+
+  function patch(p) {
+    setCheckins(c => {
+      const cur = (c || {})[day] || {};
+      const next = { ...cur, ...p, savedAt: Date.now() };
+      const out = { ...(c || {}) };
+      if (ciHasData(next)) out[day] = next; else delete out[day];
+      return out;
+    });
+  }
+  function shift(n) { setDay(d => { const nd = fmtLocal(addDays(parseLocal(d), n)); return nd > todayKey ? d : nd; }); }
+
+  if (sub === 'trends') {
+    const days = ciDays(todayKey, range);
+    const withData = days.filter(dk => ciHasData(all[dk]));
+    const moodMap = {}, energyMap = {};
+    days.forEach(dk => { if (all[dk]) { moodMap[dk] = all[dk].mood; energyMap[dk] = all[dk].energy; } });
+    const g = ciPatterns(all, fitnessLog, days);
+    const recent = Object.keys(all).filter(dk => ciHasData(all[dk])).sort().reverse().slice(0, 5);
+    return (
+      <div className="main-content">
+        <div className="ci-page"><div className="ci-inner">
+          <div className="ci-top">
+            <button type="button" className="ci-btn" onClick={() => setSub('today')} aria-label="Back to check-in">‹ Check-in</button>
+            <div className="ci-title"><h1>Trends</h1><span>{withData.length} {withData.length === 1 ? 'check-in' : 'check-ins'} in the last {range} days</span></div>
+          </div>
+          <div className="ci-pills" role="tablist" aria-label="Range">
+            {[7, 30, 90].map(n => <button key={n} type="button" role="tab" aria-selected={range === n} className={range === n ? 'on' : ''} onClick={() => setRange(n)}>{n} days</button>)}
+          </div>
+          {withData.length === 0 ? (
+            <div className="ci-card"><div className="ci-hint">Nothing to chart yet. Fill in a few check-ins and the trends will appear here.</div></div>
+          ) : (
+            <>
+              <div className="ci-card">
+                <div className="ci-card-title">Mood &amp; energy</div>
+                <CiChart days={days} mood={moodMap} energy={energyMap} />
+                <div className="ci-legend">
+                  <span><svg aria-hidden="true" width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="var(--accent)" strokeWidth="3" /></svg>Mood</span>
+                  <span><svg aria-hidden="true" width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="var(--ci-energy)" strokeWidth="3" strokeDasharray="5 3" /></svg>Energy</span>
+                </div>
+              </div>
+              <div className="ci-card">
+                <div className="ci-card-title">Patterns</div>
+                <CiCompare title="Average mood" rows={[{ label: 'Workout days', vals: g.workMood }, { label: 'Rest days', vals: g.restMood, alt: true }]} />
+                <CiCompare title="Energy by time in bed" rows={[{ label: '7h or more', vals: g.longSleepEnergy }, { label: 'Under 6h', vals: g.shortSleepEnergy, alt: true }]} />
+              </div>
+              <div className="ci-card">
+                <div className="ci-card-title">Recent entries</div>
+                {recent.map(dk => {
+                  const x = all[dk];
+                  return (
+                    <button key={dk} type="button" className="ci-recent" onClick={() => { setDay(dk); setSub('today'); }}>
+                      <span className="ci-recent-top"><b>{ciDayLabel(dk)}</b><span>{x.mood > 0 ? `Mood ${x.mood}` : ''}{x.mood > 0 && x.energy > 0 ? ' · ' : ''}{x.energy > 0 ? `Energy ${x.energy}` : ''}</span></span>
+                      {(x.line || '').trim() && <span className="ci-recent-line">{x.line}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div></div>
+      </div>
+    );
+  }
+
+  const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily');
+  const habitsDone = dailyHabits.filter(g => ((habitCompletions || {})[fmt(parseLocal(day))] || []).includes(g.id)).length;
+  const worked = ciWorkedOut(fitnessLog, day);
+  const sleepMins = ciSleepMins(e.bed, e.wake);
+  return (
+    <div className="main-content">
+      <div className="ci-page"><div className="ci-inner">
+        <div className="ci-top">
+          <button type="button" className="ci-btn" onClick={onBack} aria-label="Back to Habits">‹ Habits</button>
+          <div className="ci-title"><h1>Check-in</h1><span>{ciDayLabel(day, true)}</span></div>
+          <button type="button" className="ci-btn" onClick={() => setSub('trends')}>Trends</button>
+        </div>
+        <div className="ci-daynav">
+          <button type="button" className="ci-nav" aria-label="Previous day" onClick={() => shift(-1)}>‹</button>
+          <span>{day === todayKey ? 'Today' : ciDayLabel(day)}</span>
+          <button type="button" className="ci-nav" aria-label="Next day" disabled={day >= todayKey} onClick={() => shift(1)}>›</button>
+          {day !== todayKey && <button type="button" className="ci-link" onClick={() => setDay(todayKey)}>Back to today</button>}
+        </div>
+
+        <CiScale label="How is your mood?" words={CI_MOOD} value={e.mood || 0} onPick={n => patch({ mood: n })} />
+        <CiScale label="How is your energy?" words={CI_ENERGY} value={e.energy || 0} onPick={n => patch({ energy: n })} />
+
+        <div className="ci-card">
+          <div className="ci-card-title">Last night&rsquo;s sleep</div>
+          <div className="ci-two">
+            <div><label className="ci-lbl" htmlFor="ci-bed">Bedtime</label><input id="ci-bed" className="ci-input" type="time" value={e.bed || ''} onChange={ev => patch({ bed: ev.target.value })} /></div>
+            <div><label className="ci-lbl" htmlFor="ci-wake">Woke up</label><input id="ci-wake" className="ci-input" type="time" value={e.wake || ''} onChange={ev => patch({ wake: ev.target.value })} /></div>
+          </div>
+          <div className="ci-hint">{sleepMins != null ? `${ciSleepLabel(sleepMins)} in bed · ` : ''}How did it feel?</div>
+          <div className="ci-scale" role="group" aria-label="Sleep quality">
+            {CI_SLEEP.map((w, i) => (
+              <button key={w} type="button" aria-pressed={e.sleepQ === i + 1} className={e.sleepQ === i + 1 ? 'on' : ''} onClick={() => patch({ sleepQ: e.sleepQ === i + 1 ? 0 : i + 1 })}><b>{i + 1}</b><span>{w}</span></button>
+            ))}
+          </div>
+        </div>
+
+        <div className="ci-card">
+          <label className="ci-card-title" htmlFor="ci-line">Today in one line</label>
+          <input id="ci-line" className="ci-input" type="text" value={e.line || ''} placeholder="Slow morning, good afternoon…" onChange={ev => patch({ line: ev.target.value })} />
+          <label className="ci-card-title" htmlFor="ci-win" style={{ marginTop: 6 }}>One win</label>
+          <input id="ci-win" className="ci-input" type="text" value={e.win || ''} placeholder="Something that went right" onChange={ev => patch({ win: ev.target.value })} />
+        </div>
+
+        <div className="ci-chips">
+          <span className="ci-hint">From your other tabs:</span>
+          <span className={`ci-chip ${worked ? 'ok' : ''}`}>{worked ? 'Workout logged' : 'No workout logged'}</span>
+          {dailyHabits.length > 0 && <span className="ci-chip habit">{habitsDone} of {dailyHabits.length} daily habits</span>}
+        </div>
+        <div className="ci-foot">
+          <span className="ci-saved" aria-live="polite">{ciHasData(e) ? '✓ Saved automatically' : 'Nothing entered yet'}</span>
+          <button type="button" className="ci-primary" onClick={onBack}>Done</button>
+        </div>
+      </div></div>
     </div>
   );
 }
