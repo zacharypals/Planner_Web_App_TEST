@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.72.2 -->
+<!-- LP Planner v5.73.0 -->
+<!-- v5.73.0 — Fitness tab: the left sidebar can be collapsed on desktop and iPad with a slim toggle strip (‹ / ›) on its edge, like the Weekly sidebar; the choice is remembered on each device. Phones unchanged. -->
 <!-- v5.72.2 — Fitness Day view: the ⏱ interval-timer button on exercise tiles is now a modern line-style stopwatch icon, a bit bigger. -->
 <!-- v5.72.1 — Fitness Day view: the collapse/expand arrow on exercise tiles is now the same rounded chevron button as milestones. -->
 <!-- v5.72.0 — Check-in: bedtime / wake-up use a custom time picker instead of the browser's — rounded pill buttons for hour, minute (5-minute steps) and AM/PM in a bottom sheet (centered on desktop), so there is nothing to scroll. Times are still stored as 24-hour HH:MM; an old time that isn't on a 5-minute mark still shows and can be reselected. -->
@@ -550,6 +551,12 @@
     background: var(--paper); border-right: 1px solid var(--border);
     overflow-y: auto; padding: 16px 12px;
   }
+  /* v5.73.0 — collapsible Fitness sidebar: wrapper holds the sidebar + a slim toggle strip (same pattern as the Weekly sidebar) */
+  .fitness-side-wrap { display: flex; flex-direction: row; flex-shrink: 0; width: 252px; transition: width 0.25s ease; } /* 220px sidebar + 32px strip */
+  .fitness-side-wrap.collapsed { width: 32px; }
+  .fitness-side-wrap > .fitness-sidebar { min-width: 220px; transition: opacity 0.2s, width 0.25s, padding 0.25s; }
+  .fitness-side-wrap.collapsed > .fitness-sidebar { opacity: 0; pointer-events: none; width: 0; min-width: 0; padding: 0; overflow: hidden; }
+  .fitness-side-wrap.collapsed .sidebar-collapsed-label { opacity: 1; }
   .fitness-main {
     flex: 1; overflow-y: auto; padding: 20px 24px;
     display: flex; flex-direction: column; gap: 16px;
@@ -734,7 +741,7 @@
   @media (max-width: 767px) { .fc-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   /* Mobile fitness */
   @media (max-width: 767px) {
-    .fitness-sidebar { display: none; }
+    .fitness-side-wrap { display: none; }
     .fitness-main { padding: 10px 12px 80px; }
     .fitness-view-tabs { width: 100%; }
     .fitness-view-tab { padding: 5px 8px; font-size: 11px; }
@@ -2368,7 +2375,7 @@
     .main-content, .fitness-layout { padding: 16px; gap: 16px; }
 
     /* Sidebars become cards (toggle strip lives inside the card) */
-    .sidebar-wrap, .pages-sidebar-wrap, .fitness-sidebar {
+    .sidebar-wrap, .pages-sidebar-wrap, .fitness-side-wrap {
       background: var(--paper); border: var(--card-border);
       border-radius: var(--radius-lg); box-shadow: var(--card-shadow); overflow: hidden;
     }
@@ -2377,7 +2384,7 @@
       border-right: none; border-left: 1px solid var(--border); background: var(--paper);
     }
     .pages-sidebar-wrap > .pages-sidebar { border-right: none; }
-    .fitness-sidebar { border-right: var(--card-border); }
+    .fitness-side-wrap > .fitness-sidebar { border-right: none; }
 
     /* Weekly planner: calendar + review as two stacked cards */
     .weekly-main-panel { gap: 16px; }
@@ -15059,7 +15066,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.72.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.73.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -16684,6 +16691,8 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
   const [showGoalManager, setShowGoalManager] = useState(false);
   const [goalFocus, setGoalFocus] = useState(null); // v5.39.0: 'exerciseId|period' of the goal whose pencil opened the manager
   const [goalsCollapsed, setGoalsCollapsed] = useState(false);
+  const [fitSideCollapsed, setFitSideCollapsedRaw] = useState(() => lsGet('fitSideCollapsed') === '1'); // v5.73.0 — desktop/iPad only; remembered per device
+  const setFitSideCollapsed = (v) => { lsSet('fitSideCollapsed', v ? '1' : '0'); setFitSideCollapsedRaw(v); };
   const prIndex = React.useMemo(() => prBuildIndex(fitnessLog), [fitnessLog]); // v5.17.0 PR history, derived
   // Collapsed/expanded state for Day-view exercise tiles is stored on the exercise
   // itself (ex.collapsed in fitnessLog) so it survives tab switches, reloads, and
@@ -17301,7 +17310,8 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
 
   return (
     <div className="fitness-layout">
-      {/* SIDEBAR */}
+      {/* SIDEBAR (collapsible on desktop/iPad, v5.73.0) */}
+      <div className={`fitness-side-wrap${fitSideCollapsed ? ' collapsed' : ''}`}>
       <div className="fitness-sidebar">
         <div className="fitness-day-nav" style={{marginBottom:12}}>
           <button className="nav-arrow" onClick={()=>{
@@ -17417,6 +17427,12 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
             </div>
           ))}
         </div>
+      </div>
+      <div className="sidebar-toggle-strip fitness-toggle-strip" onClick={()=>setFitSideCollapsed(!fitSideCollapsed)}
+        title={fitSideCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+        <div className="sidebar-toggle-btn">{fitSideCollapsed ? '›' : '‹'}</div>
+        <span className="sidebar-collapsed-label">Fitness</span>
+      </div>
       </div>
 
       {/* MAIN */}
