@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.80.1 -->
+<!-- LP Planner v5.81.0 -->
+<!-- v5.81.0 — Time-bound habits: a habit can have an optional Start and End date (both inclusive). Outside those dates it drops out of the Habit Tracker lists, calendar views, the Weekly Planner day habits, the check-in and the weekly review; its history stays and still shows when you browse back. New habits start today. "End today" ends a habit with an Undo; an "Ended & upcoming" list under the calendar lets you view, re-date, resume or delete them. Fitness-linked habits stop auto-checking after their end date. No new synced key (startDate / endDate live on the habit). -->
 <!-- v5.80.1 — Fitness set rows: the Done-time pill is wider (52px, 44px on phones) so the whole time has breathing room. -->
 <!-- v5.80.0 — Fitness set rows: tapping Done now records the time (shown as a small pill like 2:41p just before the Done circle). Tap the pill to edit it in the same hour / minute / AM-PM sheet as the check-in, or Clear it; unchecking Done clears it. Only stamps automatically when you are logging today; on other days (or older done sets) the pill reads "+ time" and you tap to enter one. Stored as `doneAt` (HH:MM) on the set, so no new sync key. -->
 <!-- v5.79.7 — Weekly › Habits: tap anywhere on a habit row (name, blank space, circle) to check or uncheck it, in every Weekly layout (desktop columns, phone day view, time-block popover). The ▼ Qty/Notes button still just expands the row. -->
@@ -3414,10 +3415,23 @@ function genLiId() { return 'li'+Date.now()+Math.random().toString(36).slice(2,7
 // Days off the schedule are neutral too; a completion on any day still counts.
 // perWeek streaks count consecutive weeks (Sun–Sat) with at least n completions; the current
 // week counts once it is met and is "pending" (never a break) until then.
+// ── TIME-BOUND HABITS (v5.81.0) ──
+// goal.startDate / goal.endDate: optional 'YYYY-MM-DD' keys (same keys as habitCompletions), both inclusive.
+// A missing date means "no limit", so every older habit stays active forever, exactly as before.
+// History is never deleted: completions, qty and notes stay under their dates; views simply stop listing the habit
+// on days outside its range (a completion logged outside the range still shows).
+function habitActiveOn(h, dk) { return (!h.startDate || h.startDate <= dk) && (!h.endDate || h.endDate >= dk); }
+function habitActiveIn(h, fromDk, toDk) { return (!h.startDate || h.startDate <= toDk) && (!h.endDate || h.endDate >= fromDk); }
+function habitEnded(h, todayDk) { return !!h.endDate && h.endDate < todayDk; }
+function habitUpcoming(h, todayDk) { return !!h.startDate && h.startDate > todayDk; }
+function habitTodayKey() { const d = new Date(); d.setHours(0,0,0,0); return fmt(d); }
 function habitStreak(goal, completions, todayDate) {
   const done = dk => ((completions || {})[dk] || []).includes(goal.id);
   const type = goal.freq && goal.freq.type;
   const t0 = new Date(todayDate); t0.setHours(0,0,0,0);
+  // v5.81.0: an ended habit's streak stays frozen at its last day
+  const endD = goal.endDate ? parseLocal(goal.endDate) : null;
+  if (endD && endD < t0) t0.setTime(endD.getTime());
   if (type === 'perWeek') {
     const n = Math.max(1, parseInt(goal.freq.n, 10) || 1);
     const count = w => { let c = 0; for (let i = 0; i < 7; i++) if (done(fmt(addDays(w, i)))) c++; return c; };
@@ -6239,7 +6253,7 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
   const busiest = perDay.indexOf(Math.max(...perDay));
   const quietest = perDay.indexOf(Math.min(...perDay));
 
-  const habitStats = (habitGoals || []).map(h => ({ h, ...habitWeekStats(h, habitCompletions, weekStart) }));
+  const habitStats = (habitGoals || []).filter(h => habitActiveIn(h, fmt(weekStart), fmt(addDays(weekStart, 6)))).map(h => ({ h, ...habitWeekStats(h, habitCompletions, weekStart) }));
   const habitTotal = habitStats.reduce((s, x) => s + x.target, 0);
   const habitHit = habitStats.reduce((s, x) => s + Math.min(x.done, x.target), 0);
   const workouts = dayKeys.filter(dk => ((fitnessLog || {})[dk] || []).length > 0).length;
@@ -7417,7 +7431,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       items.push({ k: 'g:' + task.id, kind: 'goal', id: task.id, ref: { goalId: goal.id, msId: ms.id, taskId: task.id }, start: s, dur: Math.max(5, Math.min(task.durMin > 0 ? task.durMin : 30, 1440 - s)),
         title: task.title, done: !!task.done, event: false, color: goal.color || 'var(--accent)' });
     });
-    const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily');
+    const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily' && habitActiveOn(g, dk));
     return { key: dk, lkey: lk, date: d, today: isSameDay(d, today), items, untimed,
       goalsTotal: gl.length, goalsDone: gl.filter(x => x.task.done).length,
       habitsTotal: dailyHabits.length, habitsDone: dailyHabits.filter(g => ((habitCompletions || {})[dk] || []).includes(g.id)).length };
@@ -8485,7 +8499,7 @@ function useDayOpen(section, dayKey) {
 // DAILY HABITS SECTION (shown in WeeklyPlanner day columns)
 // ─────────────────────────────────────────────
 function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, forceOpen }) {
-  const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily');
+  const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily' && habitActiveOn(g, dayKey));
   const [habitsOpen, toggleHabitsOpen] = useDayOpen('habits', dayKey);
   const collapsed = forceOpen ? false : !habitsOpen;   // v5.16.0: forceOpen = shown inside the time-blocks popover / sheet
   const [expandedIds, setExpandedIds] = React.useState({});
@@ -9595,7 +9609,9 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
 
   function addGoal() {
     const id = 'g'+Date.now();
-    setGoals(g=>[...g, {id, name:'New Goal', color: GOAL_COLORS[g.length % GOAL_COLORS.length]}]);
+    // v5.81.0: new habits start today; jump to today so the new row is visible
+    setGoals(g=>[...g, {id, name:'New Goal', color: GOAL_COLORS[g.length % GOAL_COLORS.length], startDate: fmt(today)}]);
+    setSelectedDate(new Date(today));
   }
   function updateGoal(id, patch) { setGoals(g=>g.map(x=>x.id===id?{...x,...patch}:x)); }
   function deleteGoal(id) {
@@ -9664,7 +9680,20 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
 
   const selectedDayKey = fmt(selectedDate);
 
-  const displayGoals = filterGoal ? goals.filter(g=>g.id===filterGoal) : goals;
+  // v5.81.0 — time-bound habits. The lists show a habit only if its dates overlap the visible window
+  // (day / week / month / year); the checklist shows it only if it is active on the selected day.
+  const todayKey = fmt(today);
+  const [winFrom, winTo] = (() => {
+    const d = selectedDate;
+    if (view==='daily') return [fmt(d), fmt(d)];
+    if (view==='weekly') { const ws=getWeekStart(d); return [fmt(ws), fmt(addDays(ws,6))]; }
+    if (view==='monthly') return [fmt(new Date(d.getFullYear(), d.getMonth(), 1)), fmt(new Date(d.getFullYear(), d.getMonth()+1, 0))];
+    return [fmt(new Date(d.getFullYear(),0,1)), fmt(new Date(d.getFullYear(),11,31))];
+  })();
+  const windowGoals = goals.filter(g => habitActiveIn(g, winFrom, winTo));
+  const dayGoals = goals.filter(g => habitActiveOn(g, selectedDayKey));
+  const effFilter = windowGoals.some(g => g.id===filterGoal) ? filterGoal : null;
+  const displayGoals = effFilter ? windowGoals.filter(g=>g.id===effFilter) : windowGoals;
 
   return (
     <div className="main-content">
@@ -9728,8 +9757,9 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
           <button className="add-btn" onClick={addGoal}>+</button>
         </div>
 
-        {goals.map(goal=>{
+        {windowGoals.map(goal=>{
           const isExpanded = !!expandedGoals[goal.id];
+          const onSelDay = habitActiveOn(goal, selectedDayKey);
           const isDragOver = dragOverGoalId === goal.id;
           return (
           <div key={goal.id}
@@ -9752,8 +9782,9 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
               title={filterGoal===goal.id?'Click to show all goals':'Click to filter by this goal'}>
               <div aria-hidden="true" style={{width:4,flexShrink:0,alignSelf:'stretch',background:goal.color,borderRadius:2,marginLeft:4}} />
               <div className={`goal-check ${isCompleted(goal.id,selectedDayKey)?'checked':''}`}
-                style={{color:hcText(goal.color),marginTop:1}}
-                onClick={e=>{e.stopPropagation();toggleCompletion(goal.id,selectedDayKey);}} />
+                style={{color:hcText(goal.color),marginTop:1,opacity:onSelDay?1:0.3}}
+                title={onSelDay?undefined:'Outside this habit\'s dates'}
+                onClick={e=>{e.stopPropagation();if(onSelDay)toggleCompletion(goal.id,selectedDayKey);}} />
               <div style={{flex:1,minWidth:0}}>
                 <HabitNameField value={goal.name} onChange={v=>updateGoal(goal.id,{name:v})} />
                 <div className="goal-meta">
@@ -9791,6 +9822,8 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                 </div>
                 {/* How often (every day / certain days / × a week) + rest day */}
                 <HabitFreqEditor goal={goal} dayKey={selectedDayKey} onChange={patch=>updateGoal(goal.id, patch)} />
+                {/* Start / end dates (v5.81.0) */}
+                <HabitDatesEditor goal={goal} onChange={patch=>updateGoal(goal.id, patch)} />
                 {/* Link to fitness exercise (collapsible, v5.27.0) */}
                 {fitnessExercises && fitnessExercises.length > 0 && (
                   <HabitExerciseLinks goal={goal} exercises={fitnessExercises} onChange={patch=>updateGoal(goal.id, patch)} />
@@ -9870,10 +9903,10 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
 
         {/* GOAL FILTER CHIPS */}
         <div className="goal-filter-row">
-          <div className={`goal-filter-chip ${!filterGoal?'active':''}`} onClick={()=>setFilterGoal(null)}>
+          <div className={`goal-filter-chip ${!effFilter?'active':''}`} onClick={()=>setFilterGoal(null)}>
             All
           </div>
-          {goals.map(g=>(
+          {windowGoals.map(g=>(
             <div key={g.id} className={`goal-filter-chip ${filterGoal===g.id?'active':''}`}
               onClick={()=>setFilterGoal(filterGoal===g.id?null:g.id)}
               style={filterGoal===g.id?{}:{borderColor:g.color, color:hcText(g.color)}}>
@@ -9923,7 +9956,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
           <div className="habit-selected-date-mobile">
             {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}
           </div>
-          <HabitChecklist date={selectedDate} goals={goals} completions={completions}
+          <HabitChecklist date={selectedDate} goals={dayGoals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
             onReorder={reorderGoals}
             onGoToMetrics={onGoToMetrics}
@@ -9938,7 +9971,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
           <div className="habit-selected-date-mobile">
             {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}
           </div>
-          <HabitChecklist date={selectedDate} goals={goals} completions={completions}
+          <HabitChecklist date={selectedDate} goals={dayGoals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
             onReorder={reorderGoals}
             onGoToMetrics={onGoToMetrics}
@@ -9953,7 +9986,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
           <div className="habit-selected-date-mobile">
             {DAYS[selectedDate.getDay()]}, {MONTHS[selectedDate.getMonth()]} {selectedDate.getDate()}
           </div>
-          <HabitChecklist date={selectedDate} goals={goals} completions={completions}
+          <HabitChecklist date={selectedDate} goals={dayGoals} completions={completions}
             onToggle={toggleCompletion} onAdd={addGoal} onDelete={deleteGoal} onRename={updateGoal}
             onReorder={reorderGoals}
             onGoToMetrics={onGoToMetrics}
@@ -9965,6 +9998,8 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
         </>}
         {view==='daily' && <DailyView date={selectedDate} goals={displayGoals} completions={completions}
           onToggle={(gid)=>toggleCompletion(gid,fmt(selectedDate))} />}
+        <HabitArchive goals={goals} completions={completions} onChange={updateGoal} onDelete={deleteGoal}
+          onView={g => { const d = parseLocal(g.endDate || g.startDate); if (d) { setSelectedDate(d); setView('monthly'); setFilterGoal(g.id); } }} />
       </div>
 
       {/* Mobile FAB + sheet for countdowns */}
@@ -10323,6 +10358,9 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                   {onRename && (
                     <HabitFreqEditor goal={g} dayKey={fmt(date)} onChange={patch=>onRename(g.id, patch)} />
                   )}
+                  {onRename && (
+                    <HabitDatesEditor goal={g} onChange={patch=>onRename(g.id, patch)} />
+                  )}
                   {onRename && fitnessExercises && fitnessExercises.length > 0 && (
                     <HabitExerciseLinks goal={g} exercises={fitnessExercises} onChange={patch=>onRename(g.id, patch)} />
                   )}
@@ -10371,6 +10409,97 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
   );
 }
 
+// ── v5.81.0 — Start / end dates for a habit (shared by the sidebar and the checklist) ──
+function HabitDatesEditor({ goal, onChange }) {
+  const todayKey = habitTodayKey();
+  const ended = habitEnded(goal, todayKey);
+  const upcoming = habitUpcoming(goal, todayKey);
+  const lbl = {fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace",flexShrink:0};
+  const inp = {fontSize:12,border:'1px solid var(--border)',borderRadius:4,padding:'3px 5px',background:'var(--surface)',color:'var(--ink)',
+    fontFamily:"'DM Sans',sans-serif",minHeight:32,boxSizing:'border-box'};
+  const btn = {background:'none',border:'1px solid var(--border)',borderRadius:4,cursor:'pointer',fontSize:11,color:'var(--ink-light)',
+    padding:'4px 10px',minHeight:32,fontFamily:"'DM Sans',sans-serif",fontWeight:600};
+  function setStart(v) { if (v && goal.endDate && v > goal.endDate) return; onChange({ startDate: v || undefined }); }
+  function setEnd(v) { if (v && goal.startDate && v < goal.startDate) return; onChange({ endDate: v || undefined }); }
+  function endToday() {
+    const prev = goal.endDate;
+    onChange({ endDate: todayKey });
+    Undo.push(`Ended habit "${(goal.name||'habit').slice(0,40)}" today`, () => onChange({ endDate: prev }));
+  }
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:5}} onClick={e=>e.stopPropagation()}>
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <span style={{...lbl,width:38}}>Start:</span>
+        <input type="date" aria-label="Habit start date" style={{...inp,flex:1,minWidth:0}} value={goal.startDate||''} max={goal.endDate||undefined}
+          onChange={e=>setStart(e.target.value)} />
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:6}}>
+        <span style={{...lbl,width:38}}>End:</span>
+        <input type="date" aria-label="Habit end date" style={{...inp,flex:1,minWidth:0}} value={goal.endDate||''} min={goal.startDate||undefined}
+          onChange={e=>setEnd(e.target.value)} />
+      </div>
+      <div style={{display:'flex',alignItems:'center',gap:6,flexWrap:'wrap'}}>
+        {!ended && !upcoming && goal.endDate !== todayKey && (
+          <button type="button" style={btn} onClick={endToday} title="Last day is today; it leaves the lists tomorrow">End today</button>
+        )}
+        {goal.endDate && (
+          <button type="button" style={btn} onClick={()=>onChange({ endDate: undefined })}>{ended ? 'Resume habit' : 'Clear end date'}</button>
+        )}
+        <span style={{fontSize:10,color:'var(--ink-faint)',fontFamily:"'DM Mono',monospace"}}>
+          {ended ? 'Ended' : upcoming ? 'Starts later' : goal.endDate ? 'Ends ' + goal.endDate : 'No end date'} · dates are inclusive
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── v5.81.0 — Ended and upcoming habits, kept below the calendar (collapsed by default) ──
+function HabitArchive({ goals, completions, onChange, onDelete, onView }) {
+  const [open, setOpen] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const todayKey = habitTodayKey();
+  const ended = goals.filter(g => habitEnded(g, todayKey));
+  const upcoming = goals.filter(g => habitUpcoming(g, todayKey));
+  if (!ended.length && !upcoming.length) return null;
+  const nice = k => { const d = parseLocal(k); return d ? `${MONTHS[d.getMonth()].slice(0,3)} ${d.getDate()}, ${d.getFullYear()}` : ''; };
+  const doneCount = g => Object.keys(completions || {}).filter(dk => (completions[dk] || []).includes(g.id)).length;
+  const sm = {background:'none',border:'1px solid var(--border)',borderRadius:4,cursor:'pointer',fontSize:11,color:'var(--ink-light)',
+    padding:'3px 9px',minHeight:30,fontFamily:"'DM Sans',sans-serif",fontWeight:600};
+  const row = (g, kind) => (
+    <div key={g.id} style={{border:'1px solid var(--border)',borderLeft:`3px solid ${g.color}`,borderRadius:6,padding:'6px 8px',background:'var(--surface)',display:'flex',flexDirection:'column',gap:6}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+        <span style={{flex:1,minWidth:100,fontSize:13,fontWeight:500,color:'var(--ink)'}}>{g.name}</span>
+        <span style={{fontSize:10,color:'var(--ink-light)',fontFamily:"'DM Mono',monospace"}}>
+          {g.startDate ? nice(g.startDate) : 'Start unset'} → {g.endDate ? nice(g.endDate) : 'open'}
+          {kind==='ended' && <> · {doneCount(g)} done · <span style={{color:'var(--gold)'}}>🔥{habitStreak(g, completions, new Date())}{g.freq && g.freq.type==='perWeek' ? 'w' : ''}</span></>}
+        </span>
+      </div>
+      <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+        <button type="button" style={sm} onClick={()=>onView(g)}>View</button>
+        <button type="button" style={sm} onClick={()=>setEditId(editId===g.id?null:g.id)}>{editId===g.id ? 'Hide dates' : 'Edit dates'}</button>
+        <button type="button" style={{...sm,color:'#ef4444',borderColor:'#fca5a5'}} onClick={()=>onDelete(g.id)}>Delete</button>
+      </div>
+      {editId===g.id && <HabitDatesEditor goal={g} onChange={patch=>onChange(g.id, patch)} />}
+    </div>
+  );
+  return (
+    <div style={{marginTop:14,borderTop:'1px solid var(--border)',paddingTop:8}}>
+      <button type="button" aria-expanded={open} onClick={()=>setOpen(o=>!o)}
+        style={{display:'flex',alignItems:'center',gap:6,background:'none',border:'none',cursor:'pointer',padding:'6px 0',minHeight:36,
+          fontSize:11,color:'var(--ink-light)',fontFamily:"'DM Mono',monospace",textTransform:'uppercase',letterSpacing:'0.05em'}}>
+        <span>{open ? '▾' : '▸'}</span>
+        <span>Ended &amp; upcoming habits ({ended.length + upcoming.length})</span>
+      </button>
+      {open && (
+        <div style={{display:'flex',flexDirection:'column',gap:6}}>
+          {ended.map(g => row(g, 'ended'))}
+          {upcoming.map(g => row(g, 'upcoming'))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function HabitNavArrows({view, date, onChange}) {
   const label = view==='yearly' ? date.getFullYear().toString()
     : view==='monthly' ? `${MONTHS[date.getMonth()]} ${date.getFullYear()}`
@@ -10408,6 +10537,8 @@ function HabitDotsForDay({dayKey, goals, completions}) {
     <div className="habit-dots-row">
       {goals.map(g=>{
         const done=(completions[dayKey]||[]).includes(g.id);
+        // v5.81.0: outside the habit's dates keep the slot (so rows line up) but draw nothing
+        if (!done && !habitActiveOn(g, dayKey)) return <div key={g.id} className="habit-dot-wrapper" style={{width:'100%'}}><div className="habit-bar" style={{background:'transparent',border:'none',width:'100%',opacity:0}} /></div>;
         return (
           <div key={g.id} className="habit-dot-wrapper" style={{width:'100%'}}>
             <div className="habit-bar" style={{
@@ -10500,6 +10631,8 @@ function WeeklyHabitView({date, selected, goals, completions, today, onDayClick,
               <div style={{flex:1,width:'100%',display:'flex',flexDirection:'column',gap:2,background:'var(--cream)',borderRadius:8,padding:4,border:isToday?'2px solid var(--gold)':isSelected?'2px solid var(--accent)':'1px solid var(--border)'}}>
                 {goals.map(g=>{
                   const done=(completions[dk]||[]).includes(g.id);
+                  // v5.81.0: outside the habit's dates keep the slot but draw nothing
+                  if (!done && !habitActiveOn(g, dk)) return <div key={g.id} style={{minHeight: goals.length === 1 ? 40 : 14, flexShrink:0}} />;
                   const isSingle = goals.length === 1;
                   const qtyRaw = (isSingle && qty) ? (qty[dk]||{})[g.id] : null;
                   const qtyVal = qtyRaw != null ? qtyTotal(qtyRaw) : 0;
@@ -10606,7 +10739,7 @@ function DailyView({date, goals, completions, onToggle}) {
         {date.getFullYear()} · {DAYS[date.getDay()]}
       </div>
       <div className="daily-goals-grid">
-        {goals.map(g=>{
+        {goals.filter(g=>habitActiveOn(g,dk)||(completions[dk]||[]).includes(g.id)).map(g=>{
           const done=(completions[dk]||[]).includes(g.id);
           return (
             <div key={g.id} className={`daily-goal-card ${done?'checked-today':''}`}
@@ -12518,7 +12651,7 @@ function GlLinkPicker({ goal, onChange, habitGoals, fitnessExercises }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
           <span style={{ fontSize: 11, color: 'var(--ink-faint)', fontFamily: "'DM Mono',monospace" }}>Habits</span>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-            {habitGoals.map(h => (
+            {habitGoals.filter(h => !habitEnded(h, habitTodayKey()) || habitIds.includes(h.id)).map(h => (
               <button key={h.id} className={`gl-chip ${habitIds.includes(h.id) ? 'on' : ''}`}
                 aria-pressed={habitIds.includes(h.id)} onClick={() => toggle('linkedHabitIds', h.id)}>{h.name || 'Habit'}</button>
             ))}
@@ -14864,6 +14997,7 @@ function App() {
         : raw;
 
       linkedGoals.forEach(habit => {
+        if (!habitActiveOn(habit, dk)) return;   // v5.81.0: never auto-check a habit outside its start/end dates
         // Normalize to array, migrate old single-id field transparently
         const linkedIds = (habit.linkedExerciseIds && habit.linkedExerciseIds.length > 0)
           ? habit.linkedExerciseIds
@@ -15191,7 +15325,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.80.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.81.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -16257,7 +16391,7 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
     );
   }
 
-  const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily');
+  const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily' && habitActiveOn(g, fmt(parseLocal(day))));
   const habitsDone = dailyHabits.filter(g => ((habitCompletions || {})[fmt(parseLocal(day))] || []).includes(g.id)).length;
   const worked = ciWorkedOut(fitnessLog, day);
   const sleepMins = ciSleepMins(e.bed, e.wake);
