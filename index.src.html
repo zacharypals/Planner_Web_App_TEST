@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.80.0 -->
+<!-- LP Planner v5.80.1 -->
+<!-- v5.80.1 — Fitness set rows: the Done-time pill is wider (52px, 44px on phones) so the whole time has breathing room. -->
 <!-- v5.80.0 — Fitness set rows: tapping Done now records the time (shown as a small pill like 2:41p just before the Done circle). Tap the pill to edit it in the same hour / minute / AM-PM sheet as the check-in, or Clear it; unchecking Done clears it. Only stamps automatically when you are logging today; on other days (or older done sets) the pill reads "+ time" and you tap to enter one. Stored as `doneAt` (HH:MM) on the set, so no new sync key. -->
 <!-- v5.79.7 — Weekly › Habits: tap anywhere on a habit row (name, blank space, circle) to check or uncheck it, in every Weekly layout (desktop columns, phone day view, time-block popover). The ▼ Qty/Notes button still just expands the row. -->
 <!-- v5.79.6 — Weekly (phone / narrow iPad): the round ☰ menu button sits 20px higher (bottom 80px → 100px) so it clears the Today + S M T W T F S day row and no longer covers the Saturday dot. Weekly only; the Monthly and Countdowns buttons are unchanged. -->
@@ -670,7 +671,7 @@
   .set-check.done { background: var(--accent); border-color: var(--accent); }
   .set-check.done::after { content: '✓'; color: white; font-size: 12px; font-weight: 700; }
   /* v5.80.0: time the set was marked Done — small pill just before the check */
-  .set-time { width: 40px; height: 22px; flex-shrink: 0; margin-left: 4px; box-sizing: border-box; padding: 0; border: 1px solid var(--border); border-radius: 999px; background: var(--cream); color: var(--ink-light); font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 600; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; white-space: nowrap; }
+  .set-time { width: 52px; height: 22px; flex-shrink: 0; margin-left: 4px; box-sizing: border-box; padding: 0; border: 1px solid var(--border); border-radius: 999px; background: var(--cream); color: var(--ink-light); font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 600; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; white-space: nowrap; }
   .set-time:hover { border-color: var(--accent); color: var(--accent); }
   .set-time.empty { background: transparent; border-style: dashed; color: var(--ink-faint); font-weight: 400; font-size: 9px; }
   .set-time-ph { visibility: hidden; pointer-events: none; }
@@ -681,7 +682,7 @@
     .set-cw-dist { width: 50px !important; }
     .set-cw-min, .set-cw-sec { width: 36px !important; margin-left: 0 !important; }
     .set-cw-pace { width: 42px !important; }
-    .set-time, .set-time-h { width: 36px !important; margin-left: 0 !important; }
+    .set-time, .set-time-h { width: 44px !important; margin-left: 0 !important; }
   }
   /* Exercise library in sidebar */
   .ex-lib-item {
@@ -15190,7 +15191,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.80.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.80.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -17605,7 +17606,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
               <span className="set-label" style={{visibility:'hidden'}}>×</span>
               <span className="set-label" style={{width:52,textAlign:'center'}}>Weight</span>
               <span className="set-label" style={{visibility:'hidden'}}>lbs</span></>)}
-            <span className="set-label set-time-h" style={{width:40,marginLeft:4,textAlign:'center'}}>Time</span>
+            <span className="set-label set-time-h" style={{width:52,marginLeft:4,textAlign:'center'}}>Time</span>
             <span className="set-label" style={{width:22,marginLeft:6,display:'flex',justifyContent:'center',whiteSpace:'nowrap'}}>Done</span>
           </div>
           {ex.sets.map((set,si)=>{
