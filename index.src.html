@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.87.0 -->
+<!-- LP Planner v5.88.0 -->
+<!-- v5.88.0 — Daily check-in: a "Mark not done" button appears next to Done once a day is checked in, so you can reopen it (the pills go back to "Check in"). Fixes entries saved before v5.87.0 that were already counted as done. -->
 <!-- v5.87.0 — Daily check-in: an entry is no longer "checked in" just because something was typed. The Weekly / top-bar / Habits pills only turn to "✓ Checked in" after you tap Done for that day, so you can log sleep in the morning and finish the rest tonight; Back (‹ Week) leaves it as an in-progress entry. Existing entries count as done. Stored as `done` on the day's entry (no new sync key). -->
 <!-- v5.86.4 — Hover-to-delete ✕ is bigger (26px, same square as the caret) and sits exactly over the caret (anchored to the top of the card, where the caret is, instead of the bottom corner). -->
 <!-- v5.86.3 — Weekly view carets: the caret glyphs on task bars and sidebar sections are a touch bigger (boxes unchanged). Hover-to-delete now fully shows at about 1.7s (1.5s wait + 0.2s fade; v5.86.2 was 1.9s). -->
@@ -15448,7 +15449,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.87.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.88.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -16643,7 +16644,10 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
         </div>
         <div className="ci-foot">
           <span className="ci-saved" aria-live="polite">{!ciHasData(e) ? 'Nothing entered yet' : ciIsDone(e) ? '✓ Checked in' : '✓ Saved · tap Done when you\'re finished'}</span>
-          <button type="button" className="ci-primary" onClick={() => { if (ciHasData(e)) patch({ done: true }); onBack(); }}>Done</button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {ciIsDone(e) && <button type="button" className="ci-btn" onClick={() => patch({ done: false })}>Mark not done</button>}
+            <button type="button" className="ci-primary" onClick={() => { if (ciHasData(e)) patch({ done: true }); onBack(); }}>Done</button>
+          </div>
         </div>
       </div></div>
     </div>
