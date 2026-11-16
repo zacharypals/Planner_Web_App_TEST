@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.79.3 -->
+<!-- LP Planner v5.79.4 -->
+<!-- v5.79.4 — Pages editor toolbar: Undo and Redo are now proper curved-arrow icons (bolder, darker, a bit bigger on phones) instead of the thin ↶ ↷ text characters that looked like shepherd's crooks. Same buttons, same behaviour. -->
 <!-- v5.79.3 — Project page: "Mark goal done" is now "Mark Project Done" (and "Reopen project"); it and Park/Unpark moved from the bottom of the right column to the top, above Start / Target / Status / Color. On phones and narrow iPads (where that column drops below the milestones) the same buttons sit in the title card under the progress bar instead. -->
 <!-- v5.79.2 — Pages › Recent: chips are now a "dusty" version of the folder color — less saturated, paler fill and a softer border (light and dark), so they sit quieter than the folders in All Pages while still matching them. -->
 <!-- v5.79.1 — Pages › Recent: the list window is shorter — it now shows 5 and a half chips (half of the next one peeks out as the scroll hint) instead of 6 and a bit, since the new chips are taller than the old rows. Still keeps the last 10; scrolls whenever there are more than 5. -->
@@ -2176,6 +2177,10 @@
   }
   .pages-toolbar-btn:hover { background: var(--cream); color: var(--ink); }
   .pages-toolbar-btn.active { background: var(--accent-light); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--accent); }
+  /* v5.79.4 — Undo/Redo icon buttons: darker than the other tools so they read as buttons, bold round-capped strokes */
+  .pages-toolbar-btn.tb-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--ink); }
+  .pages-tb-ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; display: block; }
+  @media (max-width: 767px) { .pages-toolbar-btn.tb-icon { min-width: 36px; } .pages-tb-ic { width: 21px; height: 21px; } }
   .pages-toolbar-sep { width: 1px; background: rgba(0,0,0,0.08); margin: 3px 3px; align-self: stretch; }
   .pages-tb-morebtn { display: none; } /* phones only — see the mobile Pages block */
 
@@ -15153,7 +15158,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.79.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.79.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -18848,6 +18853,16 @@ function leastUsedFolderHue(counts) { // first unused hue; once all are used, th
   for (let i = 1; i < counts.length; i++) if (counts[i] < counts[best]) best = i;
   return best;
 }
+// v5.79.4: Undo / Redo toolbar icons — a bold curved arrow with an arrowhead (replaces the ↶ ↷ text glyphs)
+function PagesUndoRedoIcon({ redo }) {
+  return (
+    <svg className="pages-tb-ic" viewBox="0 0 20 20" aria-hidden="true">
+      {redo
+        ? <><polyline points="13,4 17,8 13,12" /><path d="M17 8H8.5a4 4 0 0 0 0 8H12" /></>
+        : <><polyline points="7,4 3,8 7,12" /><path d="M3 8h8.5a4 4 0 0 1 0 8H8" /></>}
+    </svg>
+  );
+}
 function PagesFolderIcon({ className }) {
   return (
     <svg className={'pages-ic ' + (className || '')} viewBox="0 0 16 16" aria-hidden="true">
@@ -20058,8 +20073,8 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
               {/* Toolbar — sticky in header so it's always visible */}
               <div className="pages-toolbar-wrap" style={{padding:'8px 0 0'}}>
                 <div className={'pages-toolbar'+(tbMore?' tb-open':'')}>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();qDo(q=>q.history.undo());}} title="Undo">↶</button>
-                  <button className="pages-toolbar-btn" onMouseDown={e=>{e.preventDefault();qDo(q=>q.history.redo());}} title="Redo">↷</button>
+                  <button className="pages-toolbar-btn tb-icon" onMouseDown={e=>{e.preventDefault();qDo(q=>q.history.undo());}} title="Undo" aria-label="Undo"><PagesUndoRedoIcon /></button>
+                  <button className="pages-toolbar-btn tb-icon" onMouseDown={e=>{e.preventDefault();qDo(q=>q.history.redo());}} title="Redo" aria-label="Redo"><PagesUndoRedoIcon redo /></button>
                   <div className="pages-toolbar-sep"/>
                   <button className={'pages-toolbar-btn'+(qFmt.bold?' active':'')} onMouseDown={e=>{e.preventDefault();qToggle('bold');}} title="Bold"><b>B</b></button>
                   <button className={'pages-toolbar-btn'+(qFmt.italic?' active':'')} onMouseDown={e=>{e.preventDefault();qToggle('italic');}} title="Italic"><i>I</i></button>
