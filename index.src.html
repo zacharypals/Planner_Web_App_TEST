@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.82.0 -->
+<!-- LP Planner v5.83.0 -->
+<!-- v5.83.0 — Check-in: the five text lines (Today in one line, One win, Grateful, Looking forward to, Do differently) now wrap instead of scrolling sideways. At rest each shows at most two lines (a faint … when there is more); while you are typing it grows to six lines, then scrolls inside the field. Return finishes the line. No data change, no new synced key. -->
 <!-- v5.82.0 — Goals: a milestone with an auto-complete rule now shows where it stands right on its header: a progress ring around its checkbox and a ↻ chip (for example "↻ 6.5/10 mi", or "↻ 65%" on a phone) beside the title, so you no longer have to open the milestone and press Show rule. The chip also opens and closes the rule editor, which replaces the old "Completes automatically from my training or habits" row and its Show rule / Hide rule / Remove buttons (Remove auto-check is still at the bottom of the editor). The editor now starts closed and remembers open/closed per milestone on this device (new local key msRuleOpen; the old msRuleShut is no longer read). No data change, no new synced key. -->
 <!-- v5.81.0 — Time-bound habits: a habit can have an optional Start and End date (both inclusive). Outside those dates it drops out of the Habit Tracker lists, calendar views, the Weekly Planner day habits, the check-in and the weekly review; its history stays and still shows when you browse back. New habits start today. "End today" ends a habit with an Undo; an "Ended & upcoming" list under the calendar lets you view, re-date, resume or delete them. Fitness-linked habits stop auto-checking after their end date. No new synced key (startDate / endDate live on the habit). -->
 <!-- v5.80.1 — Fitness set rows: the Done-time pill is wider (52px, 44px on phones) so the whole time has breathing room. -->
@@ -3181,6 +3182,11 @@
   .ci-two { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .ci-lbl { display:block; font-size:12px; color:var(--ink-light); margin-bottom:3px; }
   .ci-input { width:100%; box-sizing:border-box; min-height:44px; padding:0 12px; border-radius:10px; border:1px solid var(--border); background:var(--paper); color:var(--ink); font-family:'DM Sans',sans-serif; font-size:16px; }
+  /* v5.83.0 — check-in lines: wrapping, auto-growing text (2 lines when resting, up to 6 while typing) */
+  .ci-ta-wrap { position:relative; box-sizing:border-box; min-height:44px; padding-bottom:10px; border-radius:10px; border:1px solid var(--border); background:var(--paper); cursor:text; }
+  .ci-ta-wrap:focus-within { border-color:var(--accent); }
+  .ci-ta { display:block; width:100%; box-sizing:border-box; padding:10px 12px 0; line-height:1.4; resize:none; overflow:hidden; -webkit-appearance:none; appearance:none; border:0; border-radius:0; outline:none; background:transparent; color:var(--ink); font-family:'DM Sans',sans-serif; font-size:16px; }
+  .ci-ta-wrap.clipped::after { content:'…'; position:absolute; right:13px; bottom:11px; padding-left:24px; line-height:1.4; font-size:16px; color:var(--ink-faint); background:linear-gradient(90deg, transparent, var(--paper) 55%); pointer-events:none; }
   .ci-hint { font-size:12px; color:var(--ink-light); }
   .ci-chips { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
   .ci-chip { font-size:12px; font-weight:700; padding:4px 10px; border-radius:99px; background:var(--cream); color:var(--ink-light); border:1px solid var(--border); }
@@ -15366,7 +15372,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.82.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.83.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -16328,6 +16334,43 @@ function CiTagTrends({ defs, all, days, pick, setPick }) {
   );
 }
 
+// v5.83.0 — a check-in line: a wrapping text field that rests at two lines (a faint … when there is more) and grows to six while you type.
+// Enter finishes the line (no line breaks), so it still feels like a one-liner.
+function CiLineField({ id, value, placeholder, onChange }) {
+  const ref = useRef(null);
+  const [focus, setFocus] = useState(false);
+  const [clipped, setClipped] = useState(false);
+  const fit = useCallback(() => {
+    const el = ref.current; if (!el) return;
+    const cs = getComputedStyle(el);
+    const lh = parseFloat(cs.lineHeight) || 22;
+    const padV = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0);
+    const bord = (parseFloat(cs.borderTopWidth) || 0) + (parseFloat(cs.borderBottomWidth) || 0);
+    el.style.height = 'auto';
+    const lines = Math.max(1, Math.round((el.scrollHeight - padV) / lh));
+    const cap = focus ? 6 : 2;
+    el.style.height = (Math.min(lines, cap) * lh + padV + bord) + 'px';
+    el.style.overflowY = lines > cap ? 'auto' : 'hidden';
+    if (!focus) el.scrollTop = 0;
+    setClipped(!focus && lines > 2);
+  }, [focus]);
+  React.useLayoutEffect(() => { fit(); }, [value, focus, fit]);
+  useEffect(() => {
+    const on = () => fit();
+    window.addEventListener('resize', on);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(on).catch(() => {});
+    return () => window.removeEventListener('resize', on);
+  }, [fit]);
+  return (
+    <div className={`ci-ta-wrap${clipped ? ' clipped' : ''}`} onMouseDown={ev => { if (ev.target !== ref.current) { ev.preventDefault(); ref.current && ref.current.focus(); } }}>
+      <textarea ref={ref} id={id} className="ci-ta" rows={1} enterKeyHint="done" value={value || ''} placeholder={placeholder}
+        onChange={ev => onChange(ev.target.value.replace(/[\r\n]+/g, ' '))}
+        onKeyDown={ev => { if (ev.key === 'Enter') { ev.preventDefault(); ev.currentTarget.blur(); } }}
+        onFocus={() => setFocus(true)} onBlur={() => setFocus(false)} />
+    </div>
+  );
+}
+
 function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitnessLog, onBack, backLabel, tagDefs, setTagDefs, initialDay }) {
   const todayKey = glToday();
   const [tagSheet, setTagSheet] = useState(undefined);   // undefined = closed · null = new · def = edit
@@ -16470,15 +16513,15 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
 
         <div className="ci-card">
           <label className="ci-card-title" htmlFor="ci-line">Today in one line</label>
-          <input id="ci-line" className="ci-input" type="text" value={e.line || ''} placeholder="Slow morning, good afternoon…" onChange={ev => patch({ line: ev.target.value })} />
+          <CiLineField id="ci-line" value={e.line} placeholder="Slow morning, good afternoon…" onChange={v => patch({ line: v })} />
           <label className="ci-card-title" htmlFor="ci-win" style={{ marginTop: 6 }}>One win</label>
-          <input id="ci-win" className="ci-input" type="text" value={e.win || ''} placeholder="Something that went right" onChange={ev => patch({ win: ev.target.value })} />
+          <CiLineField id="ci-win" value={e.win} placeholder="Something that went right" onChange={v => patch({ win: v })} />
           <label className="ci-card-title" htmlFor="ci-grat" style={{ marginTop: 6 }}>Grateful for today</label>
-          <input id="ci-grat" className="ci-input" type="text" value={e.grat || ''} placeholder="Someone or something you appreciated" onChange={ev => patch({ grat: ev.target.value })} />
+          <CiLineField id="ci-grat" value={e.grat} placeholder="Someone or something you appreciated" onChange={v => patch({ grat: v })} />
           <label className="ci-card-title" htmlFor="ci-look" style={{ marginTop: 6 }}>Looking forward to</label>
-          <input id="ci-look" className="ci-input" type="text" value={e.look || ''} placeholder="Something coming up, big or small" onChange={ev => patch({ look: ev.target.value })} />
+          <CiLineField id="ci-look" value={e.look} placeholder="Something coming up, big or small" onChange={v => patch({ look: v })} />
           <label className="ci-card-title" htmlFor="ci-diff" style={{ marginTop: 6 }}>Do differently</label>
-          <input id="ci-diff" className="ci-input" type="text" value={e.diff || ''} placeholder="One thing you would change next time" onChange={ev => patch({ diff: ev.target.value })} />
+          <CiLineField id="ci-diff" value={e.diff} placeholder="One thing you would change next time" onChange={v => patch({ diff: v })} />
         </div>
 
         <CiTags defs={tagDefs} tg={e.tg} onSet={setTag} onOpenSheet={d => setTagSheet(d)} />
