@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.83.0 -->
+<!-- LP Planner v5.84.0 -->
+<!-- v5.84.0 — Home upkeep now shows on the Monthly calendar too, placed on exactly the same day as in the Weekly planner (7 days before due, or today once that has passed, so an overdue task keeps moving forward day by day until it is done). Only tasks with "Show in Week view" on appear. Desktop/iPad: a house chip with a tick-to-done circle; three or more on one day collapse into a single "N upkeep" chip (red if any is overdue) that opens Home upkeep. Phone portrait: one house-coloured dot per day and rows with a done tick in the selected-day panel. Read from `upkeep`, never copied; no new stored data. -->
 <!-- v5.83.0 — Check-in: the five text lines (Today in one line, One win, Grateful, Looking forward to, Do differently) now wrap instead of scrolling sideways. At rest each shows at most two lines (a faint … when there is more); while you are typing it grows to six lines, then scrolls inside the field. Return finishes the line. No data change, no new synced key. -->
 <!-- v5.82.0 — Goals: a milestone with an auto-complete rule now shows where it stands right on its header: a progress ring around its checkbox and a ↻ chip (for example "↻ 6.5/10 mi", or "↻ 65%" on a phone) beside the title, so you no longer have to open the milestone and press Show rule. The chip also opens and closes the rule editor, which replaces the old "Completes automatically from my training or habits" row and its Show rule / Hide rule / Remove buttons (Remove auto-check is still at the bottom of the editor). The editor now starts closed and remembers open/closed per milestone on this device (new local key msRuleOpen; the old msRuleShut is no longer read). No data change, no new synced key. -->
 <!-- v5.81.0 — Time-bound habits: a habit can have an optional Start and End date (both inclusive). Outside those dates it drops out of the Habit Tracker lists, calendar views, the Weekly Planner day habits, the check-in and the weekly review; its history stays and still shows when you browse back. New habits start today. "End today" ends a habit with an Undo; an "Ended & upcoming" list under the calendar lets you view, re-date, resume or delete them. Fitness-linked habits stop auto-checking after their end date. No new synced key (startDate / endDate live on the habit). -->
@@ -2581,6 +2582,22 @@
   .monthly-day-event-body { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
   .monthly-day-event-time { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--gold); }
   .monthly-day-event-title { font-size: 14px; line-height: 1.3; color: var(--ink); overflow-wrap: anywhere; }
+  /* v5.84.0 — Home upkeep on the month */
+  .monthly-up-chip { display:flex; align-items:center; gap:4px; font-size:10.5px; padding:2px 5px; border-radius:3px; cursor:pointer; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-family:'DM Sans',sans-serif; background:var(--up-ok-bg); color:var(--up-ok-fg); font-weight:600; }
+  .monthly-up-chip.late { background:var(--up-late-bg); color:var(--up-late-fg); }
+  .monthly-up-chip:hover { filter:brightness(0.94); }
+  .monthly-up-chip.collapsed { gap:3px; }
+  .monthly-up-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  .monthly-up-tick { width:11px; height:11px; border-radius:50%; border:1.5px solid currentColor; flex:none; }
+  .monthly-up-tick:hover { background:currentColor; }
+  .monthly-dot.up { background:var(--up-ok-fg); }
+  .monthly-dot.up.late { background:var(--up-late-fg); }
+  .monthly-day-up { align-items:center; }
+  .monthly-day-up-tick { width:26px; height:26px; border-radius:50%; border:2px solid var(--accent); background:transparent; flex:none; cursor:pointer; }
+  .monthly-day-up-tick:active { background:var(--accent-light); }
+  .monthly-day-up-pill { align-self:flex-start; display:inline-flex; align-items:center; gap:4px; font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; background:var(--up-ok-bg); color:var(--up-ok-fg); }
+  .monthly-day-up.late .monthly-day-up-pill { background:var(--up-late-bg); color:var(--up-late-fg); }
+  .monthly-day-up.soon .monthly-day-up-pill { background:var(--up-soon-bg); color:var(--up-soon-fg); }
   .monthly-day-empty { font-size: 12.5px; color: var(--ink-faint); font-style: italic; padding: 6px 2px 10px; }
   .monthly-day-add {
     width: 100%; margin-top: 6px; min-height: 40px; padding: 8px; border-radius: 8px;
@@ -11151,7 +11168,7 @@ function TimeSelect({ value, onChange }) {
   );
 }
 
-function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals, upkeep, onOpenUpkeep }) {
+function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals, upkeep, setUpkeep, onOpenUpkeep }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(null);
@@ -11387,6 +11404,12 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals,
   const activeDayKey = (pickedDay && cellKeys.includes(pickedDay)) ? pickedDay
     : (cellKeys.includes(todayDayKey) ? todayDayKey : cellKeys[0]);
 
+  // v5.84.0 — Home upkeep on the month: identical day placement to the Weekly planner. Read from `upkeep`, never copied.
+  const upTodayKey = glToday();
+  const upMonth = React.useMemo(() => upMonthInfo(upkeep, upTodayKey), [upkeep, upTodayKey]);
+  function upDoneTap(it) { if (setUpkeep) setUpkeep(l => (l||[]).map(x => x.id === it.id ? upMarkDone(x, glToday()) : x)); }
+  function upOpen() { if (onOpenUpkeep) onOpenUpkeep(); }
+
   const sidebarContent = (
     <>
       {/* Month Nav */}
@@ -11521,6 +11544,11 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals,
               const isToday = isSameDay(d, today);
               const dayEvents = getEventsForDay(dk);
               const isDragOver = dragOverDay === dk;
+              const upList = upMonth.byDay[dk] || [];
+              const upCollapsed = upList.length >= 3;          // 3+ on one day → a single "N upkeep" chip
+              const upSlots = upCollapsed ? 1 : upList.length;  // chip rows used out of the 3 visible
+              const evSlots = 3 - upSlots;
+              const upLate = upMonth.anyLate(upList);
               return (
                 <div key={dk}
                   className={`monthly-cell ${isToday?'today':''} ${isDragOver?'drag-over':''} ${compact && dk===activeDayKey ? 'picked' : ''}`}
@@ -11532,14 +11560,31 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals,
                   <div className="monthly-cell-date">{d.getDate()}</div>
                   {compact ? (
                     <div className="monthly-cell-dots">
-                      {dayEvents.slice(0, dayEvents.length > 4 ? 3 : 4).map(ev=>(
+                      {upList.length > 0 && <span className={`monthly-dot up ${upLate?'late':''}`} title="Home upkeep" />}
+                      {dayEvents.slice(0, dayEvents.length > (upList.length ? 3 : 4) ? (upList.length ? 2 : 3) : (upList.length ? 3 : 4)).map(ev=>(
                         <span key={ev.id} className="monthly-dot" style={{background: taskBg(ev.colorIndex??3)}} />
                       ))}
-                      {dayEvents.length > 4 && <span className="monthly-dot-more">+{dayEvents.length-3}</span>}
+                      {dayEvents.length > (upList.length ? 3 : 4) && <span className="monthly-dot-more">+{dayEvents.length-(upList.length ? 2 : 3)}</span>}
                     </div>
                   ) : (
                     <div className="monthly-cell-events">
-                      {dayEvents.slice(0,3).map(ev=>(
+                      {upCollapsed ? (
+                        <div className={`monthly-up-chip collapsed ${upLate?'late':''}`} title={upList.map(i=>i.name||'Untitled').join('\n')}
+                          onClick={e=>{e.stopPropagation();upOpen();}}>
+                          <UpHouse size={11} /> <span>{upList.length} upkeep</span>
+                        </div>
+                      ) : upList.map(it=>{
+                        const late = upStatus(it, upTodayKey).kind === 'late';
+                        return (
+                          <div key={'up-'+it.id} className={`monthly-up-chip ${late?'late':''}`} title={`${it.name||'Untitled'} · ${upDueLabel(it, upTodayKey)}`}
+                            onClick={e=>{e.stopPropagation();upOpen();}}>
+                            <span className="monthly-up-tick" role="checkbox" aria-checked="false" aria-label={`Mark ${it.name||'task'} done`}
+                              onClick={e=>{e.stopPropagation();upDoneTap(it);}} />
+                            <span className="monthly-up-name">{it.name||'Untitled'}</span>
+                          </div>
+                        );
+                      })}
+                      {dayEvents.slice(0,evSlots).map(ev=>(
                         <div key={ev.id} className="monthly-event-chip"
                           title={`${ev.eventTime ? ev.eventTime + ' ' : ''}${ev.title || ''}`.trim()}
                           style={{background: taskBg(ev.colorIndex??3), cursor:'grab', opacity: dragInfo?.eventId===ev.id ? 0.4 : 1}}
@@ -11551,8 +11596,8 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals,
                           {ev.title||'…'}
                         </div>
                       ))}
-                      {dayEvents.length > 3 && (
-                        <div className="monthly-event-more">+{dayEvents.length-3} more</div>
+                      {dayEvents.length > evSlots && (
+                        <div className="monthly-event-more">+{dayEvents.length-evSlots} more</div>
                       )}
                     </div>
                   )}
@@ -11565,13 +11610,26 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals,
             const pd = new Date(activeDayKey + 'T00:00:00');
             const dayEvs = getEventsForDay(activeDayKey).slice()
               .sort((a,b) => (a.eventTime||'99:99').localeCompare(b.eventTime||'99:99'));
+            const dayUp = upMonth.byDay[activeDayKey] || [];
             return (
               <div className="monthly-day-panel">
                 <div className="monthly-day-panel-title">
                   {pd.toLocaleDateString(undefined, {weekday:'long', month:'short', day:'numeric'})}
                   {activeDayKey === todayDayKey && <span className="today-tag">Today</span>}
                 </div>
-                {dayEvs.length === 0 && <div className="monthly-day-empty">No events this day</div>}
+                {dayUp.map(it => {
+                  const st = upStatus(it, upTodayKey);
+                  return (
+                    <div key={'up-'+it.id} className={`monthly-day-event monthly-day-up ${st.kind}`}>
+                      <button type="button" className="monthly-day-up-tick" aria-label={`Mark ${it.name||'task'} done`} onClick={()=>upDoneTap(it)} />
+                      <div className="monthly-day-event-body" onClick={upOpen}>
+                        <div className="monthly-day-event-title">{it.name || 'Untitled'}</div>
+                        <span className="monthly-day-up-pill"><UpHouse size={12} /> Home upkeep · {upDueLabel(it, upTodayKey)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+                {dayEvs.length === 0 && dayUp.length === 0 && <div className="monthly-day-empty">No events this day</div>}
                 {dayEvs.map(ev => (
                   <div key={ev.id} className="monthly-day-event" onClick={()=>openEditEvent(ev)}>
                     <div className="monthly-day-event-bar" style={{background: taskBg(ev.colorIndex??3)}} />
@@ -15372,7 +15430,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.83.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.84.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15457,7 +15515,7 @@ function App() {
       {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} onOpenCheckin={dk=>openCheckin('planner', dk)} checkinDoneFor={dk=>ciHasData((checkins||{})[dk])} />}
       {page==='checkin' && <CheckinView checkins={checkins} setCheckins={setCheckins} habitGoals={habitGoals} habitCompletions={habitCompletions} fitnessLog={fitnessLog} tagDefs={checkinTags} setTagDefs={setCheckinTags} initialDay={checkinDay} backLabel={checkinFrom==='habit'?'Habits':'Week'} onBack={()=>setPage(checkinFrom)} />}
       {page==='upkeep' && <UpkeepView upkeep={upkeep} setUpkeep={setUpkeep} onBack={()=>setPage('planner')} />}
-      {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} upkeep={upkeep} onOpenUpkeep={()=>setPage('upkeep')} />}
+      {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} />}
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
         completions={habitCompletions} setCompletions={setHabitCompletions}
@@ -15645,6 +15703,11 @@ function upWeekMap(list, todayKey) {
     (map[show] = map[show] || []).push(it);
   });
   return map;
+}
+// v5.84.0 — Monthly calendar upkeep: same placement as the Weekly planner (upWeekMap), plus a one-tap done and a "late" flag.
+function upMonthInfo(list, todayKey) {
+  const byDay = upWeekMap(list, todayKey);
+  return { byDay, anyLate: arr => (arr || []).some(it => upStatus(it, todayKey).kind === 'late') };
 }
 function UpHouse({ size }) {
   return (
