@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.79.7 -->
+<!-- LP Planner v5.80.0 -->
+<!-- v5.80.0 — Fitness set rows: tapping Done now records the time (shown as a small pill like 2:41p just before the Done circle). Tap the pill to edit it in the same hour / minute / AM-PM sheet as the check-in, or Clear it; unchecking Done clears it. Only stamps automatically when you are logging today; on other days (or older done sets) the pill reads "+ time" and you tap to enter one. Stored as `doneAt` (HH:MM) on the set, so no new sync key. -->
 <!-- v5.79.7 — Weekly › Habits: tap anywhere on a habit row (name, blank space, circle) to check or uncheck it, in every Weekly layout (desktop columns, phone day view, time-block popover). The ▼ Qty/Notes button still just expands the row. -->
 <!-- v5.79.6 — Weekly (phone / narrow iPad): the round ☰ menu button sits 20px higher (bottom 80px → 100px) so it clears the Today + S M T W T F S day row and no longer covers the Saturday dot. Weekly only; the Monthly and Countdowns buttons are unchanged. -->
 <!-- v5.79.5 — Goals › Project milestone: the Clone button is now a clear "duplicate" icon (two overlapping pages with a +) in a cream 30px tile (32px on phones) like the move arrows and caret (phone date boxes now shrink so the row still fits), instead of the tiny faint ⧉ glyph. It is always visible (it used to appear only on hover, so it was missing on iPad); delete ✕ is unchanged. -->
@@ -668,6 +669,20 @@
   .set-check:hover { border-color: var(--accent); background: var(--accent-light); }
   .set-check.done { background: var(--accent); border-color: var(--accent); }
   .set-check.done::after { content: '✓'; color: white; font-size: 12px; font-weight: 700; }
+  /* v5.80.0: time the set was marked Done — small pill just before the check */
+  .set-time { width: 40px; height: 22px; flex-shrink: 0; margin-left: 4px; box-sizing: border-box; padding: 0; border: 1px solid var(--border); border-radius: 999px; background: var(--cream); color: var(--ink-light); font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 600; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; white-space: nowrap; }
+  .set-time:hover { border-color: var(--accent); color: var(--accent); }
+  .set-time.empty { background: transparent; border-style: dashed; color: var(--ink-faint); font-weight: 400; font-size: 9px; }
+  .set-time-ph { visibility: hidden; pointer-events: none; }
+  /* v5.80.0: on phones the cardio row (Dist / Min : Sec / pace + Time + Done + ✕) is wider than the screen, so tighten it; header and rows share these classes so the columns stay lined up */
+  @media (max-width: 480px) {
+    .set-row-main, .set-head { gap: 4px !important; }
+    .set-num { width: 14px; }
+    .set-cw-dist { width: 50px !important; }
+    .set-cw-min, .set-cw-sec { width: 36px !important; margin-left: 0 !important; }
+    .set-cw-pace { width: 42px !important; }
+    .set-time, .set-time-h { width: 36px !important; margin-left: 0 !important; }
+  }
   /* Exercise library in sidebar */
   .ex-lib-item {
     display: flex; align-items: center; gap: 6px;
@@ -15175,7 +15190,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.79.7</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.80.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15828,9 +15843,11 @@ function ciParseTime(v) {   // 'HH:MM' (24h) → { h:1-12, m, pm } | null
   return { h: H % 12 === 0 ? 12 : H % 12, m, pm: H >= 12 };
 }
 function ciTo24({ h, m, pm }) { return String((h % 12) + (pm ? 12 : 0)).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }
+function fitNowHM() { const n = new Date(); return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0'); }   // v5.80.0
+function fitTimeShort(v) { const t = ciParseTime(v); return t ? `${t.h}:${String(t.m).padStart(2, '0')}${t.pm ? 'p' : 'a'}` : ''; }   // v5.80.0 — "2:41p"
 function ciFmt12(v) { const t = ciParseTime(v); return t ? `${t.h}:${String(t.m).padStart(2, '0')} ${t.pm ? 'PM' : 'AM'}` : ''; }
 
-function CiTimeField({ id, label, value, onChange, fallback }) {
+function CiTimeField({ id, label, value, onChange, fallback, triggerClass, triggerContent, portal }) {
   const [open, setOpen] = useState(false);
   const [dr, setDr] = useState({ h: 10, m: 30, pm: true });
   function openIt() { setDr(ciParseTime(value) || ciParseTime(fallback) || { h: 10, m: 0, pm: true }); setOpen(true); }
@@ -15843,13 +15860,15 @@ function CiTimeField({ id, label, value, onChange, fallback }) {
   const mins = [...new Set([...Array.from({ length: 12 }, (_, i) => i * 5), dr.m])].sort((a, b) => a - b);
   return (
     <>
-      <button type="button" id={id} className={`ci-time ${value ? '' : 'empty'}`} onClick={openIt} aria-haspopup="dialog"
+      <button type="button" id={id} className={triggerClass || `ci-time ${value ? '' : 'empty'}`} onClick={openIt} aria-haspopup="dialog"
         aria-label={`${label}, ${value ? ciFmt12(value) : 'not set'}. Change`}>
+        {triggerContent || <>
         <span>{value ? ciFmt12(value) : 'Set time'}</span>
         <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+        </>}
       </button>
-      {open && (
-        <div className="ci-tp-overlay" onClick={() => setOpen(false)}>
+      {open && (portal ? (n => ReactDOM.createPortal(n, document.body)) : (n => n))(
+        <div className="ci-tp-overlay" onClick={e => { e.stopPropagation(); setOpen(false); }}>
           <div className="ci-tp" role="dialog" aria-modal="true" aria-label={label} onClick={ev => ev.stopPropagation()}>
             <div className="ci-tp-handle" />
             <div className="ci-tp-head"><span>{label}</span><b aria-live="polite">{ciFmt12(ciTo24(dr))}</b></div>
@@ -17575,18 +17594,19 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
         </div>
         {!isCollapsed && <div className="exercise-block">
           {prs.length>0&&<div className="pr-notes">{prs.map(p=><div key={p.kind} className="pr-note">🏆 <b>{p.label}</b> · {p.text}</div>)}</div>}
-          <div style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:2}}>
+          <div className="set-head" style={{display:'flex',alignItems:'center',gap:6,padding:'2px 0 4px',borderBottom:'1px solid var(--border)',marginBottom:2}}>
             <span className="set-num"></span>
-            {isCardio?(<><span className="set-label" style={{width:60,textAlign:'center'}}>Dist (mi)</span>
-              <span className="set-label" style={{width:44,textAlign:'center',marginLeft:6}}>Min</span>
+            {isCardio?(<><span className="set-label set-cw-dist" style={{width:60,textAlign:'center'}}>Dist (mi)</span>
+              <span className="set-label set-cw-min" style={{width:44,textAlign:'center',marginLeft:6}}>Min</span>
               <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,flexShrink:0,visibility:'hidden'}}>:</span>
-              <span className="set-label" style={{width:44,textAlign:'center'}}>Sec</span>
-              <span className="set-label" style={{width:56,textAlign:'center'}}>min/mi</span></>)
+              <span className="set-label set-cw-sec" style={{width:44,textAlign:'center'}}>Sec</span>
+              <span className="set-label set-cw-pace" style={{width:56,textAlign:'center'}}>min/mi</span></>)
             :(<><span className="set-label" style={{width:52,textAlign:'center'}}>Reps</span>
               <span className="set-label" style={{visibility:'hidden'}}>×</span>
               <span className="set-label" style={{width:52,textAlign:'center'}}>Weight</span>
               <span className="set-label" style={{visibility:'hidden'}}>lbs</span></>)}
-            <span className="set-label" style={{width:22,marginLeft:10,display:'flex',justifyContent:'center',whiteSpace:'nowrap'}}>Done</span>
+            <span className="set-label set-time-h" style={{width:40,marginLeft:4,textAlign:'center'}}>Time</span>
+            <span className="set-label" style={{width:22,marginLeft:6,display:'flex',justifyContent:'center',whiteSpace:'nowrap'}}>Done</span>
           </div>
           {ex.sets.map((set,si)=>{
             const dist=parseFloat(set.dist)||0,timeDec=parseTimeInput(set.time);
@@ -17600,27 +17620,27 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                 <div className="set-row-main">
                 <span className="set-num">{si+1}</span>
                 {isCardio?(<>
-                  <input type="number" min="0" step="0.01" className="set-input" placeholder="—" value={set.dist||''}
+                  <input type="number" min="0" step="0.01" className="set-input set-cw-dist" placeholder="—" value={set.dist||''}
                     ref={el=>setFirstInputRefs.current[focusKey]=el}
                     onChange={e=>updateSet(dk,ex.id,set.id,{dist:e.target.value})} onKeyDown={handleEnter} style={{width:60,opacity:set.done?0.6:1}}/>
                   {(()=>{
                     const tp=(set.time||'').split(':');
                     const tMins=tp[0]||''; const tSecs=tp.length>1?tp[1]:'';
                     return (<>
-                      <input type="number" min="0" inputMode="numeric" className="set-input" placeholder="0"
+                      <input type="number" min="0" inputMode="numeric" className="set-input set-cw-min" placeholder="0"
                         value={tMins}
                         onChange={e=>{const s=tSecs!==''?':'+tSecs:''; updateSet(dk,ex.id,set.id,{time:e.target.value+s});}}
                         onKeyDown={handleEnter}
                         style={{width:44,marginLeft:6,textAlign:'center',opacity:set.done?0.6:1}}/>
                       <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,color:'var(--ink-faint)',flexShrink:0}}>:</span>
-                      <input type="number" min="0" max="59" inputMode="numeric" className="set-input" placeholder="00"
+                      <input type="number" min="0" max="59" inputMode="numeric" className="set-input set-cw-sec" placeholder="00"
                         value={tSecs}
                         onChange={e=>{const m=tMins||'0'; updateSet(dk,ex.id,set.id,{time:m+':'+e.target.value});}}
                         onKeyDown={handleEnter}
                         style={{width:44,textAlign:'center',opacity:set.done?0.6:1}}/>
                     </>);
                   })()}
-                  <span className="set-label" style={{width:56,textAlign:'center',fontWeight:pace?700:400,color:pace?'var(--gold)':'var(--ink-faint)',fontSize:pace?11:9}}>{pace||'—'}</span>
+                  <span className="set-label set-cw-pace" style={{width:56,textAlign:'center',fontWeight:pace?700:400,color:pace?'var(--gold)':'var(--ink-faint)',fontSize:pace?11:9}}>{pace||'—'}</span>
                 </>):(<>
                   <input type="number" min="0" className="set-input" placeholder="—" value={set.reps||''}
                     ref={el=>setFirstInputRefs.current[focusKey]=el}
@@ -17630,7 +17650,14 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                     onChange={e=>updateSet(dk,ex.id,set.id,{weight:e.target.value})} onKeyDown={handleEnter} style={{opacity:set.done?0.6:1}}/>
                   <span className="set-label">lbs</span>
                 </>)}
-                <div className={`set-check ${set.done?'done':''}`} onClick={()=>updateSet(dk,ex.id,set.id,{done:!set.done})}/>
+                {set.done
+                  ? <CiTimeField label={`Set ${si+1} finished at`} value={set.doneAt||''} fallback={fitNowHM()}
+                      onChange={v=>updateSet(dk,ex.id,set.id,{doneAt:v})} portal
+                      triggerClass={`set-time${set.doneAt?'':' empty'}`}
+                      triggerContent={set.doneAt?fitTimeShort(set.doneAt):'+ time'}/>
+                  : <span className="set-time set-time-ph" aria-hidden="true"/>}
+                <div className={`set-check ${set.done?'done':''}`} style={{marginLeft:6}}
+                  onClick={()=>{const nd=!set.done; updateSet(dk,ex.id,set.id,{done:nd,doneAt:(nd&&dk===fmt(today))?fitNowHM():''});}}/>
                 <button className="set-del-btn" aria-label="Delete set" onClick={()=>deleteSet(dk,ex.id,set.id)}>✕</button>
                 </div>
                 <input type="text" className="set-note-input" placeholder="note…" value={set.note||''}
