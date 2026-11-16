@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.86.0 -->
+<!-- LP Planner v5.86.1 -->
+<!-- v5.86.1 — Home upkeep: corrected how "Show ahead" places a task. It now sits ON ITS DUE DATE in the Weekly and Monthly calendars (so you can look at a week or month and see what is coming), and "Show ahead" (1 week / 2 weeks / 30 days) only decides how early it starts appearing there — a task is hidden until its due date is within that window of today. Once the due date has passed and it is not done, it moves to today and stays on today until you mark it done. (v5.86.0 wrongly put it on today as soon as the window opened.) -->
 <!-- v5.86.0 — Home upkeep: tasks now show on the Weekly and Monthly calendars well before they are due. Each task has a "Show ahead" choice (1 week, 2 weeks or 30 days; 30 days is the default, including for tasks that were already set to show). The card appears that many days before the due date and then stays on today's list every day until you mark it done, so it is visible as an upcoming job as well as an overdue one. Placement is still identical in Weekly and Monthly. -->
 <!-- v5.85.0 — Home upkeep: the fixed Area (Condo / HOA / Appliances) is replaced by free-form Tags. A task can carry several tags, typed in the editor (suggestions come from tags already in use, matched ignoring case; comma or Enter adds one, ✕ removes it). The filter row on the Home upkeep page now lists the tags actually in use (and hides itself when there are none); tags also show under each task. Existing tasks keep their old area as a tag automatically, so nothing is lost and no data is rewritten until you edit a task. -->
 <!-- v5.84.0 — Home upkeep now shows on the Monthly calendar too, placed on exactly the same day as in the Weekly planner (7 days before due, or today once that has passed, so an overdue task keeps moving forward day by day until it is done). Only tasks with "Show in Week view" on appear. Desktop/iPad: a house chip with a tick-to-done circle; three or more on one day collapse into a single "N upkeep" chip (red if any is overdue) that opens Home upkeep. Phone portrait: one house-coloured dot per day and rows with a done tick in the selected-day panel. Read from `upkeep`, never copied; no new stored data. -->
@@ -7305,7 +7306,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   // Goal tasks (v4.2.0): read from `goals`, never copied into weekData. Keys are local dates.
   const [dragGoal, setDragGoal] = useState(null); // {goalId, msId, taskId} while dragging a goal task
   const goalTasksByDay = React.useMemo(() => glTasksByDay(goals), [goals]);
-  // Home upkeep (v5.68.0): items with "Show in Week view" appear `lead` days before due (default 30; v5.86.0; or today if that has passed). Read from `upkeep`, never copied.
+  // Home upkeep (v5.68.0): items with "Show in Week view" sit on their due date once it is within `lead` days (default 30), or on today once overdue. Read from `upkeep`, never copied.
   const upkeepByDay = React.useMemo(() => upWeekMap(upkeep, glToday()), [upkeep]);
   function renderUpkeepTasks(localKey) {
     const list = upkeepByDay[localKey] || [];
@@ -15433,7 +15434,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.86.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.86.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15702,16 +15703,17 @@ function upSort(list, todayKey) {   // most overdue first, then soonest due; und
     return da === db ? (a.name || '').localeCompare(b.name || '') : da < db ? -1 : 1;
   });
 }
-// Weekly/Monthly placement (v5.86.0): dueDate − lead days (1 week / 2 weeks / 30 days, default 30), or today when that day has already passed
-// (so upcoming and overdue items stay on today's list until they are done).
+// Weekly/Monthly placement (v5.86.1): the task sits ON ITS DUE DATE once that date is within `lead` days of today (1 week / 2 weeks / 30 days,
+// default 30); before that it is hidden. When the due date has passed and it is not done, it shows on today until it is marked done.
 const UP_LEADS = [[7, '1 week'], [14, '2 weeks'], [30, '30 days']];
 function upLead(it) { const n = Number(it && it.lead); return n > 0 ? Math.round(n) : 30; }
 function upWeekMap(list, todayKey) {
   const map = {};
   (list || []).forEach(it => {
     if (!it.weekView || !it.dueDate) return;
-    let show = fmtLocal(addDays(parseLocal(it.dueDate), -upLead(it)));
-    if (show < todayKey) show = todayKey;
+    let show = it.dueDate;
+    if (show < todayKey) show = todayKey;                                   // overdue → today
+    else if (upDays(todayKey, show) > upLead(it)) return;                   // not inside the "show ahead" window yet
     (map[show] = map[show] || []).push(it);
   });
   return map;
@@ -16006,7 +16008,7 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
               <div className="up-pills" role="group" aria-label="How far ahead to show it">
                 {UP_LEADS.map(([n, label]) => <button key={n} type="button" aria-pressed={upLead(d) === n} className={upLead(d) === n ? 'on' : ''} onClick={() => setD(x => ({ ...x, lead: n }))}>{label}</button>)}
               </div>
-              <div className="up-hint">It appears that long before it is due, then stays on today until you mark it done.</div>
+              <div className="up-hint">It shows on its due date once it is this close, then moves to today if it goes overdue, until you mark it done.</div>
             </>
           )}
 
