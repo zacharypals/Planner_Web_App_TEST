@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.86.4 -->
+<!-- LP Planner v5.87.0 -->
+<!-- v5.87.0 — Daily check-in: an entry is no longer "checked in" just because something was typed. The Weekly / top-bar / Habits pills only turn to "✓ Checked in" after you tap Done for that day, so you can log sleep in the morning and finish the rest tonight; Back (‹ Week) leaves it as an in-progress entry. Existing entries count as done. Stored as `done` on the day's entry (no new sync key). -->
 <!-- v5.86.4 — Hover-to-delete ✕ is bigger (26px, same square as the caret) and sits exactly over the caret (anchored to the top of the card, where the caret is, instead of the bottom corner). -->
 <!-- v5.86.3 — Weekly view carets: the caret glyphs on task bars and sidebar sections are a touch bigger (boxes unchanged). Hover-to-delete now fully shows at about 1.7s (1.5s wait + 0.2s fade; v5.86.2 was 1.9s). -->
 <!-- v5.86.2 — Weekly view carets: the caret on each task bar now matches the Pages folders (▸ / ▾ glyph with a soft square behind it on hover; bigger on touch screens, like the Pages caret), and the section carets in the left sidebar / menu popup (Goals · next up, Weekly Goals, People to Connect With) are bigger with the same hover square. Hover-to-delete (the caret turning into a red ✕) now waits about 50% longer: 1.7s instead of 1.15s. -->
@@ -9962,7 +9963,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
             ))}
           </div>
           <div style={{flex:1}}/>
-          {onOpenCheckin && (()=>{ const done = ciHasData((checkins||{})[glToday()]); return (
+          {onOpenCheckin && (()=>{ const done = ciIsDone((checkins||{})[glToday()]); return (
             <button type="button" className="ci-btn" onClick={onOpenCheckin} aria-label={done?'Check-in done for today, open it':'Open today\'s check-in'}>{done?'✓ Checked in':'Check in'}</button>
           ); })()}
         </div>
@@ -14926,7 +14927,7 @@ function App() {
   const [checkinFrom, setCheckinFrom] = useState('planner'); // v5.71.0 — page the check-in was opened from (Back / Done return there)
   const [checkinDay, setCheckinDay] = useState(null); // v5.78.3 — day the check-in opens on (null = today)
   const openCheckin = (from, day) => { setCheckinFrom(from); setCheckinDay(day || null); setPage('checkin'); };
-  const checkinDoneToday = ciHasData((checkins || {})[glToday()]);
+  const checkinDoneToday = ciIsDone((checkins || {})[glToday()]);
   const [upkeep, setUpkeep] = useSynced('upkeep', []); // v5.68.0 Home upkeep — see HOME UPKEEP section
   const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
   // v5.35.0 — a Project linked to a reading-log book finishes that book when the project is marked done.
@@ -15447,7 +15448,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.86.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.87.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15529,7 +15530,7 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} onOpenCheckin={dk=>openCheckin('planner', dk)} checkinDoneFor={dk=>ciHasData((checkins||{})[dk])} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} onOpenCheckin={dk=>openCheckin('planner', dk)} checkinDoneFor={dk=>ciIsDone((checkins||{})[dk])} />}
       {page==='checkin' && <CheckinView checkins={checkins} setCheckins={setCheckins} habitGoals={habitGoals} habitCompletions={habitCompletions} fitnessLog={fitnessLog} tagDefs={checkinTags} setTagDefs={setCheckinTags} initialDay={checkinDay} backLabel={checkinFrom==='habit'?'Habits':'Week'} onBack={()=>setPage(checkinFrom)} />}
       {page==='upkeep' && <UpkeepView upkeep={upkeep} setUpkeep={setUpkeep} onBack={()=>setPage('planner')} />}
       {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} />}
@@ -16072,6 +16073,9 @@ const CI_MIN_GROUP = 3;   // a comparison in Trends needs at least this many day
 function ciHasData(e) {
   return !!e && (e.mood > 0 || e.energy > 0 || e.sleepQ > 0 || !!e.bed || !!e.wake || !!(e.line || '').trim() || !!(e.win || '').trim() || !!(e.grat || '').trim() || !!(e.look || '').trim() || !!(e.diff || '').trim() || Object.keys(e.tg || {}).length > 0);
 }
+// v5.87.0 — "Checked in" means the day has data AND Done was tapped. New entries start with done:false; Done sets it true.
+// Entries saved before v5.87.0 have no `done` field and keep counting as done.
+function ciIsDone(e) { return ciHasData(e) && e.done !== false; }
 function ciSleepMins(bed, wake) {   // minutes in bed; wake is the next morning when it is earlier than bed
   if (!bed || !wake) return null;
   const [bh, bm] = bed.split(':').map(Number), [wh, wm] = wake.split(':').map(Number);
@@ -16490,6 +16494,7 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
     setCheckins(c => {
       const cur = (c || {})[day] || {};
       const next = { ...cur, ...p, savedAt: Date.now() };
+      if (!ciHasData(cur) && p.done === undefined) next.done = false;   // v5.87.0 — a brand-new entry is in progress until Done is tapped
       const out = { ...(c || {}) };
       if (ciHasData(next)) out[day] = next; else delete out[day];
       return out;
@@ -16637,8 +16642,8 @@ function CheckinView({ checkins, setCheckins, habitGoals, habitCompletions, fitn
           {dailyHabits.length > 0 && <span className="ci-chip habit">{habitsDone} of {dailyHabits.length} daily habits</span>}
         </div>
         <div className="ci-foot">
-          <span className="ci-saved" aria-live="polite">{ciHasData(e) ? '✓ Saved automatically' : 'Nothing entered yet'}</span>
-          <button type="button" className="ci-primary" onClick={onBack}>Done</button>
+          <span className="ci-saved" aria-live="polite">{!ciHasData(e) ? 'Nothing entered yet' : ciIsDone(e) ? '✓ Checked in' : '✓ Saved · tap Done when you\'re finished'}</span>
+          <button type="button" className="ci-primary" onClick={() => { if (ciHasData(e)) patch({ done: true }); onBack(); }}>Done</button>
         </div>
       </div></div>
     </div>
