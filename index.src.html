@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.79.6 -->
+<!-- LP Planner v5.79.7 -->
+<!-- v5.79.7 — Weekly › Habits: tap anywhere on a habit row (name, blank space, circle) to check or uncheck it, in every Weekly layout (desktop columns, phone day view, time-block popover). The ▼ Qty/Notes button still just expands the row. -->
 <!-- v5.79.6 — Weekly (phone / narrow iPad): the round ☰ menu button sits 20px higher (bottom 80px → 100px) so it clears the Today + S M T W T F S day row and no longer covers the Saturday dot. Weekly only; the Monthly and Countdowns buttons are unchanged. -->
 <!-- v5.79.5 — Goals › Project milestone: the Clone button is now a clear "duplicate" icon (two overlapping pages with a +) in a cream 30px tile (32px on phones) like the move arrows and caret (phone date boxes now shrink so the row still fits), instead of the tiny faint ⧉ glyph. It is always visible (it used to appear only on hover, so it was missing on iPad); delete ✕ is unchanged. -->
 <!-- v5.79.4 — Pages editor toolbar: Undo and Redo are now proper curved-arrow icons (bolder, darker, a bit bigger on phones) instead of the thin ↶ ↷ text characters that looked like shepherd's crooks. Same buttons, same behaviour. -->
@@ -8516,7 +8517,9 @@ function DailyHabitsSection({ dayKey, habitGoals, habitCompletions, setHabitComp
         const isExpanded = !!expandedIds[g.id];
         return (
           <div key={g.id} className="habit-task-row" style={{borderLeft:`3px solid ${g.color}`}}>
-            <div style={{display:'flex', alignItems:'center', gap:5, padding:'6px 8px'}}>
+            <div role="checkbox" aria-checked={done} aria-label={g.name}   // v5.79.7 — the whole top line toggles the habit
+              style={{display:'flex', alignItems:'center', gap:5, padding:'6px 8px', cursor:'pointer', userSelect:'none', WebkitUserSelect:'none', WebkitTapHighlightColor:'transparent'}}
+              onClick={e => { e.stopPropagation(); toggleHabit(g.id); }}>
               <div className="habit-task-check"
                 style={{background: done ? g.color : 'transparent', borderColor: g.color}}
                 onClick={e => { e.stopPropagation(); toggleHabit(g.id); }}>
@@ -15172,7 +15175,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.79.6</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.79.7</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
