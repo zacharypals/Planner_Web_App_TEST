@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.86.2 -->
+<!-- LP Planner v5.86.3 -->
+<!-- v5.86.3 — Weekly view carets: the caret glyphs on task bars and sidebar sections are a touch bigger (boxes unchanged). Hover-to-delete now fully shows at about 1.7s (1.5s wait + 0.2s fade; v5.86.2 was 1.9s). -->
 <!-- v5.86.2 — Weekly view carets: the caret on each task bar now matches the Pages folders (▸ / ▾ glyph with a soft square behind it on hover; bigger on touch screens, like the Pages caret), and the section carets in the left sidebar / menu popup (Goals · next up, Weekly Goals, People to Connect With) are bigger with the same hover square. Hover-to-delete (the caret turning into a red ✕) now waits about 50% longer: 1.7s instead of 1.15s. -->
 <!-- v5.86.1 — Home upkeep: corrected how "Show ahead" places a task. It now sits ON ITS DUE DATE in the Weekly and Monthly calendars (so you can look at a week or month and see what is coming), and "Show ahead" (1 week / 2 weeks / 30 days) only decides how early it starts appearing there — a task is hidden until its due date is within that window of today. Once the due date has passed and it is not done, it moves to today and stays on today until you mark it done. (v5.86.0 wrongly put it on today as soon as the window opened.) -->
 <!-- v5.86.0 — Home upkeep: tasks now show on the Weekly and Monthly calendars well before they are due. Each task has a "Show ahead" choice (1 week, 2 weeks or 30 days; 30 days is the default, including for tasks that were already set to show). The card appears that many days before the due date and then stays on today's list every day until you mark it done, so it is visible as an upcoming job as well as an overdue one. Placement is still identical in Weekly and Monthly. -->
@@ -912,12 +913,12 @@
     background: none; border: none; cursor: pointer; flex-shrink: 0;
     color: var(--ink); line-height: 1; opacity: 0.6;
     display: flex; align-items: center; justify-content: center;
-    font-size: 17px; width: 26px; height: 26px; padding: 0; margin: -6px -4px -6px 0; border-radius: 6px;
+    font-size: 21px; width: 26px; height: 26px; padding: 0; margin: -6px -4px -6px 0; border-radius: 6px;
     -webkit-tap-highlight-color: transparent; touch-action: manipulation;
   }
   .task-expand-btn:hover { opacity: 1; background: color-mix(in oklab, currentColor 12%, transparent); }
   @media (hover: none), (pointer: coarse) {
-    .task-expand-btn { font-size: 22px; width: 40px; height: 34px; margin: -10px -8px -10px 0; }
+    .task-expand-btn { font-size: 26px; width: 40px; height: 34px; margin: -10px -8px -10px 0; }
   }
   .task-delete-btn {
     position: absolute; bottom: 5px; right: 6px;
@@ -933,8 +934,8 @@
   .task-card:hover .task-delete-btn {
     opacity: 1;
     visibility: visible;
-    /* v5.86.2 — hover-to-delete wait lengthened ~50% (was 1.15s / 1.1s) */
-    transition: opacity 0.2s 1.7s, visibility 0s 1.65s;
+    /* v5.86.2 — hover-to-delete wait lengthened (was 1.15s; v5.86.2 had 1.7s; now 1.5s wait + 0.2s fade = fully shown at 1.7s) */
+    transition: opacity 0.2s 1.5s, visibility 0s 1.45s;
   }
   .task-delete-btn:hover { background: #c0392b; }
   .task-delete-btn.confirming {
@@ -1779,7 +1780,7 @@
     /* Bigger tap targets for task radio and accordion caret on mobile */
     .task-check { width: 16px; height: 16px; padding: 4px; box-sizing: content-box; margin: -4px; margin-right: 0; }
     .task-check.done::after { font-size: 12px; }
-    .task-expand-btn { font-size: 22px; width: 40px; height: 34px; padding: 0; margin: -10px -8px -10px 0; }
+    .task-expand-btn { font-size: 26px; width: 40px; height: 34px; padding: 0; margin: -10px -8px -10px 0; }
 
     /* ── Mobile day view ── */
     .mobile-day-view { display: flex; flex-direction: column; flex: 1; min-height: 0; }
@@ -3020,11 +3021,11 @@
   .sb-toggle { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; min-height: 28px; padding: 2px 0; background: none; border: none; cursor: pointer; color: inherit; text-align: left; font-family: inherit; }
   .sb-toggle .sidebar-section-title { margin: 0; }
   /* v5.86.2 — bigger chevron in a rounded square that tints when you hover the section header (same look as the task caret) */
-  .sb-chev { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 24px; height: 24px; margin: -2px 0 -2px -4px; font-size: 16px; line-height: 1; color: var(--ink-light); border-radius: 6px; transition: transform 0.15s, background 0.12s, color 0.12s; }
+  .sb-chev { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 24px; height: 24px; margin: -2px 0 -2px -4px; font-size: 20px; line-height: 1; color: var(--ink-light); border-radius: 6px; transition: transform 0.15s, background 0.12s, color 0.12s; }
   .sb-toggle:hover .sb-chev { background: color-mix(in oklab, currentColor 12%, transparent); color: var(--ink); }
   .sb-head.folded .sb-chev { transform: rotate(-90deg); }
   .sb-count { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-light); background: var(--cream); border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
-  @media (pointer: coarse) { .sb-toggle { min-height: 36px; } .sb-chev { width: 28px; height: 28px; font-size: 18px; } }
+  @media (pointer: coarse) { .sb-toggle { min-height: 36px; } .sb-chev { width: 28px; height: 28px; font-size: 22px; } }
   .wk-be { padding: 9px 44px 9px 16px; }
   .wk-be .wk-be-word { font-size: 26px; margin-top: 3px; }
   .wk-be .wk-be-word.long { font-size: 18px; }
@@ -15445,7 +15446,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.86.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.86.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
