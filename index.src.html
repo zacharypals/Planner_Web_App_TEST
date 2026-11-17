@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.90.0 -->
+<!-- LP Planner v5.90.1 -->
+<!-- v5.90.1 — Pages checklist box: on mouse-and-keyboard screens the box is a touch smaller (.95em) with a thicker 2px border so stacked boxes no longer butt up against each other; touch screens keep the v5.90.0 size. -->
 <!-- v5.90.0 — Pages checklists: a drawn rounded-square checkbox replaces the ☐ / ☑ text glyph (accent-filled with a white tick when checked; follows the light and dark themes). The clickable area is larger than the box (extra invisible padding on the left and top/bottom, and a little taller on touch screens) while the text indent is unchanged. Checked lines keep the strikethrough + 50% fade. -->
 <!-- v5.89.0 — Pages checklists: optional "move checked items to the bottom" (like Apple Notes). New ☑↓ toolbar toggle (per device, off by default). When on, ticking a box re-orders that checklist so unchecked items come first and checked items follow, stable; unticking sends the item to the bottom of the unchecked items. Nested items move with their parent. One undo step. -->
 <!-- v5.88.1 — Desktop / iPad top-bar "Check in" pill now matches the phone: filled gold with dark text while today is not checked in (white-filled while open, and the quiet outlined "✓ Checked in" once Done). -->
@@ -2258,8 +2259,8 @@
      change); the click target is the .ql-ui span, widened with an invisible ::after so it is easier to hit than the 18px box. */
   .pages-body .ql-editor li[data-list=unchecked] > .ql-ui:before,
   .pages-body .ql-editor li[data-list=checked] > .ql-ui:before {
-    content: ''; box-sizing: border-box; display: inline-block; width: 1.15em; height: 1.15em; margin-left: -1.7em; margin-right: .4em;
-    vertical-align: middle; position: relative; top: -1px; border: 1.75px solid var(--ink-light); border-radius: 6px; background: transparent no-repeat center / 100% 100%;
+    content: ''; box-sizing: border-box; display: inline-block; width: .95em; height: .95em; margin-left: -1.7em; margin-right: .4em;
+    vertical-align: middle; position: relative; top: -1px; border: 2px solid var(--ink-light); border-radius: 6px; background: transparent no-repeat center / 100% 100%;
     transition: background-color .12s ease, border-color .12s ease, transform .1s ease;
   }
   .pages-body .ql-editor li[data-list=checked] > .ql-ui:before {
@@ -2270,7 +2271,7 @@
   .pages-body .ql-editor li[data-list=checked] > .ql-ui { -webkit-tap-highlight-color: transparent; }
   .pages-body .ql-editor li[data-list=unchecked] > .ql-ui:after,
   .pages-body .ql-editor li[data-list=checked] > .ql-ui:after {   /* invisible hit area: 14px left of the box, 4px right, a full line tall */
-    content: ''; position: absolute; left: calc(-1.7em - 14px); top: -1px; bottom: -1px; width: calc(1.15em + 18px);
+    content: ''; position: absolute; left: calc(-1.7em - 14px); top: -1px; bottom: -1px; width: calc(.95em + 18px);
   }
   .pages-body .ql-editor li[data-list=unchecked] > .ql-ui:active:before,
   .pages-body .ql-editor li[data-list=checked] > .ql-ui:active:before { transform: scale(.88); }
@@ -2280,6 +2281,7 @@
   }
   @media (hover: none), (pointer: coarse) {   /* touch: a bit more room above/below each line so the target is taller */
     .pages-body .ql-editor li[data-list=unchecked], .pages-body .ql-editor li[data-list=checked] { margin: 4px 0; }
+    .pages-body .ql-editor li[data-list=unchecked] > .ql-ui:before, .pages-body .ql-editor li[data-list=checked] > .ql-ui:before { width: 1.15em; height: 1.15em; border-width: 1.75px; }
     .pages-body .ql-editor li[data-list=unchecked] > .ql-ui:after, .pages-body .ql-editor li[data-list=checked] > .ql-ui:after { top: -2px; bottom: -2px; left: calc(-1.7em - 12px); width: calc(1.15em + 16px); }
   }
   /* v5.77.1: Quill draws its own bullet / number / checkbox (.ql-ui), so the browser's native list marker must never show.
@@ -15482,7 +15484,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.90.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.90.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
