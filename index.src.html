@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.88.1 -->
+<!-- LP Planner v5.89.0 -->
+<!-- v5.89.0 — Pages checklists: optional "move checked items to the bottom" (like Apple Notes). New ☑↓ toolbar toggle (per device, off by default). When on, ticking a box re-orders that checklist so unchecked items come first and checked items follow, stable; unticking sends the item to the bottom of the unchecked items. Nested items move with their parent. One undo step. -->
 <!-- v5.88.1 — Desktop / iPad top-bar "Check in" pill now matches the phone: filled gold with dark text while today is not checked in (white-filled while open, and the quiet outlined "✓ Checked in" once Done). -->
 <!-- v5.88.0 — Daily check-in: a "Mark not done" button appears next to Done once a day is checked in, so you can reopen it (the pills go back to "Check in"). Fixes entries saved before v5.87.0 that were already counted as done. -->
 <!-- v5.87.0 — Daily check-in: an entry is no longer "checked in" just because something was typed. The Weekly / top-bar / Habits pills only turn to "✓ Checked in" after you tap Done for that day, so you can log sleep in the morning and finish the rest tonight; Back (‹ Week) leaves it as an in-progress entry. Existing entries count as done. Stored as `done` on the day's entry (no new sync key). -->
@@ -15452,7 +15453,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.88.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.89.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -19161,6 +19162,75 @@ function pagesDeltaToHtml(delta) {
   return html;
 }
 
+// ── v5.89.0: Pages checklist auto-sort ("move checked items to the bottom") ───────────────
+// Per-device toggle (toolbar ☑↓, localStorage 'pagesSortChecked'). After a checkbox is clicked the checklist it belongs to is
+// re-ordered: unchecked items first, then checked items, each keeping their relative order. The item that was just clicked sits
+// between the two groups: a newly ticked item lands at the top of the checked group, an unticked one at the bottom of the unchecked group.
+// Only the clicked item's own level is re-ordered (siblings in the same run); nested lines travel with their parent.
+const PAGES_SORT_LS = 'pagesSortChecked';
+const pagesSortOn = () => lsGet(PAGES_SORT_LS) === '1';
+// Split a Delta's ops into lines: { start, len (incl. its newline), ops, attrs (the newline's attributes) }
+function pagesDeltaLines(ops) {
+  const lines = [];
+  let cur = [], len = 0, start = 0;
+  const flush = attrs => { lines.push({ start, len, ops: cur, attrs: attrs || {} }); start += len; cur = []; len = 0; };
+  ops.forEach(op => {
+    if (typeof op.insert !== 'string') { cur.push(op); len += 1; return; }
+    const parts = op.insert.split('\n');
+    parts.forEach((txt, i) => {
+      if (txt) { cur.push(op.attributes ? { insert: txt, attributes: op.attributes } : { insert: txt }); len += txt.length; }
+      if (i < parts.length - 1) { cur.push(op.attributes ? { insert: '\n', attributes: op.attributes } : { insert: '\n' }); len += 1; flush(op.attributes); }
+    });
+  });
+  if (len) flush({});
+  return lines;
+}
+// Returns the lines in their new order (same line objects, permuted). `targets` = line objects whose box was just clicked.
+function pagesChecklistReorder(lines, targets) {
+  const isChk = l => l.attrs.list === 'checked' || l.attrs.list === 'unchecked';
+  const ind = l => l.attrs.indent | 0;
+  let cur = lines.slice();
+  targets.forEach(tl => {
+    const t = cur.indexOf(tl);
+    if (t < 0 || !isChk(tl)) return;
+    const k = ind(tl);
+    const inRun = l => !!l.attrs.list && ind(l) >= k && !(ind(l) === k && !isChk(l));
+    let a = t; while (a > 0 && inRun(cur[a - 1])) a--;
+    let b = t + 1; while (b < cur.length && inRun(cur[b])) b++;
+    while (a < t && ind(cur[a]) > k) a++;               // deeper lines with no parent in this run stay where they are
+    const items = [];
+    for (let i = a; i < b; i++) { if (ind(cur[i]) === k) items.push([cur[i]]); else items[items.length - 1].push(cur[i]); }
+    // everyone else: unchecked first, then checked, each in their existing order; the clicked item sits between the two groups
+    // (a ticked item = top of the checked group, an unticked item = bottom of the unchecked group)
+    const rest = items.filter(it => it[0] !== tl);
+    const un = rest.filter(it => it[0].attrs.list === 'unchecked'), ck = rest.filter(it => it[0].attrs.list === 'checked');
+    const mine = items.filter(it => it[0] === tl);
+    const seq = un.concat(mine, ck).reduce((acc, it) => acc.concat(it), []);
+    const orig = cur.slice(a, b);
+    if (seq.every((l, i) => l === orig[i])) return;
+    cur = cur.slice(0, a).concat(seq, cur.slice(b));
+  });
+  return cur;
+}
+// One Delta that rewrites only the span that changed, plus a function mapping an old document position to the new one.
+function pagesChecklistDelta(Delta, orig, fin) {
+  let f = 0; while (f < orig.length && orig[f] === fin[f]) f++;
+  if (f === orig.length) return null;
+  let l = orig.length - 1; while (orig[l] === fin[l]) l--;
+  const segStart = orig[f].start;
+  let segLen = 0; for (let i = f; i <= l; i++) segLen += orig[i].len;
+  let d = new Delta().retain(segStart);
+  const newStart = new Map(); let p = segStart;
+  for (let i = f; i <= l; i++) { fin[i].ops.forEach(op => { d = d.insert(op.insert, op.attributes); }); newStart.set(fin[i], p); p += fin[i].len; }
+  d = d.delete(segLen);
+  const mapPos = pos => {
+    if (pos < segStart || pos >= segStart + segLen) return pos;
+    const ln = orig.find(x => pos >= x.start && pos < x.start + x.len);
+    return ln ? newStart.get(ln) + (pos - ln.start) : pos;
+  };
+  return { change: d, mapPos };
+}
+
 // The editor itself. Remounted (key=docId) for each page; the page's saved HTML is read once on mount.
 function PagesQuill({ docId, html, apiRef, onInput, onFmt, onText, onGone }) {
   const hostRef = useRef(null);
@@ -19208,7 +19278,43 @@ function PagesQuill({ docId, html, apiRef, onInput, onFmt, onText, onGone }) {
       if (sel) cb.current.onFmt(q.getFormat(sel));
     });
     q.on('selection-change', r => { if (r) cb.current.onFmt(q.getFormat(r)); });
+    // v5.89.0 — auto-sort checklists. Quill's own checkbox handler (on the .ql-ui span) runs first and flips the item; this
+    // listener (bubbling on the host) then notes which line was clicked and re-orders after a short pause so the tick is seen.
+    // Re-ordering is one updateContents → one undo step (it merges with the tick inside the history delay).
+    const sortQ = { items: [], timer: null };
+    const runSort = () => {
+      sortQ.timer = null;
+      const pend = sortQ.items; sortQ.items = [];
+      if (!pend.length || !pagesSortOn() || !host.isConnected) return;
+      const lines = pagesDeltaLines(q.getContents().ops);
+      const targets = [];
+      pend.forEach(p => {
+        const ln = lines.find(x => x.start === p.pos);
+        if (ln && q.getText(ln.start, ln.len - 1) === p.text && !targets.includes(ln)) targets.push(ln);
+      });
+      if (!targets.length) return;
+      const res = pagesChecklistDelta(Delta, lines, pagesChecklistReorder(lines, targets));
+      if (!res) return;
+      const sel = q.getSelection();            // null unless the editor has focus — never focuses it
+      q.updateContents(res.change, 'user');
+      if (sel) q.setSelection(res.mapPos(sel.index), sel.length, 'silent');
+    };
+    const onChk = e => {
+      if (!pagesSortOn()) return;
+      const ui = e.target && e.target.closest ? e.target.closest('.ql-ui') : null;
+      const li = ui && ui.closest('li[data-list]');
+      if (!li || (li.getAttribute('data-list') !== 'checked' && li.getAttribute('data-list') !== 'unchecked')) return;
+      const blot = Quill.find(li);
+      if (!blot) return;
+      const idx = q.getIndex(blot);
+      sortQ.items.push({ pos: idx, text: q.getText(idx, blot.length() - 1) });
+      clearTimeout(sortQ.timer); sortQ.timer = setTimeout(runSort, 350);
+    };
+    host.addEventListener('mousedown', onChk);
+    host.addEventListener('touchstart', onChk, { passive: true });
     return () => {
+      clearTimeout(sortQ.timer);
+      host.removeEventListener('mousedown', onChk); host.removeEventListener('touchstart', onChk);
       let h = null;
       try { h = api.getHtml(); } catch {}
       if (apiRef.current === api) apiRef.current = null;
@@ -19670,6 +19776,8 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
   pagesRef.current = pagesData;
   const [wordCount, setWordCount] = useState(0);
   const [dlOpen, setDlOpen] = useState(false);   // v5.59.0 — Download menu in the page header
+  const [sortChk, setSortChk] = useState(() => pagesSortOn());   // v5.89.0 — move checked checklist items to the bottom (per device)
+  const toggleSortChk = () => { const v = !sortChk; lsSet(PAGES_SORT_LS, v ? '1' : '0'); setSortChk(v); };
   const [tbMore, setTbMore] = useState(false);  // v5.51.0 — phones: toolbar shows everyday tools; ⋯ reveals the rest
   const [showNewMenu, setShowNewMenu] = useState(null); // null=closed, 'top'=top-level, folderId=folder menu
   const [expandedFolders, setExpandedFolders] = useState({});
@@ -20474,6 +20582,7 @@ function PagesView({ pagesData, setPagesData, foldersData, setFoldersData, weekD
                   <button className={'pages-toolbar-btn'+(qFmt.list==='bullet'?' active':'')} onMouseDown={e=>{e.preventDefault();qList('bullet');}} title="Bullet list">• —</button>
                   <button className={'pages-toolbar-btn tb-more'+(qFmt.list==='ordered'?' active':'')} onMouseDown={e=>{e.preventDefault();qList('ordered');}} title="Numbered list">1.</button>
                   <button className={'pages-toolbar-btn'+((qFmt.list==='checked'||qFmt.list==='unchecked')?' active':'')} onMouseDown={e=>{e.preventDefault();qList('check');}} title="Checklist">☑</button>
+                  <button className={'pages-toolbar-btn tb-more'+(sortChk?' active':'')} aria-pressed={sortChk} onMouseDown={e=>{e.preventDefault();toggleSortChk();}} title={sortChk ? 'Checked items move to the bottom of the list — on (tap to turn off)' : 'Checked items stay where they are — tap to move them to the bottom of the list'}>☑↓</button>
                   <button className={'pages-toolbar-btn tb-more'+(qFmt.blockquote?' active':'')} onMouseDown={e=>{e.preventDefault();qQuote();}} title="Quote">"</button>
                   <div className="pages-toolbar-sep tb-more"/>
                   <button className={'pages-toolbar-btn tb-more'+(qFmt.align?' active':'')} onMouseDown={e=>{e.preventDefault();qOpenPop('align',e);}} title="Alignment">≡ ▾</button>
