@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.94.0 -->
+<!-- LP Planner v5.94.1 -->
+<!-- v5.94.1 — Us: the date field in "Add a moment" (and when editing a moment) no longer spills past the card edge on phones. -->
 <!-- v5.94.0 — Us: photos on moments. A moment can carry one photo (shrunk on your phone to about 1600px, with a small thumbnail for the timeline) stored in a private Cloudflare R2 bucket; tap a thumbnail to see it large. Moments can also be photo-only. Remove a photo from your own moment while editing; deleting a moment deletes its photo. Needs Worker 0.4.0 and the R2 bucket `lp-planner-photos` (binding PHOTOS). Photos are not in the Drive backups. -->
 <!-- v5.93.0 — Us: Timeline tab. Add a moment (date + a few words) any time, separate from a check-in; the timeline shows moments and completed check-ins together, newest first, grouped by month. You can edit or delete only your own moments (enforced in the app). New shared collection relMoments; no Worker change. -->
 <!-- v5.92.0 — Us: shared relationship check-ins. A new "Us" button sits beside Weekly review in the Weekly sidebar (Weekly review is narrower to make room; gold while no check-in is complete this week). Each of you answers the same editable questions on your own device and sees the other's answers appear; a shared Together section holds notes and action items; History lists every check-in; any time you like you can start another. Needs Worker 0.3.0 (shared space, /api/shared/*). New shared collections relMeta / relCheckins, synced by a small separate client (Shared) — your private sync engine is untouched. -->
@@ -1719,6 +1720,9 @@
   .us-month { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700; color: var(--ink); margin: 8px 2px 0; }
   .us-moment-note { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 1.45; color: var(--ink); }
   .us-moment-btns { display: flex; gap: 6px; }
+  /* iOS gives date inputs a built-in minimum width; clamp it so the field stays inside the card */
+  .ci-card > div, .us-moment > div { min-width: 0; }
+  .ci-card input[type="date"] { display: block; width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; -webkit-appearance: none; appearance: none; text-align: left; }
   .us-photo { display: block; max-width: 100%; max-height: 340px; border-radius: 12px; cursor: zoom-in; align-self: flex-start; }
   .us-photo.full { max-height: 78vh; max-width: 100%; cursor: default; }
   .us-photo-ph { min-height: 84px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--cream); color: var(--ink-faint); font-size: 13px; }
@@ -15740,7 +15744,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.94.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.94.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
