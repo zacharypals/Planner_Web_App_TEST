@@ -600,3 +600,15 @@ test('CORS allows DELETE for the app origin (photos)', async () => {
   assert.equal(res.status, 204);
   assert.match(res.headers.get('Access-Control-Allow-Methods'), /DELETE/);
 });
+
+test('assembleBackup writes the Projects under both `projects` and the old `goals` name (v5.96.0)', () => {
+  const rows = [
+    { collection: 'projects', doc_id: 'p:a', data: '{"id":"a"}' },
+    { collection: 'projects', doc_id: '__order', data: '["p:a"]' },
+    { collection: 'goals', doc_id: 'p:a', data: '{"id":"a"}' },
+    { collection: 'goals', doc_id: '__order', data: '["p:a"]' },
+  ];
+  const out = JSON.parse(assembleBackup(rows, new Date(0)));
+  assert.deepEqual(out.projects, [{ id: 'a' }]);
+  assert.deepEqual(out.goals, [{ id: 'a' }]);
+});

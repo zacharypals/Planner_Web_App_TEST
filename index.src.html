@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.95.0 -->
+<!-- LP Planner v5.96.0 -->
+<!-- v5.96.0 — Cleanup: the Goals tab's code names now match the screen. Projects are `projects` / ProjectsMain (were `goals` / GoalsMain), the Goals sub-tab is `goals` / GoalsView (was `targets` / TargetsView) and the Reading log is `readingLog`; the tab wrapper is GoalsTab. DATA: Projects are now stored in a new `projects` collection. On first load the old `goals` documents are copied across once (byte for byte); the old documents are left untouched as a safety copy and the live app still reads them. Old backups that hold the Projects under `goals` still import. Worker: backup.js now also lists `projects` (deploy needed). The sub-tab pref moved from `glSubTab` to `glSub` (a device opens on Projects once). The Goals sub-tab's data keys (`targets`, `targetLog`) are unchanged for now. -->
 <!-- v5.95.0 — Us: delete a check-in. A "Delete this check-in" link at the bottom of an open check-in (either of you can use it) asks for confirmation naming the date, then removes it for both of you. Check-ins you delete are gone from History and the Timeline; the nightly Drive backup of the shared space is the way back. No Worker change. -->
 <!-- v5.94.4 — Weekly: the day "Notes" toggle is now a full-width pill (icon, label, rotating chevron) that fills with the accent color when the day has a note, with a one-line preview when collapsed; the note box has a themed fill and border so it shows in dark mode. -->
 <!-- v5.94.3 — Us: date field is fixed-height, centered, and clipped to the card on iPhone. -->
@@ -4521,7 +4522,7 @@ function ruleBase(rule, fctx) {
 const _glRpCache = new WeakMap();   // goal object -> { log, day, pool } (goals are replaced, never mutated, so identity is a safe key)
 function glReadingPool(goal, fctx) {
   const todayKey = (fctx && fctx.todayKey) || glToday();
-  const log = (fctx && fctx.targetLog) || null;
+  const log = (fctx && fctx.readingLog) || null;
   const hit = goal && _glRpCache.get(goal);
   if (hit && hit.log === log && hit.day === todayKey) return hit.pool;
   const L = Array.isArray(log) ? log : [];
@@ -4609,12 +4610,12 @@ function glMsRule(m, goal, fctx, todayKey) {
 // nothing changed (so React does no work) plus what was reached, for the Undo toast.
 // Only active goals; something you unchecked by hand after it auto-completed (metricHold / ruleHold) is left alone.
 // mctx carries {metrics, fitnessLog, fitnessExercises}.
-function glAutoComplete(goals, mctx, asOf) {
+function glAutoComplete(projects, mctx, asOf) {
   const reached = [];
   let changed = false;
   const todayKey = fmtLocal(asOf);
-  const fctx = { fitnessLog: mctx.fitnessLog, fitnessExercises: mctx.fitnessExercises, habitGoals: mctx.habitGoals, habitCompletions: mctx.habitCompletions, habitQty: mctx.habitQty, targetLog: mctx.targetLog, todayKey };
-  const out = (goals || []).map(g => {
+  const fctx = { fitnessLog: mctx.fitnessLog, fitnessExercises: mctx.fitnessExercises, habitGoals: mctx.habitGoals, habitCompletions: mctx.habitCompletions, habitQty: mctx.habitQty, readingLog: mctx.readingLog, todayKey };
+  const out = (projects || []).map(g => {
     if (g.status === 'done' || g.status === 'parked') return g;
     let touched = false;
     const ms = (g.milestones || []).map(m => {
@@ -4647,7 +4648,7 @@ function glAutoComplete(goals, mctx, asOf) {
     changed = true;
     return { ...g, milestones: ms };
   });
-  return { goals: changed ? out : goals, reached };
+  return { projects: changed ? out : projects, reached };
 }
 
 // ─────────────────────────────────────────────
@@ -5293,8 +5294,13 @@ const SYNC_SPLITS = {
   fitnessLog: 'map',        // one doc per day
   pagesData: 'list',        // one doc per page, plus a small order doc
   habitCompletions: 'month', habitQty: 'month', habitNotes: 'month', habitMetrics: 'month',
-  goals: 'list',            // one doc per goal (v4.2.0)
+  projects: 'list',         // one doc per project (stored under `goals` until v5.96.0 — see SYNC_RENAMED)
 };
+// v5.96.0 — collections that were renamed. On first load, if the server has none of the NEW collection's
+// documents, the OLD collection's documents are copied across (byte for byte, as new documents). The old
+// documents are never changed or deleted here, so the live app (still on the old name) keeps working and
+// there is always a copy to fall back on. [from, to]
+const SYNC_RENAMED = [['goals', 'projects']];
 const SYNC_DELETED = Symbol('deleted');   // sentinel for "document removed"
 const SYNC_NO_BASE = Symbol('nobase');    // sentinel for "base version content unknown"
 
@@ -5801,6 +5807,15 @@ const Sync = {
       this.setBase(d.c, d.i, d.v, j);
       (server[d.c] || (server[d.c] = {}))[d.i] = d.d;
     }
+    // v5.96.0 — one-time copy for renamed collections (see SYNC_RENAMED). Only when the server has no document
+    // at all under the new name; documents already waiting in the outbox are left alone.
+    for (const [from, to] of SYNC_RENAMED) {
+      if (!this.reg[to] || (server[to] && Object.keys(server[to]).length) || !server[from]) continue;
+      for (const id of Object.keys(server[from])) {
+        if (this.outbox[to] && this.outbox[to][id]) continue;
+        this.setOutbox(to, id, JSON.stringify(server[from][id]));
+      }
+    }
     // Layer unsent local edits on top of the server copy.
     for (const c of Object.keys(this.outbox)) {
       for (const i of Object.keys(this.outbox[c])) {
@@ -5839,6 +5854,8 @@ const Sync = {
     for (let n = 0; this.flushing && n < 300; n++) await new Promise(r => setTimeout(r, 100));
   },
   importValue(values, coll) {
+    // Backups made before v5.96.0 hold the Projects under `goals`.
+    for (const [from, to] of SYNC_RENAMED) if (coll === to && values && values[to] === undefined && Array.isArray(values[from])) return values[from];
     return values && Object.prototype.hasOwnProperty.call(values, coll) && values[coll] !== undefined ? values[coll] : this.reg[coll].init;
   },
   async importAll(values, onProgress) {
@@ -6575,9 +6592,9 @@ function SortableChecklist({ items, onUpdate, onAdd, onDelete, onReorder, placeh
 // an older week works the same way. Writes go through the Weekly Planner's own task helpers, so
 // cross-week moves, calendar sync and Undo all behave exactly as they do elsewhere.
 // ─────────────────────────────────────────────
-function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletions, fitnessLog,
+function WeekReview({ weekStart, wd, projects, setProjects, habitGoals, habitCompletions, fitnessLog,
                       fitnessExercises, mctx, onMoveTask, onDeleteTask, onAddTask, onSetWD, onNavWeek,
-                      onGoToWeek, onOpenGoal, onClose }) {
+                      onGoToWeek, onOpenProject, onClose }) {
   const [step, setStep] = useState(1);
   const [custom, setCustom] = useState(null);     // id of the row whose date picker is open
   const [top3, setTop3] = useState(['', '', '']);
@@ -6599,7 +6616,7 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
   dayKeys.forEach((dk, i) => ((wd.tasks || {})[dk] || []).forEach(t => {
     if ((t.title || '').trim()) rows.push({ kind: 'task', id: t.id, dk, dayIdx: i, title: t.title, done: !!t.done, task: t });
   }));
-  (goals || []).forEach(g => (g.milestones || []).forEach(m => (m.tasks || []).forEach(t => {
+  (projects || []).forEach(g => (g.milestones || []).forEach(m => (m.tasks || []).forEach(t => {
     if (!t.scheduledDate || !inWeek.has(t.scheduledDate)) return;
     const d = parseLocal(t.scheduledDate);
     rows.push({ kind: 'goal', id: t.id, dk: t.scheduledDate, dayIdx: d ? d.getDay() : 0,
@@ -6616,7 +6633,7 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
   const habitTotal = habitStats.reduce((s, x) => s + x.target, 0);
   const habitHit = habitStats.reduce((s, x) => s + Math.min(x.done, x.target), 0);
   const workouts = dayKeys.filter(dk => ((fitnessLog || {})[dk] || []).length > 0).length;
-  const activeGoals = (goals || []).filter(g => g.status === 'active');
+  const activeGoals = (projects || []).filter(g => g.status === 'active');
 
   // ── Moving an unfinished task ──
   function place(r, toKey) {
@@ -6626,29 +6643,29 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
       Undo.push(`Moved "${r.title.trim().slice(0, 30)}" to ${glShort(toKey)}`, () => onMoveTask(toKey, from, r.id));
     } else {
       const from = r.dk;
-      setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: toKey }));
+      setProjects(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: toKey }));
       Undo.push(`Moved "${r.title.trim().slice(0, 30)}" to ${glShort(toKey)}`,
-        () => setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: from })));
+        () => setProjects(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: from })));
     }
     setCustom(null);
   }
   function drop(r) {
     if (r.kind === 'task') { onDeleteTask(r.dk, r.id); return; }
     const from = r.dk;
-    setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: '' }));
+    setProjects(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: '' }));
     Undo.push(`Unscheduled "${r.title.trim().slice(0, 30)}"`,
-      () => setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: from })));
+      () => setProjects(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: from })));
     setCustom(null);
   }
   function moveAll() {
     const list = [...unfinished];
     list.forEach(r => {
       if (r.kind === 'task') onMoveTask(r.dk, nextMonKey, r.id);
-      else setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: nextMonKey }));
+      else setProjects(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: nextMonKey }));
     });
     Undo.push(`Moved ${list.length} task${list.length === 1 ? '' : 's'} to ${glShort(nextMonKey)}`, () => list.forEach(r => {
       if (r.kind === 'task') onMoveTask(nextMonKey, r.dk, r.id);
-      else setGoals(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: r.dk }));
+      else setProjects(gs => glPatchTask(gs, r.g.id, r.m.id, r.id, { scheduledDate: r.dk }));
     }));
   }
   function addGoalTask(g) {
@@ -6657,7 +6674,7 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
     const m = glNextMilestone(g) || (g.milestones || [])[0];
     if (!m) return;
     const t = { id: glId('t'), title, scheduledDate: fmtLocal(nextMon), done: false, completedAt: null };
-    setGoals(gs => glPatchGoal(gs, g.id, gg => glPatchMs(gg, m.id, mm => ({ ...mm, tasks: [...(mm.tasks || []), t] }))));
+    setProjects(gs => glPatchProject(gs, g.id, gg => glPatchMs(gg, m.id, mm => ({ ...mm, tasks: [...(mm.tasks || []), t] }))));
     setGoalDraft(d => ({ ...d, [g.id]: '' }));
   }
   // Closing by tapping outside after step 1 still counts as having done the review (the moves
@@ -6777,7 +6794,7 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
                   <span className="gl-dot" style={{ background: g.color }} />
                   <span style={{ flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600, cursor: 'pointer', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                    onClick={() => { onClose(); onOpenGoal(g.id); }}>{g.title || 'Untitled goal'}</span>
+                    onClick={() => { onClose(); onOpenProject(g.id); }}>{g.title || 'Untitled goal'}</span>
                   <GlHealthPill h={h} />
                 </div>
                 {[['Work done', h.p], ['Time used', h.used]].map(([lab, v]) => (
@@ -6803,7 +6820,7 @@ function WeekReview({ weekStart, wd, goals, setGoals, habitGoals, habitCompletio
               </div>
             );
           }) : (
-            <div className="wr-done">No active goals. Create one on the Goals tab and it shows up here.</div>
+            <div className="wr-done">No active projects. Create one on the Goals tab and it shows up here.</div>
           ))}
 
           {step === 4 && (<>
@@ -6931,7 +6948,7 @@ function WeekTile({ kind, text, extra, onSave }) {
   );
 }
 
-function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, goals, setGoals, onOpenGoal, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen, repeatSeries, seriesRun, upkeep, setUpkeep, onOpenUpkeep, onOpenCheckin, checkinDoneFor, onOpenUs, usDue }) {
+function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, projects, setProjects, onOpenProject, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen, repeatSeries, seriesRun, upkeep, setUpkeep, onOpenUpkeep, onOpenCheckin, checkinDoneFor, onOpenUs, usDue }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
@@ -7611,7 +7628,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   const [dragging, setDragging] = useState(null); // {dayKey, id}
   // Goal tasks (v4.2.0): read from `goals`, never copied into weekData. Keys are local dates.
   const [dragGoal, setDragGoal] = useState(null); // {goalId, msId, taskId} while dragging a goal task
-  const goalTasksByDay = React.useMemo(() => glTasksByDay(goals), [goals]);
+  const projectTasksByDay = React.useMemo(() => glTasksByDay(projects), [projects]);
   // Home upkeep (v5.68.0): items with "Show in Week view" sit on their due date once it is within `lead` days (default 30), or on today once overdue. Read from `upkeep`, never copied.
   const upkeepByDay = React.useMemo(() => upWeekMap(upkeep, glToday()), [upkeep]);
   function renderUpkeepTasks(localKey) {
@@ -7624,25 +7641,25 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         onOpen={()=>onOpenUpkeep && onOpenUpkeep()} />
     ));
   }
-  function setGoalTask(it, patch) { if (setGoals) setGoals(gs => glPatchTask(gs, it.goalId, it.msId, it.taskId, patch)); }
-  function renderGoalTasks(localKey, desktop) {
-    const list = goalTasksByDay[localKey] || [];
+  function setProjectTask(it, patch) { if (setProjects) setProjects(gs => glPatchTask(gs, it.goalId, it.msId, it.taskId, patch)); }
+  function renderProjectTasks(localKey, desktop) {
+    const list = projectTasksByDay[localKey] || [];
     if (!list.length) return null;
     return (
       <GlDaySection key={'gls-'+localKey} dayKey={localKey} done={list.filter(x => x.task.done).length} total={list.length}>
-        {renderGoalTaskCards(list, desktop)}
+        {renderProjectTaskCards(list, desktop)}
       </GlDaySection>
     );
   }
-  function renderGoalTaskCards(list, desktop) {
+  function renderProjectTaskCards(list, desktop) {
     return list.map(({goal, ms, task}) => {
       const ref = {goalId: goal.id, msId: ms.id, taskId: task.id};
       return (
         <GlWeekTask key={'gt-'+task.id} item={{goal, ms, task}}
-          rule={task.rule ? glTaskRule(task, {fitnessLog, fitnessExercises, targetLog: mctx && mctx.targetLog}, goal) : null}
-          onToggle={()=>setGoalTask(ref, {done: !task.done})}
-          onMove={d=>setGoalTask(ref, {scheduledDate: d})}
-          onOpen={()=>onOpenGoal && onOpenGoal(goal.id)}
+          rule={task.rule ? glTaskRule(task, {fitnessLog, fitnessExercises, readingLog: mctx && mctx.readingLog}, goal) : null}
+          onToggle={()=>setProjectTask(ref, {done: !task.done})}
+          onMove={d=>setProjectTask(ref, {scheduledDate: d})}
+          onOpen={()=>onOpenProject && onOpenProject(goal.id)}
           onDragStart={desktop ? ()=>{ setDragging(null); setDragGoal(ref); } : undefined}
           onDragEnd={desktop ? ()=>setDragGoal(null) : undefined} />
       );
@@ -7784,7 +7801,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       items.push({ k: 't:' + t.id, kind: 'task', id: t.id, start: s, dur: Math.max(5, Math.min(tbTaskDur(t), 1440 - s)), title: t.title, done: !!t.done, event: !!t.isEvent,
         bg: t.customColor ? t.customColor + '55' : paletteBg(t.isEvent, t.colorIndex) });
     });
-    const gl = goalTasksByDay[lk] || [];
+    const gl = projectTasksByDay[lk] || [];
     gl.forEach(({ goal, ms, task }) => {
       const s = tbMin(task.startTime); if (s == null) return;
       items.push({ k: 'g:' + task.id, kind: 'goal', id: task.id, ref: { goalId: goal.id, msId: ms.id, taskId: task.id }, start: s, dur: Math.max(5, Math.min(task.durMin > 0 ? task.durMin : 30, 1440 - s)),
@@ -7792,16 +7809,16 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     });
     const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily' && habitActiveOn(g, dk));
     return { key: dk, lkey: lk, date: d, today: isSameDay(d, today), items, untimed,
-      goalsTotal: gl.length, goalsDone: gl.filter(x => x.task.done).length,
+      projectsTotal: gl.length, projectsDone: gl.filter(x => x.task.done).length,
       habitsTotal: dailyHabits.length, habitsDone: dailyHabits.filter(g => ((habitCompletions || {})[dk] || []).includes(g.id)).length };
   }
-  function tbFindGoalTask(ref) {
-    const g = (goals || []).find(x => x.id === ref.goalId); const m = g && (g.milestones || []).find(x => x.id === ref.msId);
+  function tbFindProjectTask(ref) {
+    const g = (projects || []).find(x => x.id === ref.goalId); const m = g && (g.milestones || []).find(x => x.id === ref.msId);
     return m && (m.tasks || []).find(x => x.id === ref.taskId);
   }
   function tbPlace(it, fromKey, toKey, start, dur) {
     if (it.kind === 'goal') {
-      setGoalTask(it.ref, { scheduledDate: fmtLocal(parseLocal(toKey)), startTime: tbStr(start), durMin: dur });
+      setProjectTask(it.ref, { scheduledDate: fmtLocal(parseLocal(toKey)), startTime: tbStr(start), durMin: dur });
       return;
     }
     const patch = it.event ? { eventTime: tbStr(start), durMin: dur } : { startTime: tbStr(start), durMin: dur };
@@ -7813,13 +7830,13 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     }
   }
   function tbToggleDone(it, dayKey) {
-    if (it.kind === 'goal') setGoalTask(it.ref, { done: !it.done });
+    if (it.kind === 'goal') setProjectTask(it.ref, { done: !it.done });
     else updateTask(dayKey, it.id, { done: !it.done });
   }
   function tbDropMin(dayKey, min) {
     if (dragGoal) {
-      const gt = tbFindGoalTask(dragGoal);
-      setGoalTask(dragGoal, { scheduledDate: fmtLocal(parseLocal(dayKey)), startTime: tbStr(min), durMin: (gt && gt.durMin > 0) ? gt.durMin : 30 });
+      const gt = tbFindProjectTask(dragGoal);
+      setProjectTask(dragGoal, { scheduledDate: fmtLocal(parseLocal(dayKey)), startTime: tbStr(min), durMin: (gt && gt.durMin > 0) ? gt.durMin : 30 });
       setDragGoal(null); return;
     }
     if (dragging) {
@@ -7841,7 +7858,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   }
   function tbItemExists(ref, dayKey) {
     if (!ref) return false;
-    if (ref.kind === 'goal') return !!(goalTasksByDay[fmtLocal(parseLocal(dayKey))] || []).some(x => x.task.id === ref.id);
+    if (ref.kind === 'goal') return !!(projectTasksByDay[fmtLocal(parseLocal(dayKey))] || []).some(x => x.task.id === ref.id);
     return getTasks(dayKey).some(x => x.id === ref.id);
   }
   function tbTaskCard(task, dk, forceOpen) {
@@ -7873,14 +7890,14 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
         currentDayKey={dk} />
     );
   }
-  function tbGoalRows(lk, desktop, onlyId) {
-    const list = (goalTasksByDay[lk] || []).filter(x => !onlyId || x.task.id === onlyId);
+  function tbProjectRows(lk, desktop, onlyId) {
+    const list = (projectTasksByDay[lk] || []).filter(x => !onlyId || x.task.id === onlyId);
     return list.map(({ goal, ms, task }) => {
       const ref = { goalId: goal.id, msId: ms.id, taskId: task.id };
       return (
         <div key={'tg-' + task.id} className="tb-goalrow">
-          {renderGoalTaskCards([{ goal, ms, task }], desktop)}
-          <TbTimeRow start={task.startTime} dur={task.durMin} onChange={p => setGoalTask(ref, p)} />
+          {renderProjectTaskCards([{ goal, ms, task }], desktop)}
+          <TbTimeRow start={task.startTime} dur={task.durMin} onChange={p => setProjectTask(ref, p)} />
         </div>
       );
     });
@@ -7889,7 +7906,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     renderHabits: m => <DailyHabitsSection forceOpen dayKey={m.key}
       habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
       habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />,
-    renderGoals: (m, desktop) => <div className="tb-goals">{tbGoalRows(m.lkey, desktop !== false)}</div>,
+    renderGoals: (m, desktop) => <div className="tb-goals">{tbProjectRows(m.lkey, desktop !== false)}</div>,
     renderNoTime: m => (
       <div className="tb-notime">
         {m.untimed.length === 0 && <div className="tb-empty">Nothing without a time. Tasks you add here stay untimed until you give them one.</div>}
@@ -7901,16 +7918,16 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       if (!ref) return null;
       if (ref.kind === 'goal') {
         const lk = fmtLocal(parseLocal(dk));
-        const f = (goalTasksByDay[lk] || []).find(x => x.task.id === ref.id);
+        const f = (projectTasksByDay[lk] || []).find(x => x.task.id === ref.id);
         if (!f) return null;
         const gref = { goalId: f.goal.id, msId: f.ms.id, taskId: f.task.id };
         return (
           <div className="tb-goalrow">
-            {renderGoalTaskCards([f], true)}
-            <TbTimeRow start={f.task.startTime} dur={f.task.durMin} onChange={p => setGoalTask(gref, p)} />
+            {renderProjectTaskCards([f], true)}
+            <TbTimeRow start={f.task.startTime} dur={f.task.durMin} onChange={p => setProjectTask(gref, p)} />
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
-              <button className="tb-link" onClick={() => setGoalTask(gref, { startTime: '' })}>Remove time</button>
-              {onOpenGoal && <button className="tb-link" onClick={() => onOpenGoal(f.goal.id)}>Open goal →</button>}
+              <button className="tb-link" onClick={() => setProjectTask(gref, { startTime: '' })}>Remove time</button>
+              {onOpenProject && <button className="tb-link" onClick={() => onOpenProject(f.goal.id)}>Open goal →</button>}
             </div>
           </div>
         );
@@ -7970,7 +7987,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       </div>
       <WeekTile kind="quote" text={wd.proverb||''} extra={wd.proverbSrc||''} onSave={p=>setWD(w=>({...w,...p}))} />
       <WeekTile kind="be" text={wd.beWord||''} onSave={p=>setWD(w=>({...w,...p}))} />
-      {onOpenGoal && <GlNextUp goals={goals} weekKeys={weekDays.map(fmtLocal)} onOpenGoal={onOpenGoal} folded={!!sbFold.goals} onToggleFold={()=>toggleFold('goals')} />}
+      {onOpenProject && <GlNextUp projects={projects} weekKeys={weekDays.map(fmtLocal)} onOpenProject={onOpenProject} folded={!!sbFold.goals} onToggleFold={()=>toggleFold('goals')} />}
       <div className="sidebar-section">
         <SbHead title="Weekly Goals:" count={`${(wd.goals||[]).filter(g=>g.done).length} of ${(wd.goals||[]).length}`} folded={!!sbFold.weekly} onToggle={()=>toggleFold('weekly')}>
           <button className="add-btn" onClick={()=>{ setFold('weekly', false); addGoal(null); }}>+</button>
@@ -8073,7 +8090,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                     onDragOver={e=>e.preventDefault()}
                     onDrop={e=>{
                       e.preventDefault();
-                      if(dragGoal) { setGoalTask(dragGoal, {scheduledDate: fmtLocal(d)}); setDragGoal(null); setDragOver(null); return; }
+                      if(dragGoal) { setProjectTask(dragGoal, {scheduledDate: fmtLocal(d)}); setDragGoal(null); setDragOver(null); return; }
                       if(!dragging) return;
                       if(dragging.dayKey === dk) {
                         if(!dragOver || dragOver.dayKey !== dk) reorderTasks(dk, dragging.id, null);
@@ -8085,7 +8102,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                     <DailyHabitsSection dayKey={dk}
                       habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
                       habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />
-                    {renderGoalTasks(fmtLocal(d), true)}
+                    {renderProjectTasks(fmtLocal(d), true)}
                     {renderUpkeepTasks(fmtLocal(d))}
                     {tasks.map(task=>(
                       <TaskCard key={task.id} task={task}
@@ -8120,7 +8137,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                         onDragOver={()=>setDragOver({dayKey:dk, id:task.id})}
                         onDragEnd={()=>{ setDragging(null); setDragOver(null); }}
                         onDrop={()=>{
-                          if(dragGoal) { setGoalTask(dragGoal, {scheduledDate: fmtLocal(d)}); setDragGoal(null); setDragOver(null); return; }
+                          if(dragGoal) { setProjectTask(dragGoal, {scheduledDate: fmtLocal(d)}); setDragGoal(null); setDragOver(null); return; }
                           if(dragging) {
                             if(dragging.dayKey === dk) reorderTasks(dk, dragging.id, task.id);
                             else moveTaskBetweenDays(dragging.dayKey, dk, dragging.id, task.id);
@@ -8204,13 +8221,13 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           })}>›</button>
         </div>
         {wkView === 'blocks' ? (
-          <TbDay ctx={{...tbDayCtx, renderGoals: m => <div className="tb-goals">{tbGoalRows(m.lkey, false)}</div>}} />
+          <TbDay ctx={{...tbDayCtx, renderGoals: m => <div className="tb-goals">{tbProjectRows(m.lkey, false)}</div>}} />
         ) : (
         <div className="mobile-day-tasks" ref={mobileTasksContainerRef}>
           <DailyHabitsSection dayKey={mobileDayKey}
             habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
             habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />
-          {renderGoalTasks(fmtLocal(mobileDayDate), false)}
+          {renderProjectTasks(fmtLocal(mobileDayDate), false)}
           {renderUpkeepTasks(fmtLocal(mobileDayDate))}
           {mobileDayTasks.map(task=>(
             <div key={task.id} data-task-id={task.id}
@@ -8339,7 +8356,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       )}
 
       {reviewOpen && reviewWeek && (
-        <WeekReview weekStart={reviewWeek} wd={wdFor(reviewWeek)} goals={goals} setGoals={setGoals}
+        <WeekReview weekStart={reviewWeek} wd={wdFor(reviewWeek)} projects={projects} setProjects={setProjects}
           habitGoals={habitGoals} habitCompletions={habitCompletions}
           fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx}
           onMoveTask={(from, to, id) => moveTaskBetweenDays(from, to, id, null)}
@@ -8347,7 +8364,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           onSetWD={fn => setWDFor(reviewWeek, fn)}
           onNavWeek={n => setReviewWeek(w => addDays(w, n * 7))}
           onGoToWeek={() => { setWeekStart(reviewWeek); setReviewOpen(false); }}
-          onOpenGoal={onOpenGoal} onClose={() => setReviewOpen(false)} />
+          onOpenProject={onOpenProject} onClose={() => setReviewOpen(false)} />
       )}
       {seriesPrompt && (
         <SeriesEditToast sp={seriesPrompt} onPick={(scope)=>applySeriesEdit(seriesPrompt, scope)} onClose={()=>setSeriesPrompt(null)} />
@@ -11362,7 +11379,7 @@ function TbPills({ d, openSec, onPick, onAdd, mobile }) {
   return (
     <div className={`tb-pills ${mobile ? 'tb-pills-m' : ''}`}>
       {d.habitsTotal > 0 && <button data-tb-pill className={`tb-pill ${on('habits') ? 'on' : ''} ${d.habitsDone === d.habitsTotal ? 'all' : ''}`} onClick={e => onPick('habits', e.currentTarget)}>Habits {d.habitsDone}/{d.habitsTotal}</button>}
-      {d.goalsTotal > 0 && <button data-tb-pill className={`tb-pill ${on('goals') ? 'on' : ''} ${d.goalsDone === d.goalsTotal ? 'all' : ''}`} onClick={e => onPick('goals', e.currentTarget)}>Goals {d.goalsDone}/{d.goalsTotal}</button>}
+      {d.projectsTotal > 0 && <button data-tb-pill className={`tb-pill ${on('goals') ? 'on' : ''} ${d.projectsDone === d.projectsTotal ? 'all' : ''}`} onClick={e => onPick('goals', e.currentTarget)}>Goals {d.projectsDone}/{d.projectsTotal}</button>}
       <button data-tb-pill className={`tb-pill ${on('notime') ? 'on' : ''}`} onClick={e => onPick('notime', e.currentTarget)}>{d.untimed.length ? `No time ${d.untimed.length}` : '+ Task'}</button>
       {mobile && <button className="tb-pill" onClick={onAdd}>＋ Time block</button>}
     </div>
@@ -11442,7 +11459,7 @@ function TbDay({ ctx }) {
   useEffect(() => { if (sheet && sheet.tab === 'item' && !ctx.itemExists(sheet.ref, d.key)) setSheet(null); });
   const tabs = [];
   if (d.habitsTotal > 0) tabs.push({ id: 'habits', label: `Habits ${d.habitsDone}/${d.habitsTotal}` });
-  if (d.goalsTotal > 0) tabs.push({ id: 'goals', label: `Goals ${d.goalsDone}/${d.goalsTotal}` });
+  if (d.projectsTotal > 0) tabs.push({ id: 'goals', label: `Goals ${d.projectsDone}/${d.projectsTotal}` });
   tabs.push({ id: 'notime', label: d.untimed.length ? `No time ${d.untimed.length}` : '+ Task' });
   function addBlock() {
     const nm = new Date(); const cur = nm.getHours() * 60 + nm.getMinutes();
@@ -12819,15 +12836,23 @@ function DataPanel({ me, refreshMe, suggestImport, onClose }) {
 // Synced app data is created with useSynced(key, init) below; each one uploads and syncs itself.
 
 // ─────────────────────────────────────────────
-// GOALS (v4.2.0)
-// goals: [{ id, title, why, color, status:'active'|'parked'|'done', startDate, targetDate,
+// GOALS TAB — NAMING (v5.96.0). The tab is called Goals and has two sub-tabs:
+//   Projects (timeline of milestones)  → code `projects`, ProjectsMain, GlDetail etc.; stored in the collection `projects`
+//                                         (it was `goals` until v5.96.0; the old documents are kept as a safety copy).
+//   Goals (recurring goals + the Reading log) → code `goals` / `readingLog`, GoalsView, goal* helpers; still stored
+//                                         under the OLD collection names `targets` / `targetLog` until the next step.
+// The `gl` / `Gl` / `GL_` / `.gl-` prefix means "Goals tab" and is shared by both sub-tabs.
+// `habitGoals`, `fitnessGoals`, `monthlyGoals` and a week's `goals` list are different things and keep their names.
+// ─────────────────────────────────────────────
+// PROJECTS (v4.2.0)
+// projects: [{ id, title, why, color, status:'active'|'parked'|'done', startDate, targetDate,
 //           notesPageId, showCountdown, retro, createdAt, completedAt,
 //           milestones:[{ id, title, startDate, dueDate, done, completedAt,
 //                         tasks:[{ id, title, scheduledDate, done, completedAt }] }] }]
-// Goal tasks live ONLY in `goals`. The Weekly Planner shows every task whose scheduledDate falls
+// Project tasks live ONLY in `projects`. The Weekly Planner shows every task whose scheduledDate falls
 // in the visible week; checking it off or moving it edits this record — nothing is copied into
 // weekData, so there is nothing to keep in step. Dates are local 'YYYY-MM-DD' (fmtLocal).
-// Synced as one document per goal (SYNC_SPLITS.goals = 'list').
+// Synced as one document per project (SYNC_SPLITS.projects = 'list').
 // ─────────────────────────────────────────────
 const GL_COLORS = ['#8b4aac','#2e7eb8','#1a9c82','#c4960e','#dc4a3a','#2d6b4a','#7c3f6e','#b8682e'];
 const GL_SOFT_LIMIT = 5;
@@ -12881,7 +12906,7 @@ function glHealth(g, today) {
   if (p >= used - 0.25) return { ...base, key: 'atrisk', label: 'At risk' };
   return { ...base, key: 'behind', label: 'Behind' };
 }
-function glPatchGoal(gs, gid, fn) { return gs.map(g => g.id === gid ? fn(g) : g); }
+function glPatchProject(gs, gid, fn) { return gs.map(g => g.id === gid ? fn(g) : g); }
 function glPatchMs(g, mid, fn) { return { ...g, milestones: (g.milestones || []).map(m => m.id === mid ? fn(m) : m) }; }
 // v5.11.0: the stamp for checking or unchecking a task by hand. Unchecking something the log checked for you
 // pauses its rule (ruleHold) so the rule can't simply re-check it; editing the rule clears the pause.
@@ -12891,20 +12916,20 @@ function glDoneExtra(item, done) {
   return e;
 }
 function glPatchTask(gs, gid, mid, tid, patch) {
-  return glPatchGoal(gs, gid, g => glPatchMs(g, mid, m => ({
+  return glPatchProject(gs, gid, g => glPatchMs(g, mid, m => ({
     ...m, tasks: (m.tasks || []).map(t => t.id === tid ? { ...t, ...patch, ...(('done' in patch) ? glDoneExtra(t, patch.done) : {}) } : t),
   })));
 }
-function glTasksByDay(goals) {   // 'YYYY-MM-DD' → [{ goal, ms, task }]
+function glTasksByDay(projects) {   // 'YYYY-MM-DD' → [{ goal, ms, task }]
   const out = {};
-  (goals || []).forEach(g => (g.milestones || []).forEach(m => (m.tasks || []).forEach(t => {
+  (projects || []).forEach(g => (g.milestones || []).forEach(m => (m.tasks || []).forEach(t => {
     if (t.scheduledDate) (out[t.scheduledDate] || (out[t.scheduledDate] = [])).push({ goal: g, ms: m, task: t });
   })));
   return out;
 }
-function glNewGoal(goals) {
-  const used = new Set((goals || []).map(g => g.color));
-  const color = GL_COLORS.find(c => !used.has(c)) || GL_COLORS[(goals || []).length % GL_COLORS.length];
+function glNewProject(projects) {
+  const used = new Set((projects || []).map(g => g.color));
+  const color = GL_COLORS.find(c => !used.has(c)) || GL_COLORS[(projects || []).length % GL_COLORS.length];
   const t = glToday();
   return { id: glId('gl'), title: '', why: '', color, status: 'active', startDate: t, targetDate: glAddDays(t, 90),
     notesPageId: null, showCountdown: false, retro: '', createdAt: Date.now(), completedAt: null, milestones: [] };
@@ -12912,9 +12937,9 @@ function glNewGoal(goals) {
 // v5.60.0 — project tags: plain strings on goal.tags, matched ignoring case/spaces (same idea as exercise subcategories)
 function glTagKey(s) { return String(s || '').trim().toLowerCase(); }
 function glTags(g) { return Array.isArray(g && g.tags) ? g.tags : []; }
-function glAllTags(goals) {
+function glAllTags(projects) {
   const seen = {}, out = [];
-  (goals || []).forEach(g => glTags(g).forEach(t => { const k = glTagKey(t); if (k && !seen[k]) { seen[k] = 1; out.push(String(t).trim()); } }));
+  (projects || []).forEach(g => glTags(g).forEach(t => { const k = glTagKey(t); if (k && !seen[k]) { seen[k] = 1; out.push(String(t).trim()); } }));
   return out.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 }
 function GlTagEditor({ tags, all, onChange, placeholder }) {
@@ -13148,11 +13173,11 @@ function GlSchedulePicker({ value, onPick, onClose, extra, anchor }) {
 // ── Goal task as it appears inside the Weekly Planner (desktop column + mobile day view) ──
 // v4.5.0: collapsible "Goals" section under Habits in the week grid / mobile day view (collapsed by default, like Habits)
 function GlDaySection({ dayKey, done, total, children }) {
-  const [goalsOpen, toggleGoalsOpen] = useDayOpen('goals', dayKey);
-  const collapsed = !goalsOpen;
+  const [projectsOpen, toggleProjectsOpen] = useDayOpen('goals', dayKey);
+  const collapsed = !projectsOpen;
   return (
     <div className="habit-task-section gl-day-section">
-      <div className="habit-task-label" onClick={toggleGoalsOpen}>
+      <div className="habit-task-label" onClick={toggleProjectsOpen}>
         <span style={{fontSize:8}}>{collapsed ? '▸' : '▾'}</span>
         <span>Goals</span>
         <span style={{marginLeft:'auto', fontSize:9, fontWeight:700, opacity:0.8}}>{done}/{total}</span>
@@ -13209,15 +13234,15 @@ function GlWeekTask({ item, rule, onToggle, onMove, onOpen, onDragStart, onDragE
 }
 
 // ── "Goals · next up" block for the Weekly Planner sidebar ──
-function GlNextUp({ goals, weekKeys, onOpenGoal, folded, onToggleFold }) {
+function GlNextUp({ projects, weekKeys, onOpenProject, folded, onToggleFold }) {
   const today = glToday();
-  const active = (goals || []).filter(g => g.status === 'active');
+  const active = (projects || []).filter(g => g.status === 'active');
   if (!active.length) return null;
   const inWeek = new Set(weekKeys);
   return (
     <div className="sidebar-section">
       <SbHead title="Goals · next up" count={`${active.length} active`} folded={!!folded} onToggle={onToggleFold || (() => {})}>
-        <button className="add-btn" title="Open Goals" onClick={() => onOpenGoal(null)}>›</button>
+        <button className="add-btn" title="Open Goals" onClick={() => onOpenProject(null)}>›</button>
       </SbHead>
       {!folded && <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {active.map(g => {
@@ -13225,7 +13250,7 @@ function GlNextUp({ goals, weekKeys, onOpenGoal, folded, onToggleFold }) {
           const late = m && glMsOverdue(m, today);
           const thisWeek = (g.milestones || []).reduce((n, mm) => n + (mm.tasks || []).filter(t => !t.done && inWeek.has(t.scheduledDate)).length, 0);
           return (
-            <button key={g.id} className={`gl-next ${late ? 'late' : ''}`} onClick={() => onOpenGoal(g.id)}>
+            <button key={g.id} className={`gl-next ${late ? 'late' : ''}`} onClick={() => onOpenProject(g.id)}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, fontWeight: 600 }}>
                 <span className="gl-dot" style={{ background: g.color, width: 8, height: 8 }} />
                 <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m ? (m.title || 'Untitled milestone') : (g.title || 'Untitled goal')}</span>
@@ -13271,7 +13296,7 @@ function glRange(zoom, offset) {
   return { start: s, end: new Date(s.getFullYear(), s.getMonth() + count * per, 1), cols };
 }
 
-function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
+function GlTimeline({ projects, onOpenProject, onChangeProject }) {
   const today = glToday();
   const [zoom, setZoom] = useState(() => sessionStorage.getItem('lp_glZoom') || 'month');
   const [offset, setOffset] = useState(0);
@@ -13290,7 +13315,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   const dragRef = useRef(null);
   const suppressClick = useRef(false);
   const [drag, setDrag] = useState(null);
-  const canDrag = !!onChangeGoal;
+  const canDrag = !!onChangeProject;
   function glShift(s, e, d) {
     if (!d || !d.days) return [s, e];
     if (d.kind === 'move') return [glAddDays(s, d.days), glAddDays(e, d.days)];
@@ -13335,7 +13360,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
       const [ns, ne] = glShift(d.s0, d.e0, d);
       if (ns === d.s0 && ne === d.e0) return;
       const { gid, mid, s0, e0 } = d;
-      const put = (a, b) => onChangeGoal(gid, g => mid
+      const put = (a, b) => onChangeProject(gid, g => mid
         ? glPatchMs(g, mid, m => ({ ...m, startDate: a, dueDate: b }))
         : { ...g, startDate: a, targetDate: b });
       put(ns, ne);
@@ -13350,7 +13375,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
       window.removeEventListener('pointercancel', onUp);
     };
   }, [!!drag]);
-  const openGoal = gid => { if (!suppressClick.current) onOpenGoal(gid); };
+  const openProject = gid => { if (!suppressClick.current) onOpenProject(gid); };
   // Grab handles drawn inside a bar, for resizing one end
   function dragHandles(gid, mid, s0, e0) {
     if (!canDrag || !s0 || !e0) return null;
@@ -13364,7 +13389,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
   const pct = (s, endOfDay) => { const d = parseLocal(s); if (!d) return null; if (endOfDay) d.setDate(d.getDate() + 1); return (d - range.start) / total * 100; };
   const clip = (a, b) => { if (a == null || b == null) return null; const l = Math.max(0, a), r = Math.min(100, b); return r > l ? { left: l, width: r - l } : null; };
 
-  const allTags = glAllTags(goals);
+  const allTags = glAllTags(projects);
   const tagKeys = tagSel.filter(k => allTags.some(t => glTagKey(t) === k));   // ignore tags nobody uses any more
   const tagFilterOn = tagKeys.length > 0 && (show === 'active' || show === 'all');   // picking one specific project ignores the tag filter
   function toggleTag(t) {
@@ -13372,7 +13397,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
     setTagSel(cur => { const n = cur.includes(k) ? cur.filter(x => x !== k) : [...cur, k]; try { sessionStorage.setItem('lp_glTags', JSON.stringify(n)); } catch (e) {} return n; });
   }
   function clearTags() { setTagSel([]); try { sessionStorage.removeItem('lp_glTags'); } catch (e) {} }
-  const shown = goals.filter(g => show === 'active' ? g.status === 'active' : show === 'all' ? g.status !== 'done' : g.id === show)
+  const shown = projects.filter(g => show === 'active' ? g.status === 'active' : show === 'all' ? g.status !== 'done' : g.id === show)
     .filter(g => !tagFilterOn || glTags(g).some(t => tagKeys.includes(glTagKey(t))));
   const rows = [];
   shown.forEach(g => {
@@ -13407,7 +13432,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
             <select className="gl-input" style={{ padding: '5px 8px' }} value={show} onChange={e => setShow(e.target.value)}>
               <option value="active">All active projects</option>
               <option value="all">Active + parked</option>
-              {goals.map(g => <option key={g.id} value={g.id}>{g.title || 'Untitled goal'}</option>)}
+              {projects.map(g => <option key={g.id} value={g.id}>{g.title || 'Untitled goal'}</option>)}
             </select>
           </label>
           <button className="gl-btn" onClick={expandAll}>Expand all</button>
@@ -13435,7 +13460,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
       )}
       {!rows.length ? (
         <div style={{ padding: '28px 16px', fontSize: 13, color: 'var(--ink-light)', textAlign: 'center' }}>
-          {goals.length ? 'No projects match this filter.' : 'Create a project to see it on the timeline.'}
+          {projects.length ? 'No projects match this filter.' : 'Create a project to see it on the timeline.'}
         </div>
       ) : (
       <div className="gl-tl-scroll">
@@ -13446,7 +13471,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
               <div key={r.t.id} className="gl-tl-row task gl-tl-lab" style={{ paddingLeft: 60 }}>
                 <span aria-hidden="true" style={{ color: r.t.done ? 'var(--accent)' : 'var(--ink-faint)', width: 12 }}>{r.t.done ? '✓' : '○'}</span>
                 <span className="t" style={{ fontSize: 12.5, color: r.t.done ? 'var(--ink-light)' : 'var(--ink)', textDecoration: r.t.done ? 'line-through' : 'none', cursor: 'pointer' }}
-                  onClick={() => onOpenGoal(r.g.id)}>{r.t.title || 'Untitled task'}</span>
+                  onClick={() => onOpenProject(r.g.id)}>{r.t.title || 'Untitled task'}</span>
                 {!r.t.scheduledDate && !r.t.done && <span style={{ fontSize: 11, color: 'var(--ink-faint)', whiteSpace: 'nowrap' }}>not scheduled</span>}
               </div>
             ) : r.type === 'goal' ? (
@@ -13454,7 +13479,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
                 <button className="gl-caret" aria-label={opened[r.g.id] ? 'Collapse' : 'Expand'}
                   onClick={() => setOpened(c => ({ ...c, [r.g.id]: !c[r.g.id] }))}>{opened[r.g.id] ? '▾' : '▸'}</button>
                 <span className="gl-dot" style={{ background: r.g.color }} />
-                <span className="t" style={{ fontWeight: 600, cursor: 'pointer', fontSize: 14 }} onClick={() => onOpenGoal(r.g.id)}>{r.g.title || 'Untitled goal'}</span>
+                <span className="t" style={{ fontWeight: 600, cursor: 'pointer', fontSize: 14 }} onClick={() => onOpenProject(r.g.id)}>{r.g.title || 'Untitled goal'}</span>
                 <span className="gl-mono" style={{ fontSize: 11, color: 'var(--ink-light)' }}>{Math.round(glProgress(r.g) * 100)}%</span>
               </div>
             ) : (
@@ -13465,7 +13490,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
                   : <span aria-hidden="true" style={{ width: 32, flexShrink: 0 }} />}
                 <span aria-hidden="true" style={{ color: r.m.done ? 'var(--accent)' : glMsOverdue(r.m, today) ? 'var(--red)' : r.g.color, width: 12 }}>{r.m.done ? '✓' : '◆'}</span>
                 <span className="t" style={{ color: r.m.done ? 'var(--ink-light)' : glMsOverdue(r.m, today) ? '#b03a2e' : 'var(--ink)', textDecoration: r.m.done ? 'line-through' : 'none', cursor: 'pointer' }}
-                  onClick={() => onOpenGoal(r.g.id)}>{r.m.title || 'Untitled milestone'}</span>
+                  onClick={() => onOpenProject(r.g.id)}>{r.m.title || 'Untitled milestone'}</span>
                 {glMsOverdue(r.m, today)
                   ? <span style={{ fontSize: 11, fontWeight: 600, color: '#b03a2e' }}>Overdue</span>
                   : (r.m.tasks || []).length > 0 && <span className="gl-mono" style={{ fontSize: 11, color: 'var(--ink-light)' }}>{(r.m.tasks || []).filter(t => t.done).length}/{r.m.tasks.length}</span>}
@@ -13493,7 +13518,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
                 return (
                   <div key={t.id} className="gl-tl-row task">
                     {mid != null && mid >= 0 && mid <= 100 && (
-                      <div className="gl-tl-dia" onClick={() => openGoal(g.id)} title={`${t.title || 'Task'} · ${glShortDay(t.scheduledDate)}${t.done ? ' · done' : lateT ? ' · late' : ''}`}
+                      <div className="gl-tl-dia" onClick={() => openProject(g.id)} title={`${t.title || 'Task'} · ${glShortDay(t.scheduledDate)}${t.done ? ' · done' : lateT ? ' · late' : ''}`}
                         style={{ width: 9, height: 9, top: 9.5, left: `calc(${mid}% - 4.5px)`, pointerEvents: 'auto', cursor: 'pointer', zIndex: 1,
                           background: lateT ? 'var(--red)' : g.color, opacity: t.done ? 0.45 : 1 }} />
                     )}
@@ -13511,7 +13536,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
                 const grab = canDrag && g.startDate && g.targetDate;
                 return (
                   <div key={g.id} className="gl-tl-row goal" style={{ background: glTint(g.color, 0.04) }}>
-                    {bar && <div className={`gl-tl-bar${grab ? ' grab' : ''}${d ? ' dragging' : ''}`} onClick={() => openGoal(g.id)}
+                    {bar && <div className={`gl-tl-bar${grab ? ' grab' : ''}${d ? ' dragging' : ''}`} onClick={() => openProject(g.id)}
                       onPointerDown={e2 => beginDrag(e2, 'move', g.id, null, g.startDate, g.targetDate)}
                       title={grab ? `${g.title || 'Goal'}: ${glShort(gs)} – ${glShort(ge)} · drag to move, drag an edge to resize` : `${g.title || 'Goal'}: ${glShort(gs)} – ${glShort(ge)}`}
                       style={{ top: 13, height: 20, left: bar.left + '%', width: bar.width + '%', background: glTint(g.color, 0.2) }}>
@@ -13540,7 +13565,7 @@ function GlTimeline({ goals, onOpenGoal, onChangeGoal }) {
               return (
                 <div key={m.id} className="gl-tl-row ms">
                   {bar && (
-                    <div className={`gl-tl-bar${mGrab ? ' grab' : ''}${md ? ' dragging' : ''}`} onClick={() => openGoal(g.id)}
+                    <div className={`gl-tl-bar${mGrab ? ' grab' : ''}${md ? ' dragging' : ''}`} onClick={() => openProject(g.id)}
                       onPointerDown={e2 => beginDrag(e2, 'move', g.id, m.id, m.startDate, m.dueDate)}
                       title={mGrab ? `${m.title || 'Milestone'}: ${glShort(mS)} – ${glShort(mE)} · drag to move, drag an edge to resize` : `${m.title || 'Milestone'}: ${glShort(mS)} – ${glShort(mE)}`}
                       style={{ top: 10, height: 14, left: bar.left + '%', width: bar.width + '%', ...st }}>
@@ -13799,7 +13824,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', cn);
   }
   const late = glMsOverdue(m, today);
-  const fctx = { fitnessLog: mctx && mctx.fitnessLog, fitnessExercises: mctx && mctx.fitnessExercises, habitGoals: mctx && mctx.habitGoals, habitCompletions: mctx && mctx.habitCompletions, habitQty: mctx && mctx.habitQty, targetLog: mctx && mctx.targetLog };
+  const fctx = { fitnessLog: mctx && mctx.fitnessLog, fitnessExercises: mctx && mctx.fitnessExercises, habitGoals: mctx && mctx.habitGoals, habitCompletions: mctx && mctx.habitCompletions, habitQty: mctx && mctx.habitQty, readingLog: mctx && mctx.readingLog };
   function setTask(tid, patch) {
     onChange(mm => ({ ...mm, tasks: (mm.tasks || []).map(t => t.id === tid ? { ...t, ...patch, ...(('done' in patch) ? glDoneExtra(t, patch.done) : {}) } : t) }));
   }
@@ -14000,7 +14025,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   );
 }
 
-function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelete, onBack, pagesData, setPagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
+function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, onBack, pagesData, setPagesData, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const linkWeekStart = getWeekStart(new Date());
   const [openMs, setOpenMs] = useState(() => { const n = glNextMilestone(goal); return n ? { [n.id]: true } : {}; });
@@ -14089,7 +14114,7 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
       {goal.status === 'parked' && <button className="gl-btn" style={{ minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'active' }))}>Unpark</button>}
     </div>);
   const healthText = h.key === 'done' ? 'Goal complete.'
-    : h.key === 'parked' ? 'Parked — not counted against your active goals.'
+    : h.key === 'parked' ? 'Parked — not counted against your active projects.'
     : h.key === 'upcoming' ? `Starts ${glShort(goal.startDate)}.`
     : h.key === 'behind' && goal.targetDate && today > goal.targetDate ? `Target date passed ${glDays(goal.targetDate, today)} days ago.`
     : `${h.p >= h.used ? 'Ahead of pace' : h.key === 'ontrack' ? 'Roughly on pace' : 'Behind pace'}${ms.some(m => glMsOverdue(m, today)) ? ', with an overdue milestone' : ''}.${h.daysLeft != null ? ` ${h.daysLeft} day${h.daysLeft === 1 ? '' : 's'} to target.` : ''}`;
@@ -14211,17 +14236,17 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
               </div>
             )}
             {/* v5.65.0 — link this project to a General goal on the Goals sub-tab (the link is stored on the goal) */}
-            {typeof setTargets === 'function' && (() => {
-              const tl = (Array.isArray(targets) ? targets : []).filter(x => x && x.kind === 'general');
+            {typeof setGoals === 'function' && (() => {
+              const tl = (Array.isArray(goals) ? goals : []).filter(x => x && x.kind === 'general');
               const linked = tl.find(x => x.projectId === goal.id) || null;
               const opts = tl.filter(x => !x.projectId || x.projectId === goal.id);
               if (!opts.length) return null;
               return (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <select className="gl-input" value={linked ? linked.id : ''} aria-label="Linked goal"
-                    onChange={e => { const v = e.target.value; setTargets(ts => (Array.isArray(ts) ? ts : []).map(x => x.id === v ? { ...tgNorm(x), projectId: goal.id } : (linked && x.id === linked.id ? { ...x, projectId: '' } : x))); }}>
+                    onChange={e => { const v = e.target.value; setGoals(ts => (Array.isArray(ts) ? ts : []).map(x => x.id === v ? { ...goalNorm(x), projectId: goal.id } : (linked && x.id === linked.id ? { ...x, projectId: '' } : x))); }}>
                     <option value="">No linked goal</option>
-                    {opts.map(x => <option key={x.id} value={x.id}>{tgTitle(x)}</option>)}
+                    {opts.map(x => <option key={x.id} value={x.id}>{goalTitle(x)}</option>)}
                   </select>
                   {linked && <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>When this project is marked done, the goal is done too, and its tile shows this project's progress.</span>}
                 </div>);
@@ -14277,15 +14302,15 @@ function GlDetail({ targets, setTargets, allTags, books, goal, onChange, onDelet
 }
 
 // ═══ TARGETS (v5.30.0) ═══
-// Recurring weekly / monthly / yearly targets backed by a generic log. Progress is never stored on the target:
+// The Goals sub-tab: recurring weekly / monthly / yearly goals backed by a generic log. Progress is never stored on the goal:
 // it is computed from the log for the current period. Only kind 'reading' has a UI so far; entries carry a `kind`
 // so other types (general counters) can reuse the same store.
-//   targets:   [{id, kind, period:'week'|'month'|'year', books, pages}]
-//   targetLog: [{id, kind, title, author, total, updates:[{date,pages}], startDate?, finishedDate|null, notes}]
-function tgUid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+//   goals (stored as `targets`):   [{id, kind, period:'week'|'month'|'year', books, pages}]
+//   readingLog (stored as `targetLog`): [{id, kind, title, author, total, updates:[{date,pages}], startDate?, finishedDate|null, notes}]
+function goalUid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 // Goal scope (v5.35.0): 'year' (a calendar year, year: 2026) | 'range' (startDate..endDate) | 'open' (no dates, counts everything).
-// Records from v5.30–v5.34 used period/startKey/repeat; tgNorm maps them on read without rewriting saved data.
-function tgNorm(t) {
+// Records from v5.30–v5.34 used period/startKey/repeat; goalNorm maps them on read without rewriting saved data.
+function goalNorm(t) {
   if (t.scope) return t;
   if (t.period === 'week' || t.period === 'month') {
     const d = parseLocal(t.startKey) || new Date();
@@ -14296,35 +14321,35 @@ function tgNorm(t) {
   const d = parseLocal(t.startKey) || new Date();
   return { ...t, scope: 'year', year: d.getFullYear() };
 }
-function tgSpan(t) {
+function goalSpan(t) {
   if (t.scope === 'year') return { s: `${t.year}-01-01`, e: `${t.year}-12-31` };
   if (t.scope === 'range') return { s: t.startDate || '0000-01-01', e: t.endDate || '9999-12-31' };
   return { s: '0000-01-01', e: '9999-12-31' };
 }
-function tgRead(x) { return (x.updates || []).reduce((a, u) => a + (Number(u.pages) || 0), 0); }
+function goalRead(x) { return (x.updates || []).reduce((a, u) => a + (Number(u.pages) || 0), 0); }
 // v5.40.0 — start date: the explicit startDate if one is set, otherwise the date of the earliest logged pages (0-page entries ignored).
-function tgStart(x) {
+function goalStart(x) {
   if (x.startDate) return x.startDate;
   const ds = (x.updates || []).filter(u => u.date && Number(u.pages) > 0).map(u => u.date).sort();
   return ds[0] || '';
 }
-function tgDayWord(a, b) {
+function goalDayWord(a, b) {
   const da = parseLocal(a), db = parseLocal(b);
   if (!da || !db) return '';
   const n = Math.round((db - da) / 86400000);
   return n < 0 ? '' : n === 0 ? 'same day' : n === 1 ? '1 day' : n + ' days';
 }
-function tgDate(s, withYear) { const d = parseLocal(s); return d ? glShort(s) + (withYear ? ', ' + d.getFullYear() : '') : ''; }
+function goalDate(s, withYear) { const d = parseLocal(s); return d ? glShort(s) + (withYear ? ', ' + d.getFullYear() : '') : ''; }
 // "Oct 3 → Nov 1 · 29 days" for a finished book (falls back to just the finish date)
-function tgSpanLabel(x) {
-  const s = tgStart(x), f = x.finishedDate;
+function goalSpanLabel(x) {
+  const s = goalStart(x), f = x.finishedDate;
   if (!f) return '';
-  if (!s) return tgDate(f);
-  const y = s.slice(0, 4) !== f.slice(0, 4), w = tgDayWord(s, f);
-  return w ? `${tgDate(s, y)} → ${tgDate(f, y)} · ${w}` : tgDate(f);
+  if (!s) return goalDate(f);
+  const y = s.slice(0, 4) !== f.slice(0, 4), w = goalDayWord(s, f);
+  return w ? `${goalDate(s, y)} → ${goalDate(f, y)} · ${w}` : goalDate(f);
 }
-function tgStats(t, log, todayStr) {
-  const sp = tgSpan(t);
+function goalStats(t, log, todayStr) {
+  const sp = goalSpan(t);
   let books = 0, pages = 0;
   (log || []).filter(x => x.kind === 'reading' && (!t.logId || x.id === t.logId)).forEach(x => {
     if (x.finishedDate && x.finishedDate >= sp.s && x.finishedDate <= sp.e) books++;
@@ -14337,12 +14362,12 @@ function tgStats(t, log, todayStr) {
   if (hasEnd && !ended) { const from = todayStr > sp.s ? todayStr : sp.s; daysLeft = Math.round((parseLocal(sp.e) - parseLocal(from)) / 86400000) + 1; }
   return { sp, books, pages, daysLeft, ended, notStarted, hasEnd };
 }
-function tgScopeLabel(t) {
+function goalScopeLabel(t) {
   if (t.scope === 'year') return String(t.year);
   if (t.scope === 'range') { const e = parseLocal(t.endDate); return `${glShort(t.startDate)} – ${glShort(t.endDate)}${e ? ', ' + e.getFullYear() : ''}`; }
   return 'Open';
 }
-function tgPace(t, st) {
+function goalPace(t, st) {
   if (!st.hasEnd || st.ended) return '';
   const out = [];
   const remP = Math.max(0, (t.pages || 0) - st.pages);
@@ -14360,23 +14385,23 @@ function tgPace(t, st) {
   return out.join(' · ');
 }
 // One place that answers "how is this goal doing today". status: 'done' | 'ended' | 'active'
-function tgProgress(t, L, todayStr, P) {   // P (optional) = the Projects list, so a goal linked to a project follows it (v5.65.0)
-  const st = tgStats(t, L, todayStr);
+function goalProgress(t, L, todayStr, P) {   // P (optional) = the Projects list, so a goal linked to a project follows it (v5.65.0)
+  const st = goalStats(t, L, todayStr);
   let met = false, label = '';
   if (t.kind === 'reading') {
-    met = tgMet(t, st);
+    met = goalMet(t, st);
     const bk = t.logId ? (L || []).find(x => x.id === t.logId) : null;
-    label = t.mode === 'finish' ? (bk ? `${tgRead(bk)}${bk.total ? '/' + bk.total : ''} pp${st.books ? ' · finished' : ''}` : 'book not found')
+    label = t.mode === 'finish' ? (bk ? `${goalRead(bk)}${bk.total ? '/' + bk.total : ''} pp${st.books ? ' · finished' : ''}` : 'book not found')
       : [t.books ? `${st.books}/${t.books} books` : '', t.pages ? `${st.pages.toLocaleString()}/${t.pages.toLocaleString()} pp` : ''].filter(Boolean).join(' · ');
   }
   const lp = t.kind === 'general' && t.projectId && Array.isArray(P) ? (P.find(g => g && g.id === t.projectId) || null) : null;
   const done = lp ? lp.status === 'done' : (met || !!t.completed);
   return { st, met, label, done, project: lp, status: done ? 'done' : st.ended ? 'ended' : 'active' };
 }
-const TG_KIND_ICON = { general: '◎', reading: '📖' };
+const GOAL_KIND_ICON = { general: '◎', reading: '📖' };
 
-function TgNewForm({ existing, defaultYear, targetLog, goals, setTargets, onDone }) {
-  const ex = existing ? tgNorm(existing) : null;
+function GoalNewForm({ existing, defaultYear, readingLog, projects, setGoals, onDone }) {
+  const ex = existing ? goalNorm(existing) : null;
   const yr = defaultYear || new Date().getFullYear();
   const [f, setF] = useState({
     title: ex ? (ex.title || '') : '', kind: ex ? (ex.kind === 'reading' ? 'reading' : 'general') : 'general',
@@ -14386,7 +14411,7 @@ function TgNewForm({ existing, defaultYear, targetLog, goals, setTargets, onDone
     logId: ex ? (ex.logId || '') : '', measure: ex ? (ex.mode === 'books' ? 'books' : ex.mode === 'finish' ? 'finish' : 'pages') : 'pages',
     amount: ex ? String((ex.mode === 'books' ? ex.books : ex.pages) || '') : '' });
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
-  const books = (Array.isArray(targetLog) ? targetLog : []).filter(x => x.kind === 'reading' && (!x.finishedDate || x.id === f.logId));
+  const books = (Array.isArray(readingLog) ? readingLog : []).filter(x => x.kind === 'reading' && (!x.finishedDate || x.id === f.logId));
   const inp = { fontSize: 13, padding: '5px 8px', border: '1px solid var(--border)', borderRadius: 8, background: 'var(--paper)', color: 'var(--ink)', minWidth: 0 };
   const small = { fontSize: 12, color: 'var(--ink-light)' };
   const measureVal = f.logId ? (f.measure === 'finish' ? 'finish' : 'pages') : (f.measure === 'books' ? 'books' : 'pages');
@@ -14401,8 +14426,8 @@ function TgNewForm({ existing, defaultYear, targetLog, goals, setTargets, onDone
       if (measureVal !== 'finish' && !n) return;
       rec = { ...rec, logId: f.logId || '', mode: measureVal, books: measureVal === 'books' ? n : 0, pages: measureVal === 'pages' ? n : 0, projectId: '' };
     } else rec = { ...rec, logId: '', mode: '', books: 0, pages: 0, projectId: f.projectId || '' };
-    if (ex) setTargets(ts => ts.map(x => x.id === ex.id ? { ...x, ...rec, period: undefined, startKey: undefined, repeat: undefined } : x));
-    else setTargets(ts => [...(Array.isArray(ts) ? ts : []), { id: tgUid(), ...rec }]);
+    if (ex) setGoals(ts => ts.map(x => x.id === ex.id ? { ...x, ...rec, period: undefined, startKey: undefined, repeat: undefined } : x));
+    else setGoals(ts => [...(Array.isArray(ts) ? ts : []), { id: goalUid(), ...rec }]);
     onDone(true);
   }
   return (
@@ -14422,11 +14447,11 @@ function TgNewForm({ existing, defaultYear, targetLog, goals, setTargets, onDone
           <input style={inp} type="date" value={f.endDate} onChange={e => set('endDate', e.target.value)} />
         </>}
       </div>
-      {f.kind === 'general' && (goals || []).some(g => g && (g.status !== 'done' || g.id === f.projectId)) && (
+      {f.kind === 'general' && (projects || []).some(g => g && (g.status !== 'done' || g.id === f.projectId)) && (
         <label style={{ ...small, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>Linked project
           <select style={{ ...inp, maxWidth: '100%' }} value={f.projectId} onChange={e => set('projectId', e.target.value)} aria-label="Linked project">
             <option value="">None (use a Done box)</option>
-            {(goals || []).filter(g => g && (g.status !== 'done' || g.id === f.projectId)).map(g => <option key={g.id} value={g.id}>{g.title || 'Untitled project'}</option>)}
+            {(projects || []).filter(g => g && (g.status !== 'done' || g.id === f.projectId)).map(g => <option key={g.id} value={g.id}>{g.title || 'Untitled project'}</option>)}
           </select>
         </label>)}
       {f.kind === 'reading' && (
@@ -14450,14 +14475,14 @@ function TgNewForm({ existing, defaultYear, targetLog, goals, setTargets, onDone
   );
 }
 
-function tgTitle(t) {
+function goalTitle(t) {
   if (t.title) return t.title;
   const parts = [];
   if (t.books) parts.push(`${t.books} book${t.books === 1 ? '' : 's'}`);
   if (t.pages) parts.push(`${t.pages.toLocaleString()} pages`);
   return t.name || ('Read ' + parts.join(' + '));
 }
-function tgMet(t, st) {
+function goalMet(t, st) {
   if (t.mode === 'finish') return st.books >= 1;
   return (!t.books || st.books >= t.books) && (!t.pages || st.pages >= t.pages) && (t.books > 0 || t.pages > 0);
 }
@@ -14493,7 +14518,7 @@ function prBuckets(mode, off, todayStr) {
   }
   return out;
 }
-function TgPagesChart({ books }) {
+function GoalPagesChart({ books }) {
   const today = glToday();
   const [mode, setMode] = useState('week');
   const [bookId, setBookId] = useState('all');
@@ -14630,10 +14655,10 @@ function TgPagesChart({ books }) {
   );
 }
 
-function TargetsView({ targets, setTargets, targetLog, setTargetLog, goals, onOpenProject }) {   // the "Goals" sub-tab (called Targets until v5.34.0)
+function GoalsView({ goals, setGoals, readingLog, setReadingLog, projects, onOpenProject }) {   // the "Goals" sub-tab (called Targets until v5.34.0)
   const today = glToday();
-  const T = (Array.isArray(targets) ? targets : []).map(tgNorm);
-  const L = Array.isArray(targetLog) ? targetLog : [];
+  const T = (Array.isArray(goals) ? goals : []).map(goalNorm);
+  const L = Array.isArray(readingLog) ? readingLog : [];
   const curYear = new Date().getFullYear();
   const [adding, setAdding] = useState(false);
   const [editId, setEditId] = useState(null);
@@ -14663,12 +14688,12 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog, goals, onOp
   const parkedBooks = books.filter(x => !x.finishedDate && x.status === 'parked');
   const setShelf = (x, v) => patchBook(x.id, b => { const { status, ...rest } = b; return v ? { ...rest, status: v } : rest; });
   const finished = books.filter(x => x.finishedDate).sort((a, b) => b.finishedDate.localeCompare(a.finishedDate));
-  const patchBook = (id, fn) => setTargetLog(l => (Array.isArray(l) ? l : []).map(x => x.id === id ? fn(x) : x));
+  const patchBook = (id, fn) => setReadingLog(l => (Array.isArray(l) ? l : []).map(x => x.id === id ? fn(x) : x));
 
   function addBook() {
     if (!bookForm || !(bookForm.title || '').trim()) return;
     const read = parseInt(bookForm.read, 10) || 0;
-    setTargetLog(l => [...(Array.isArray(l) ? l : []), { id: tgUid(), kind: 'reading', title: bookForm.title.trim(), author: (bookForm.author || '').trim(),
+    setReadingLog(l => [...(Array.isArray(l) ? l : []), { id: goalUid(), kind: 'reading', title: bookForm.title.trim(), author: (bookForm.author || '').trim(),
       total: parseInt(bookForm.total, 10) || 0, updates: read > 0 ? [{ date: today, pages: read }] : [], finishedDate: null, notes: '', ...(bookForm.shelf ? { status: bookForm.shelf } : {}), ...(bookForm.start ? { startDate: bookForm.start } : {}) }]);
     setRfilter(bookForm.shelf === 'toread' ? 'toread' : 'active');
     setBookForm(null);
@@ -14676,7 +14701,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog, goals, onOp
   function logPages(x) {
     const v = parseInt(pageIn[x.id], 10);
     if (!v || v < 1) return;
-    const n = logMode === 'on' ? v - tgRead(x) : v;   // "now on page v" logs the difference from what is already logged
+    const n = logMode === 'on' ? v - goalRead(x) : v;   // "now on page v" logs the difference from what is already logged
     if (n < 1) return;
     const d = logDate[x.id] || today;
     patchBook(x.id, b => ({ ...b, updates: [...(b.updates || []), { date: d, pages: n }] }));
@@ -14687,31 +14712,31 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog, goals, onOp
   function setEntry(id, i, patch) { patchBook(id, b => ({ ...b, updates: (b.updates || []).map((u, j) => j === i ? { ...u, ...patch } : u) })); }
   function delEntry(id, i) { patchBook(id, b => ({ ...b, updates: (b.updates || []).filter((u, j) => j !== i) })); }
   function finishBook(x) {
-    const rem = Math.max(0, (x.total || 0) - tgRead(x));
+    const rem = Math.max(0, (x.total || 0) - goalRead(x));
     patchBook(x.id, b => ({ ...b, finishedDate: finishDate || today, updates: rem > 0 ? [...(b.updates || []), { date: finishDate || today, pages: rem }] : (b.updates || []) }));
     setFinishId(null);
   }
-  function delBook(x) { if (window.confirm(`Delete "${x.title}" from your reading log?`)) { setTargetLog(l => l.filter(b => b.id !== x.id)); setOpenId(null); } }
+  function delBook(x) { if (window.confirm(`Delete "${x.title}" from your reading log?`)) { setReadingLog(l => l.filter(b => b.id !== x.id)); setOpenId(null); } }
 
   const lab = { fontSize: 12, color: 'var(--ink-light)' };
 
   // Active hides done and ended goals; Completed shows done ones; All shows everything. Another year always shows all.
-  const status = t => tgProgress(t, L, today, goals).status;
+  const status = t => goalProgress(t, L, today, projects).status;
   const visible = (t, yearly) => filter === 'all' || (yearly && year !== curYear) || (filter === 'completed' ? status(t) === 'done' : status(t) === 'active');
   function tile(t) {
     if (editId === t.id) return (
       <div key={t.id} style={{ flex: '1 1 320px', maxWidth: 460, border: '2px solid var(--accent)', borderRadius: 12, padding: 12, background: 'var(--paper)' }}>
-        <TgNewForm existing={t} defaultYear={year} targetLog={targetLog} goals={goals} setTargets={setTargets} onDone={() => setEditId(null)} />
+        <GoalNewForm existing={t} defaultYear={year} readingLog={readingLog} projects={projects} setGoals={setGoals} onDone={() => setEditId(null)} />
       </div>);
-    const pr = tgProgress(t, L, today, goals);
+    const pr = goalProgress(t, L, today, projects);
     const st = pr.st;
     const pb = t.books ? Math.min(1, st.books / t.books) : 0, pp = t.pages ? Math.min(1, st.pages / t.pages) : 0;
     const tag = pr.status === 'done' ? '✓ Done' : pr.status === 'ended' ? 'Ended' : st.notStarted ? `Starts ${glShort(st.sp.s)}` : '';
     return (
       <div key={t.id} style={{ flex: '1 1 260px', maxWidth: 380, border: '1px solid var(--border)', borderRadius: 12, padding: 12, background: 'var(--paper)', opacity: pr.status === 'active' ? 1 : 0.75 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-          <span style={{ fontWeight: 600, fontSize: 14, textDecoration: pr.status === 'done' ? 'line-through' : 'none' }}>{TG_KIND_ICON[t.kind] || '◎'} {tgTitle(t)}</span>
-          <span className="gl-mono" style={lab}>{t.scope === 'year' ? '' : tgScopeLabel(t)}</span>
+          <span style={{ fontWeight: 600, fontSize: 14, textDecoration: pr.status === 'done' ? 'line-through' : 'none' }}>{GOAL_KIND_ICON[t.kind] || '◎'} {goalTitle(t)}</span>
+          <span className="gl-mono" style={lab}>{t.scope === 'year' ? '' : goalScopeLabel(t)}</span>
         </div>
         {tag && <div style={{ ...lab, marginTop: 2, fontWeight: 600, color: pr.status === 'done' ? 'var(--accent)' : 'var(--ink-light)' }}>{tag}</div>}
         {pr.project && (() => { const pj = pr.project, pc = Math.round(glProgress(pj) * 100), tc = glTaskCounts(pj); return (
@@ -14723,24 +14748,24 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog, goals, onOp
           </div>); })()}
         {t.kind === 'general' && t.projectId && !pr.project && <div style={{ ...lab, marginTop: 6 }}>Linked project not found — using the Done box.</div>}
         {t.kind === 'general' && !pr.project && <label style={{ ...lab, display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-          <input type="checkbox" checked={!!t.completed} onChange={() => setTargets(ts => ts.map(x => x.id === t.id ? { ...tgNorm(x), completed: !t.completed } : x))} />Done</label>}
+          <input type="checkbox" checked={!!t.completed} onChange={() => setGoals(ts => ts.map(x => x.id === t.id ? { ...goalNorm(x), completed: !t.completed } : x))} />Done</label>}
         {t.kind === 'reading' && t.mode === 'finish' && <div style={{ ...lab, marginTop: 8 }}>{pr.label}</div>}
         {t.kind === 'reading' && t.books > 0 && <><div style={{ ...lab, marginTop: 8 }}>Books: <b style={{ color: 'var(--ink)' }}>{st.books}</b> of {t.books}</div>
           <div className="gl-bar" style={{ margin: '4px 0', background: glTint('#2d6b4a', 0.15) }}><div style={{ width: Math.round(pb * 100) + '%', background: accent }} /></div></>}
         {t.kind === 'reading' && t.pages > 0 && <><div style={{ ...lab, marginTop: 8 }}>Pages{t.logId ? ' (one book)' : ''}: <b style={{ color: 'var(--ink)' }}>{st.pages.toLocaleString()}</b> of {t.pages.toLocaleString()}</div>
           <div className="gl-bar" style={{ margin: '4px 0', background: glTint('#c4960e', 0.18) }}><div style={{ width: Math.round(pp * 100) + '%', background: 'var(--gold)' }} /></div></>}
-        {t.kind === 'reading' && t.mode !== 'finish' && <div style={{ ...lab, marginTop: 6 }}>{tgPace(t, st)}</div>}
+        {t.kind === 'reading' && t.mode !== 'finish' && <div style={{ ...lab, marginTop: 6 }}>{goalPace(t, st)}</div>}
         <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
           <button className="gl-btn ghost" style={{ padding: '2px 0', fontSize: 12 }} onClick={() => setEditId(t.id)}>Edit</button>
           <button className="gl-btn ghost" style={{ padding: '2px 0', fontSize: 12 }}
-            onClick={() => window.confirm('Remove this goal? Your reading log is kept.') && setTargets(ts => ts.filter(x => x.id !== t.id))}>Remove</button>
+            onClick={() => window.confirm('Remove this goal? Your reading log is kept.') && setGoals(ts => ts.filter(x => x.id !== t.id))}>Remove</button>
         </div>
       </div>
     );
   }
   // v5.63.0 — compact row for a book that is on the To read shelf or parked
   function shelfRow(x, kind) {
-    const rd = tgRead(x);
+    const rd = goalRead(x);
     return (
       <div key={x.id} className="rl-book">
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
@@ -14772,10 +14797,10 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog, goals, onOp
               onChange={e => patchBook(x.id, b => ({ ...b, startDate: e.target.value || '' }))} /></label>
           {x.startDate
             ? <button className="gl-btn ghost" onClick={() => patchBook(x.id, b => ({ ...b, startDate: '' }))}>{(x.updates || []).some(u => u.date && Number(u.pages) > 0) ? 'Use first pages logged' : 'Clear'}</button>
-            : (tgStart(x) ? <span style={lab}>auto: {tgDate(tgStart(x), true)} (first pages logged)</span> : <span style={lab}>auto: set by the first pages you log</span>)}
+            : (goalStart(x) ? <span style={lab}>auto: {goalDate(goalStart(x), true)} (first pages logged)</span> : <span style={lab}>auto: set by the first pages you log</span>)}
         </div>
         <div>
-          <div className="gl-label" style={{ margin: '2px 0 4px' }}>Pages log · {(x.updates || []).length} {(x.updates || []).length === 1 ? 'entry' : 'entries'} · {tgRead(x)} pp</div>
+          <div className="gl-label" style={{ margin: '2px 0 4px' }}>Pages log · {(x.updates || []).length} {(x.updates || []).length === 1 ? 'entry' : 'entries'} · {goalRead(x)} pp</div>
           {!(x.updates || []).length && <div style={lab}>No pages logged yet.</div>}
           <div style={{ maxHeight: 220, overflowY: 'auto' }}>
             {(x.updates || []).map((u, i) => ({ u, i })).sort((a, b) => (b.u.date || '').localeCompare(a.u.date || '') || b.i - a.i).map(({ u, i }) => (
@@ -14819,7 +14844,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog, goals, onOp
           {!secShut.goals && <>
           {adding && (
             <div style={{ marginBottom: 12, padding: 10, background: 'var(--cream)', borderRadius: 10 }}>
-              <TgNewForm defaultYear={year} targetLog={targetLog} goals={goals} setTargets={setTargets} onDone={() => setAdding(false)} />
+              <GoalNewForm defaultYear={year} readingLog={readingLog} projects={projects} setGoals={setGoals} onDone={() => setAdding(false)} />
             </div>
           )}
           {!T.length && !adding && <div style={{ fontSize: 13, color: 'var(--ink-light)' }}>No goals yet. Add one, such as "Read 24 books in 2026".</div>}
@@ -14867,7 +14892,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog, goals, onOp
             </div>}
           </div>
           {!secShut.reading && <>
-          {rview === 'chart' ? <TgPagesChart books={books} /> : <>
+          {rview === 'chart' ? <GoalPagesChart books={books} /> : <>
           {bookForm && (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, padding: 10, background: 'var(--cream)', borderRadius: 10 }}>
               <input className="gl-input" style={{ flex: 2, minWidth: 150 }} placeholder="Title" autoFocus value={bookForm.title} onChange={e => setBookForm(f => ({ ...f, title: e.target.value }))} />
@@ -14894,7 +14919,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog, goals, onOp
             <div style={{ fontSize: 13, color: 'var(--ink-light)', padding: '6px 0' }}>{{ active: 'Nothing in progress right now.', toread: 'Nothing on your To read shelf.', parked: 'Nothing parked.', finished: 'No finished books yet.', all: '' }[rfilter]}</div>) : null; })()}
           {(rfilter === 'active' || rfilter === 'all') && reading.length > 0 && <div className="gl-label" style={{ margin: '4px 0' }}>Reading now</div>}
           {(rfilter === 'active' || rfilter === 'all') && reading.map(x => {
-            const rd = tgRead(x), p = x.total ? Math.min(1, rd / x.total) : 0;
+            const rd = goalRead(x), p = x.total ? Math.min(1, rd / x.total) : 0;
             return (
               <div key={x.id} className="rl-book">
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
@@ -14902,7 +14927,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog, goals, onOp
                   <span className="gl-mono" style={{ ...lab, whiteSpace: 'nowrap', textAlign: 'right', lineHeight: 1.4, flexShrink: 0 }}>{rd}{x.total ? ` / ${x.total}` : ''} pp{x.total > rd ? <><br />{x.total - rd} left</> : ''}</span>
                 </div>
                 {x.total > 0 && <div className="gl-bar" style={{ margin: '6px 0', background: glTint('#2d6b4a', 0.15) }}><div style={{ width: Math.round(p * 100) + '%', background: accent }} /></div>}
-                {tgStart(x) && <div style={{ ...lab, margin: '2px 0 6px' }}>Started {tgDate(tgStart(x), tgStart(x).slice(0, 4) !== today.slice(0, 4))}{!x.startDate && <span style={{ color: 'var(--ink-faint)' }}> · auto</span>}</div>}
+                {goalStart(x) && <div style={{ ...lab, margin: '2px 0 6px' }}>Started {goalDate(goalStart(x), goalStart(x).slice(0, 4) !== today.slice(0, 4))}{!x.startDate && <span style={{ color: 'var(--ink-faint)' }}> · auto</span>}</div>}
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   <div role="group" aria-label="How to log pages" style={{ display: 'flex', gap: 6, flexBasis: '100%' }}>
                     <button className={`gl-chip ${logMode === 'read' ? 'on' : ''}`} aria-pressed={logMode === 'read'} onClick={() => setLogMode('read')}>Pages read</button>
@@ -14940,7 +14965,7 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog, goals, onOp
               <div className="rl-fin-head" style={{ display: 'flex', alignItems: 'baseline', gap: 8, cursor: 'pointer' }} onClick={() => setOpenId(openId === x.id ? null : x.id)}>
                 <span style={{ color: 'var(--accent)' }}>✓</span>
                 <span className="rl-fin-title" style={{ fontWeight: 600, fontSize: 16, flex: 1, minWidth: 0 }}>{x.title}{x.author ? <span style={{ fontWeight: 400, color: 'var(--ink-light)' }}> · {x.author}</span> : null}</span>
-                <span className="gl-mono rl-fin-meta" style={{ ...lab, textAlign: 'right', lineHeight: 1.4, flexShrink: 0 }}>{x.total ? <span className="rl-fin-pp">{x.total} pp</span> : null}<span className="rl-fin-sp">{tgSpanLabel(x)}</span></span>
+                <span className="gl-mono rl-fin-meta" style={{ ...lab, textAlign: 'right', lineHeight: 1.4, flexShrink: 0 }}>{x.total ? <span className="rl-fin-pp">{x.total} pp</span> : null}<span className="rl-fin-sp">{goalSpanLabel(x)}</span></span>
               </div>
               {x.notes && openId !== x.id && <div style={{ ...lab, marginTop: 4, whiteSpace: 'pre-wrap', maxHeight: 40, overflow: 'hidden' }}>{x.notes}</div>}
               {openId === x.id && bookEditor(x)}
@@ -14956,26 +14981,28 @@ function TargetsView({ targets, setTargets, targetLog, setTargetLog, goals, onOp
 }
 
 // Goals tab shell: Projects (timeline) | Goals sub-tabs (v5.30.0; renamed v5.34.0). Stored values keep the old names.
-function GoalsView(props) {
-  const [sub, setSubRaw] = useState(() => lsGet('glSubTab') === 'targets' ? 'targets' : 'goals');
-  const setSub = v => { lsSet('glSubTab', v); setSubRaw(v); };
+function GoalsTab(props) {
+  // Sub-tab choice is a per-device pref. v5.96.0 renamed the values to match the labels; the old pref key
+  // `glSubTab` (values 'goals' = Projects, 'targets' = Goals) is no longer read, so a device opens on Projects once.
+  const [sub, setSubRaw] = useState(() => lsGet('glSub') === 'goals' ? 'goals' : 'projects');
+  const setSub = v => { lsSet('glSub', v); setSubRaw(v); };
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <div className="gl-seg" role="tablist" aria-label="Goals sections" style={{ alignSelf: 'flex-start', margin: '12px 16px 0' }}>
-        <button role="tab" aria-selected={sub === 'goals'} className={sub === 'goals' ? 'on' : ''} onClick={() => setSub('goals')}>Projects</button>
-        <button role="tab" aria-selected={sub === 'targets'} className={sub === 'targets' ? 'on' : ''} onClick={() => setSub('targets')}>Goals</button>
+        <button role="tab" aria-selected={sub === 'projects'} className={sub === 'projects' ? 'on' : ''} onClick={() => setSub('projects')}>Projects</button>
+        <button role="tab" aria-selected={sub === 'goals'} className={sub === 'goals' ? 'on' : ''} onClick={() => setSub('goals')}>Goals</button>
       </div>
-      {sub === 'goals' ? <GoalsMain {...props} /> : <TargetsView targets={props.targets} setTargets={props.setTargets} targetLog={props.targetLog} setTargetLog={props.setTargetLog} goals={props.goals} onOpenProject={id => { if (props.setSelectedId) props.setSelectedId(id); setSub('goals'); }} />}
+      {sub === 'projects' ? <ProjectsMain {...props} /> : <GoalsView goals={props.goals} setGoals={props.setGoals} readingLog={props.readingLog} setReadingLog={props.setReadingLog} projects={props.projects} onOpenProject={id => { if (props.setSelectedId) props.setSelectedId(id); setSub('projects'); }} />}
     </div>
   );
 }
 
-function GoalsMain({ targets, setTargets, targetLog, goals, setGoals, pagesData, setPagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
+function ProjectsMain({ goals, setGoals, readingLog, projects, setProjects, pagesData, setPagesData, countdowns, setCountdowns, selectedId, setSelectedId, onOpenPage, habitGoals, fitnessExercises, habitCompletions, fitnessLog, mctx }) {
   const today = glToday();
   const [statusTab, setStatusTab] = useState('active');
   const [sideCollapsed, setSideCollapsedRaw] = useState(() => lsGet('glSideCollapsed') === '1'); // desktop only; per device
   const setSideCollapsed = (v) => { lsSet('glSideCollapsed', v ? '1' : '0'); setSideCollapsedRaw(v); };
-  const list = Array.isArray(goals) ? goals : [];
+  const list = Array.isArray(projects) ? projects : [];
   const sel = selectedId ? list.find(g => g.id === selectedId) : null;
   const counts = { active: 0, parked: 0, done: 0 };
   list.forEach(g => { counts[g.status] = (counts[g.status] || 0) + 1; });
@@ -14989,13 +15016,13 @@ function GoalsMain({ targets, setTargets, targetLog, goals, setGoals, pagesData,
     const others = cur.filter(c => !String(c.id).startsWith('goal-'));
     const next = [...others, ...want];
     if (JSON.stringify(next) !== JSON.stringify(cur)) setCountdowns(next);
-  }, [goals]);
+  }, [projects]);
 
-  function changeGoal(gid, fn) { setGoals(gs => glPatchGoal(gs, gid, fn)); }
+  function changeProject(gid, fn) { setProjects(gs => glPatchProject(gs, gid, fn)); }
   function newGoal() {
     if (counts.active >= GL_SOFT_LIMIT && !window.confirm(`You already have ${counts.active} active projects (soft limit ${GL_SOFT_LIMIT}). Add another anyway?`)) return;
-    const g = glNewGoal(list);
-    setGoals(gs => [...gs, g]);
+    const g = glNewProject(list);
+    setProjects(gs => [...gs, g]);
     setStatusTab('active');
     setSelectedId(g.id);
   }
@@ -15088,15 +15115,15 @@ function GoalsMain({ targets, setTargets, targetLog, goals, setGoals, pagesData,
 
       <main className="gl-main">
         {sel ? (
-          <GlDetail key={sel.id} targets={targets} setTargets={setTargets} allTags={glAllTags(list)} books={(Array.isArray(targetLog) ? targetLog : []).filter(x => x.kind === 'reading')} goal={sel} pagesData={pagesData} setPagesData={setPagesData} onOpenPage={onOpenPage}
+          <GlDetail key={sel.id} goals={goals} setGoals={setGoals} allTags={glAllTags(list)} books={(Array.isArray(readingLog) ? readingLog : []).filter(x => x.kind === 'reading')} goal={sel} pagesData={pagesData} setPagesData={setPagesData} onOpenPage={onOpenPage}
             habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
             habitCompletions={habitCompletions} fitnessLog={fitnessLog}
-            onChange={fn => changeGoal(sel.id, fn)}
+            onChange={fn => changeProject(sel.id, fn)}
             onBack={() => setSelectedId(null)}
-            onDelete={() => { setGoals(gs => gs.filter(g => g.id !== sel.id)); setSelectedId(null); }} />
+            onDelete={() => { setProjects(gs => gs.filter(g => g.id !== sel.id)); setSelectedId(null); }} />
         ) : (
           <>
-            <GlTimeline goals={list} onOpenGoal={setSelectedId} onChangeGoal={changeGoal} />
+            <GlTimeline projects={list} onOpenProject={setSelectedId} onChangeProject={changeProject} />
 
             {weekItems.length > 0 && (
               <section className="gl-card gl-mobile-only" style={{ flexDirection: 'column', overflow: 'hidden' }}>
@@ -15104,7 +15131,7 @@ function GoalsMain({ targets, setTargets, targetLog, goals, setGoals, pagesData,
                 {weekItems.map(({ goal, ms, task }) => (
                   <label key={task.id} style={{ display: 'flex', alignItems: 'center', gap: 12, minHeight: 48, padding: '0 14px', borderTop: '1px solid var(--neutral-line)', cursor: 'pointer' }}>
                     <input type="checkbox" checked={!!task.done} style={{ width: 20, height: 20, accentColor: goal.color }}
-                      onChange={() => setGoals(gs => glPatchTask(gs, goal.id, ms.id, task.id, { done: !task.done }))} />
+                      onChange={() => setProjects(gs => glPatchTask(gs, goal.id, ms.id, task.id, { done: !task.done }))} />
                     <span style={{ flex: 1, fontSize: 15, textDecoration: task.done ? 'line-through' : 'none', color: task.done ? 'var(--ink-light)' : 'var(--ink)' }}>{task.title || 'Untitled task'}</span>
                     <span style={{ fontSize: 11, fontWeight: 600, color: glInk(goal.color), background: glTint(goal.color, 0.16), padding: '2px 8px', borderRadius: 999 }}>{DAYS[parseLocal(task.scheduledDate).getDay()]}</span>
                   </label>
@@ -15223,8 +15250,8 @@ function App() {
   const [fitnessDotColors, setFitnessDotColors] = useSynced('fitnessDotColors', {}); // v5.56.0 chosen dot colour per Fitness group {'sub:run':'#hex'}
   const [fitnessCompare, setFitnessCompare] = useSynced('fitnessCompare', []); // v5.19.0 saved Fitness > Charts comparisons [{id,name,metric,untagged,groups:[{id,name,subs,exerciseIds}]}]
   const [fitnessGoals, setFitnessGoals] = useSynced('fitnessGoals', []); // [{id, exerciseId, period, target, unit}]
-  const [targets, setTargets] = useSynced('targets', []); // v5.30.0 [{id,kind,period,books,pages}] — see TARGETS section
-  const [targetLog, setTargetLog] = useSynced('targetLog', []); // v5.30.0 [{id,kind,title,author,total,updates:[{date,pages}],finishedDate,notes}]
+  const [goals, setGoals] = useSynced('targets', []); // stored under the old name `targets` until the next rename step. v5.30.0 [{id,kind,period,books,pages}] — see TARGETS section
+  const [readingLog, setReadingLog] = useSynced('targetLog', []); // stored under the old name `targetLog` until the next rename step. v5.30.0 [{id,kind,title,author,total,updates:[{date,pages}],finishedDate,notes}]
   const [countdowns, setCountdowns] = useSynced('countdowns', []); // [{id, title, startDate, endDate, color}]
   const [checkins, setCheckins] = useSynced('checkins', {}); // v5.69.0 Daily check-in — see DAILY CHECK-IN section
   const [checkinTags, setCheckinTags] = useSynced('checkinTags', []); // v5.75.0 check-in tag & counter definitions
@@ -15234,13 +15261,13 @@ function App() {
   const checkinDoneToday = ciIsDone((checkins || {})[glToday()]);
   const sh = useShared(); // v5.92.0 shared space (Us)
   const [upkeep, setUpkeep] = useSynced('upkeep', []); // v5.68.0 Home upkeep — see HOME UPKEEP section
-  const [goals, setGoals] = useSynced('goals', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see GOALS section
+  const [projects, setProjects] = useSynced('projects', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see PROJECTS section (stored under `goals` before v5.96.0)
   // v5.35.0 — a Project linked to a reading-log book finishes that book when the project is marked done.
   // b.autoDone[projectId] remembers it fired, so reopening the book by hand is not undone; it clears when the project is reopened.
   useEffect(() => {
-    const linked = (goals || []).filter(g => g.bookId);
+    const linked = (projects || []).filter(g => g.bookId);
     if (!linked.length) return;
-    setTargetLog(l => {
+    setReadingLog(l => {
       let changed = false;
       const out = (Array.isArray(l) ? l : []).map(b => {
         let nb = b;
@@ -15248,7 +15275,7 @@ function App() {
           const flag = (nb.autoDone || {})[g.id];
           if (g.status === 'done' && !flag) {
             const d = glToday();
-            const rem = Math.max(0, (nb.total || 0) - tgRead(nb));
+            const rem = Math.max(0, (nb.total || 0) - goalRead(nb));
             nb = { ...nb, autoDone: { ...(nb.autoDone || {}), [g.id]: true } };
             if (!nb.finishedDate) nb = { ...nb, finishedDate: d, updates: rem > 0 ? [...(nb.updates || []), { date: d, pages: rem }] : (nb.updates || []) };
             changed = true;
@@ -15261,27 +15288,27 @@ function App() {
       });
       return changed ? out : l;
     });
-  }, [goals]);
+  }, [projects]);
   // Weight / calorie readings and their targets, bundled for the goal views (v4.8.0)
   // v5.11.0: the fitness log and exercise library ride along so goal rules can read them
-  const mctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty, targetLog };
+  const mctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty, readingLog };
   // Complete weight milestones whose condition is met (7-day average, 3+ readings since the goal began) and
   // tasks / milestones whose training rule is met by the Fitness log (v5.11.0).
   // Debounced; writes only when something changed. The Undo toast reopens it and holds auto-complete.
   useEffect(() => {
     const t = setTimeout(() => {
       const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
-      const ctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty, targetLog };
-      const r = glAutoComplete(goals, ctx, asOf);
-      if (r.goals === goals) return;
-      setGoals(gs => glAutoComplete(gs, ctx, asOf).goals);
+      const ctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty, readingLog };
+      const r = glAutoComplete(projects, ctx, asOf);
+      if (r.projects === projects) return;
+      setProjects(gs => glAutoComplete(gs, ctx, asOf).projects);
       r.reached.forEach(x => Undo.push(`Reached: ${x.title || (x.kind === 'task' ? 'task' : 'milestone')}`, () => x.kind === 'task'
-        ? setGoals(gs => glPatchTask(gs, x.gid, x.mid, x.tid, { done: false }))
-        : setGoals(gs => glPatchGoal(gs, x.gid, g =>
+        ? setProjects(gs => glPatchTask(gs, x.gid, x.mid, x.tid, { done: false }))
+        : setProjects(gs => glPatchProject(gs, x.gid, g =>
             glPatchMs(g, x.mid, m => ({ ...m, done: false, completedAt: null, autoDone: false, metricHold: true, ruleHold: true }))))));
     }, 2500);
     return () => clearTimeout(t);
-  }, [goals, habitMetrics, weightTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty, targetLog]);
+  }, [projects, habitMetrics, weightTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty, readingLog]);
   // Keep "never ends" repeating tasks topped up as time passes (v4.6.0). Debounced; only writes when something was added.
   useEffect(() => {
     const t = setTimeout(() => {
@@ -15290,9 +15317,9 @@ function App() {
     }, 2500);
     return () => clearTimeout(t);
   }, [weekData]);
-  const [selectedGoalId, setSelectedGoalIdRaw] = useState(() => sessionStorage.getItem('lp_selectedGoalId') || null);
-  const setSelectedGoalId = (id) => { if(id) sessionStorage.setItem('lp_selectedGoalId', id); else sessionStorage.removeItem('lp_selectedGoalId'); setSelectedGoalIdRaw(id); };
-  const openGoal = (id) => { setSelectedGoalId(id || null); setPage('goals'); };
+  const [selectedProjectId, setSelectedProjectIdRaw] = useState(() => sessionStorage.getItem('lp_selectedProjectId') || null);
+  const setSelectedProjectId = (id) => { if(id) sessionStorage.setItem('lp_selectedProjectId', id); else sessionStorage.removeItem('lp_selectedProjectId'); setSelectedProjectIdRaw(id); };
+  const openProject = (id) => { setSelectedProjectId(id || null); setPage('goals'); };
   const [moreOpen, setMoreOpen] = useState(false); // mobile bottom-nav "More" sheet
   const [reviewOpen, setReviewOpen] = useState(false); // Weekly Review overlay (v4.7.0)
   // v4.4.0: theme preference — 'auto' (follow device) | 'light' | 'dark'; per device, like the swipe toggle
@@ -15767,7 +15794,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.95.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.96.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -15849,7 +15876,7 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} goals={goals} setGoals={setGoals} onOpenGoal={openGoal} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} onOpenCheckin={dk=>openCheckin('planner', dk)} checkinDoneFor={dk=>ciIsDone((checkins||{})[dk])} onOpenUs={()=>setPage('us')} usDue={usDueNow(sh)} />}
+      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} projects={projects} setProjects={setProjects} onOpenProject={openProject} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} onOpenCheckin={dk=>openCheckin('planner', dk)} checkinDoneFor={dk=>ciIsDone((checkins||{})[dk])} onOpenUs={()=>setPage('us')} usDue={usDueNow(sh)} />}
       {page==='checkin' && <CheckinView checkins={checkins} setCheckins={setCheckins} habitGoals={habitGoals} habitCompletions={habitCompletions} fitnessLog={fitnessLog} tagDefs={checkinTags} setTagDefs={setCheckinTags} initialDay={checkinDay} backLabel={checkinFrom==='habit'?'Habits':'Week'} onBack={()=>setPage(checkinFrom)} />}
       {page==='upkeep' && <UpkeepView upkeep={upkeep} setUpkeep={setUpkeep} onBack={()=>setPage('planner')} />}
       {page==='us' && authUser && <UsView sh={sh} me={String(authUser.email||'').toLowerCase()} myName={String(authUser.name||authUser.email||'').split(' ')[0]} onBack={()=>setPage('planner')} />}
@@ -15871,13 +15898,13 @@ function App() {
         calsTarget={calsTarget} setCalsTarget={setCalsTarget}
         onBack={()=>setPage('habit')} />}
       {page==='pages' && <PagesView pagesData={pagesData} setPagesData={setPagesData} foldersData={foldersData} setFoldersData={setFoldersData} weekData={weekData} setWeekData={setWeekData} selectedId={selectedPagesId} setSelectedId={setSelectedPagesId} />}
-      {page==='fitness' && <FitnessView fitnessLog={fitnessLog} setFitnessLog={setFitnessLog} fitnessExercises={fitnessExercises} setFitnessExercises={setFitnessExercises} fitnessGoals={fitnessGoals} setFitnessGoals={setFitnessGoals} goals={goals} habitGoals={habitGoals} habitCompletions={habitCompletions} habitQty={habitQty} fitnessCompare={fitnessCompare} setFitnessCompare={setFitnessCompare} fitnessDotColors={fitnessDotColors} setFitnessDotColors={setFitnessDotColors} />}
-      {page==='goals' && <GoalsView goals={goals} setGoals={setGoals} pagesData={pagesData} setPagesData={setPagesData}
+      {page==='fitness' && <FitnessView fitnessLog={fitnessLog} setFitnessLog={setFitnessLog} fitnessExercises={fitnessExercises} setFitnessExercises={setFitnessExercises} fitnessGoals={fitnessGoals} setFitnessGoals={setFitnessGoals} projects={projects} habitGoals={habitGoals} habitCompletions={habitCompletions} habitQty={habitQty} fitnessCompare={fitnessCompare} setFitnessCompare={setFitnessCompare} fitnessDotColors={fitnessDotColors} setFitnessDotColors={setFitnessDotColors} />}
+      {page==='goals' && <GoalsTab projects={projects} setProjects={setProjects} pagesData={pagesData} setPagesData={setPagesData}
         countdowns={countdowns} setCountdowns={setCountdowns}
-        selectedId={selectedGoalId} setSelectedId={setSelectedGoalId}
+        selectedId={selectedProjectId} setSelectedId={setSelectedProjectId}
         habitGoals={habitGoals} fitnessExercises={fitnessExercises} mctx={mctx}
         habitCompletions={habitCompletions} fitnessLog={fitnessLog}
-        targets={targets} setTargets={setTargets} targetLog={targetLog} setTargetLog={setTargetLog}
+        goals={goals} setGoals={setGoals} readingLog={readingLog} setReadingLog={setReadingLog}
         onOpenPage={(id)=>{ setSelectedPagesId(id); setPage('pages'); }} />}
       </div>
 
@@ -17645,9 +17672,9 @@ function fcCompare(cmp, metric, fitnessLog, fitnessExercises, weeks) {
 // ── Goal progress from milestone rules ──
 // Each open milestone with a usable rule becomes one item: a cumulative series (rules that run "since" the start) or
 // weekly values (rules that need the target within one week). Reads the same engine that auto-completes milestones.
-function fcGoalItems(goals, fctx, todayKey) {
+function fcGoalItems(projects, fctx, todayKey) {
   const out = [];
-  (goals || []).forEach(g => {
+  (projects || []).forEach(g => {
     if (g.status === 'done' || g.status === 'parked') return;
     (g.milestones || []).forEach(m => {
       if (!m.rule || m.done) return;
@@ -17834,7 +17861,7 @@ function FcPrRow({ pr, onOpenDay, todayKey }) {
     </button>
   );
 }
-function FitnessCharts({ fitnessLog, fitnessExercises, goals, habitGoals, habitCompletions, habitQty, fitnessCompare, setFitnessCompare, prIndex, onOpenDay }) {
+function FitnessCharts({ fitnessLog, fitnessExercises, projects, habitGoals, habitCompletions, habitQty, fitnessCompare, setFitnessCompare, prIndex, onOpenDay }) {
   const todayKey = fmtLocal(new Date());
   const exs = fitnessExercises || [];
   const [range, setRange] = useState(8);
@@ -17889,7 +17916,7 @@ function FitnessCharts({ fitnessLog, fitnessExercises, goals, habitGoals, habitC
   const M = mk ? FC_METRICS[mk] : null;
   // goals
   const fctx = { fitnessLog, fitnessExercises: exs, habitGoals, habitCompletions, habitQty };
-  const goalItems = React.useMemo(() => fcGoalItems(goals, fctx, todayKey), [goals, fitnessLog, exs, habitGoals, habitCompletions, habitQty, todayKey]);
+  const goalItems = React.useMemo(() => fcGoalItems(projects, fctx, todayKey), [projects, fitnessLog, exs, habitGoals, habitCompletions, habitQty, todayKey]);
   // compare
   const cres = React.useMemo(() => fcCompare(cur, cur.metric, fitnessLog, exs, weeks), [cur, fitnessLog, exs, weeks]);
   const subs = ruleSubs(exs);
@@ -18075,7 +18102,7 @@ function fitDayDots(dayExs, library, order) {
   return Array.from(map.values()).sort((a, b) => (o[a.key] ?? 99) - (o[b.key] ?? 99));
 }
 
-function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessExercises, fitnessGoals, setFitnessGoals, goals, habitGoals, habitCompletions, habitQty, fitnessCompare, setFitnessCompare, fitnessDotColors, setFitnessDotColors }) {
+function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessExercises, fitnessGoals, setFitnessGoals, projects, habitGoals, habitCompletions, habitQty, fitnessCompare, setFitnessCompare, fitnessDotColors, setFitnessDotColors }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [selectedDate, setSelectedDate] = useState(today);
   const [fitView, setFitView] = useState('week');
@@ -18891,7 +18918,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
         </div>
 
         {/* CHARTS (v5.19.0) */}
-        {fitView==='charts'&&<FitnessCharts fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} goals={goals} habitGoals={habitGoals} habitCompletions={habitCompletions} habitQty={habitQty} fitnessCompare={fitnessCompare} setFitnessCompare={setFitnessCompare} prIndex={prIndex} onOpenDay={dk=>{const d=parseLocal(dk);if(d){setSelectedDate(d);setFitView('day');}}}/>}
+        {fitView==='charts'&&<FitnessCharts fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} projects={projects} habitGoals={habitGoals} habitCompletions={habitCompletions} habitQty={habitQty} fitnessCompare={fitnessCompare} setFitnessCompare={setFitnessCompare} prIndex={prIndex} onOpenDay={dk=>{const d=parseLocal(dk);if(d){setSelectedDate(d);setFitView('day');}}}/>}
 
         {/* DAY VIEW */}
         {fitView==='day'&&(()=>{

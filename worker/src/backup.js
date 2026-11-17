@@ -35,7 +35,8 @@ const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const SPLITS = {
   weekData: 'map', fitnessLog: 'map', pagesData: 'list',
   habitCompletions: 'month', habitQty: 'month', habitNotes: 'month', habitMetrics: 'month',
-  goals: 'list',   // added with the Goals tab (app v4.2.0)
+  goals: 'list',    // the Projects, before app v5.96.0 (kept: those documents are the safety copy and live still uses them)
+  projects: 'list', // the Projects, from app v5.96.0
 };
 
 export function ptDate(d = new Date()) {

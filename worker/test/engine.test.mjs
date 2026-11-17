@@ -407,3 +407,87 @@ test('round trip: app data → D1 → nightly backup file → import on a fresh 
   const want = BIG(); delete want._savedAt;
   for (const k of Object.keys(want)) assert.deepEqual(f.state[k], want[k], k);
 });
+
+// ── v5.96.0: Projects moved from the `goals` collection to `projects` ──
+async function putRaw(env, dev, docs) {
+  const r = await worker.fetch(new Request('https://api.test/api/docs', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + dev.store.get('lpt_session'), Origin: 'https://zacharypals.github.io' },
+    body: JSON.stringify({ docs }),
+  }), env);
+  assert.equal(r.status, 200);
+  return r.json();
+}
+async function serverDocs(env, dev) {
+  const r = await worker.fetch(new Request('https://api.test/api/docs', {
+    headers: { Authorization: 'Bearer ' + dev.store.get('lpt_session'), Origin: 'https://zacharypals.github.io' },
+  }), env);
+  const out = {};
+  for (const d of (await r.json()).docs) (out[d.c] || (out[d.c] = {}))[d.i] = { v: d.v, d: d.d };
+  return out;
+}
+async function bootWithProjects(env, name) {
+  const d = device(env, name);
+  for (const [c, init] of Object.entries(COLLS)) d.register(c, structuredClone(init));
+  d.register('projects', []);
+  await d.signIn('zach@example.com');
+  await d.Sync.start('zach@example.com');
+  return d;
+}
+
+test('Projects: copied once from the old `goals` documents, which are left untouched', async () => {
+  const env = makeEnv();
+  const seed = await bootDevice(env, 'seed');           // a session only to get a token; writes the OLD documents directly
+  const pa = { id: 'a', title: 'Alpha', milestones: [{ id: 'm1', title: 'M', tasks: [{ id: 't1', title: 'T', done: true }] }] };
+  const pb = { id: 'b', title: 'Beta', milestones: [] };
+  await putRaw(env, seed, [
+    { c: 'goals', i: 'p:a', b: 0, j: JSON.stringify(pa) },
+    { c: 'goals', i: 'p:b', b: 0, j: JSON.stringify(pb) },
+    { c: 'goals', i: '__order', b: 0, j: JSON.stringify(['p:b', 'p:a']) },
+  ]);
+
+  const a = await bootWithProjects(env, 'tablet');
+  assert.deepEqual(a.state.projects, [pb, pa], 'projects arrive in the saved order');
+  await a.Sync.flush({ manual: true });
+  assert.equal(a.Sync.pendingCount(), 0);
+
+  const s1 = await serverDocs(env, seed);
+  assert.deepEqual(Object.keys(s1.projects).sort(), ['__order', 'p:a', 'p:b']);
+  assert.deepEqual(s1.projects['p:a'].d, pa, 'copied byte for byte');
+  assert.deepEqual(Object.keys(s1.goals).sort(), ['__order', 'p:a', 'p:b']);
+  assert.ok(Object.values(s1.goals).every((x) => x.v === 1), 'old documents were never rewritten');
+
+  // A second device does not copy again and sees the same projects
+  const b = await bootWithProjects(env, 'phone');
+  assert.deepEqual(b.state.projects, [pb, pa]);
+  assert.equal(b.Sync.pendingCount(), 0, 'nothing re-queued');
+
+  // Deleting every project must not bring the old ones back on the next start
+  a.edit('projects', () => []);
+  await a.Sync.flush({ manual: true });
+  const c = await bootWithProjects(env, 'laptop');
+  assert.deepEqual(c.state.projects, []);
+  const s2 = await serverDocs(env, seed);
+  assert.deepEqual(Object.keys(s2.goals).sort(), ['__order', 'p:a', 'p:b'], 'old documents still there as a safety copy');
+});
+
+test('Projects: a new account with no old documents starts empty and copies nothing', async () => {
+  const env = makeEnv();
+  const a = await bootWithProjects(env, 'laptop');
+  assert.deepEqual(a.state.projects, []);
+  assert.equal(a.Sync.pendingCount(), 0);
+});
+
+test('Projects: a backup made before v5.96.0 (Projects under `goals`) imports into `projects`', async () => {
+  const env = makeEnv();
+  const a = await bootWithProjects(env, 'laptop');
+  const pa = { id: 'a', title: 'Alpha', milestones: [] };
+  const r = await a.Sync.importAll({ goals: [pa], weekData: {}, habitGoals: [{ id: 'g1', name: 'Daily Pages' }] });
+  assert.deepEqual(r.mismatches, []);
+  assert.deepEqual(a.state.projects, [pa]);
+  // a backup that already has `projects` wins over a stray `goals`
+  const pb = { id: 'b', title: 'Beta', milestones: [] };
+  const r2 = await a.Sync.importAll({ projects: [pb], goals: [pa] });
+  assert.deepEqual(r2.mismatches, []);
+  assert.deepEqual(a.state.projects, [pb]);
+});
