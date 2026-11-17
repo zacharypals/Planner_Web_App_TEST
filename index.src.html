@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.97.0 -->
+<!-- LP Planner v5.98.0 -->
+<!-- v5.98.0 — Projects: auto-complete on the whole project, and Reading-log rules on milestones. (1) A milestone can read from the Reading log: "Reach page N" of the project's linked book (counts the whole book; the task rule is unchanged). (2) The project page has an Auto-complete card, offered by the same switches as milestones and tasks (Show auto-check options for training / habits / reading; a linked Weight for weight). A reading rule on a project means "complete when the linked book is finished" (pages read reach its total, or it is finished in the Reading log). Fitness, habit and weight rules work like a milestone's, over the project's own start date. Same Undo toast and pause-on-reopen. (3) A project linked to a book that exists is kept in step with it: Mark Project Done asks first ("will finish the book and log the remaining N pages"); once done, the project can only be reopened from the Reading log: when the book is no longer complete (pages removed, total raised, book reopened) the project reopens by itself. Unlinking the book allows a hand reopen. Nothing in the Reading log is deleted. Data: optional rule / ruleHold / metric / metricHold / autoDone on a project, no new synced key, no Worker change. -->
 <!-- v5.97.0 — Us: several photos per moment (up to 6). Pick more than one at a time when adding a moment; the timeline shows 1 photo large or 2–6 as a grid; tap one to open it and swipe or use ‹ › to move between that moment's photos. When editing your own moment you can add more photos or remove single ones. Moments store a `photos` list; older moments with one `photo` still show and are upgraded to the list the first time you add or remove a photo. No Worker change. -->
 <!-- v5.96.0 — Cleanup: the Goals tab's code names now match the screen. Projects are `projects` / ProjectsMain (were `goals` / GoalsMain), the Goals sub-tab is `goals` / GoalsView (was `targets` / TargetsView) and the Reading log is `readingLog`; the tab wrapper is GoalsTab. DATA: Projects are now stored in a new `projects` collection. On first load the old `goals` documents are copied across once (byte for byte); the old documents are left untouched as a safety copy and the live app still reads them. Old backups that hold the Projects under `goals` still import. Worker: backup.js now also lists `projects` (deploy needed). The sub-tab pref moved from `glSubTab` to `glSub` (a device opens on Projects once). The Goals sub-tab's data keys (`targets`, `targetLog`) are unchanged for now. -->
 <!-- v5.95.0 — Us: delete a check-in. A "Delete this check-in" link at the bottom of an open check-in (either of you can use it) asks for confirmation naming the date, then removes it for both of you. Check-ins you delete are gone from History and the Timeline; the nightly Drive backup of the shared space is the way back. No Worker change. -->
@@ -4385,6 +4386,9 @@ const GL_RULE_MEASURES = {
   'h-qty':      { label: 'Total of the Qty field',      unit: 'total', day: 'qty',      agg: 'sum',  src: 'habits' },
   // v5.61.0 — a task rule that reads the Reading log (rule.source === 'reading'); computed by glReadingTaskRule, not by ruleAgg
   'r-pages':    { label: 'Pages read',                  unit: 'pp',   day: null,        agg: 'sum',  src: 'reading' },
+  // v5.98.0 — milestone rule: the linked book has reached page N (the whole book counts); project rule: the linked book is finished
+  'r-reach':    { label: 'Reach page',                  unit: 'p.',   day: null,        agg: 'sum',  src: 'reading' },
+  'r-finish':   { label: 'Finish the book',             unit: 'pp',   day: null,        agg: 'sum',  src: 'reading' },
 };
 function ruleSource(rule) { return rule && rule.source === 'habits' ? 'habits' : rule && rule.source === 'reading' ? 'reading' : 'fitness'; }
 // A day of the fitness log as a flat list of exercise entries (handles the older workout-shaped days too)
@@ -4420,11 +4424,12 @@ function fgGoalName(exerciseId, library) {
   const m = (library || []).find(e => ruleSubKey(e.subcategory) === k);
   return (m ? String(m.subcategory).trim() : k) + ' (all)';
 }
-function glNewRule(source) {
+// v5.98.0 — `scope` picks the reading measure: task = pages to read (running total), ms = reach page N, project = finish the book
+function glNewRule(source, scope) {
   return source === 'habits'
     ? { source: 'habits', src: { habitIds: [] }, measure: 'h-days', target: '', window: 'since' }
     : source === 'reading'
-    ? { source: 'reading', src: {}, measure: 'r-pages', target: '', window: 'since' }
+    ? { source: 'reading', src: {}, measure: scope === 'project' ? 'r-finish' : scope === 'ms' ? 'r-reach' : 'r-pages', target: '', window: 'since' }
     : { source: 'fitness', src: { exerciseIds: [], subs: [] }, measure: 'dist-sum', target: '', window: 'since' };
 }
 // Habits a habit rule counts (ids that still exist). A day counts for 'Days completed' when ANY chosen habit is checked
@@ -4577,6 +4582,46 @@ function glReadingTaskRule(task, goal, fctx) {
   if (!pool.book) return { ...base, why: 'Link a book to this project' };
   return pool.byId[task.id] || { ...base, why: 'Set a target' };
 }
+// ── READING-LOG RULES FOR MILESTONES AND PROJECTS (v5.98.0) ──
+// These read the WHOLE linked book (every logged page, not just pages since the project started):
+//   milestone  'r-reach'  — met when the book has reached page N (pages read >= N, or the book is finished)
+//   project    'r-finish' — met when the book is complete (finished in the Reading log, or pages read >= its total)
+// A project linked to a book that exists is also kept in step with it: a project that was finished together with its book can
+// only be reopened from the Reading log (see the reopen effect in App and GlDetail).
+function glLinkedBook(goal, L) {
+  if (!goal || !goal.bookId || !Array.isArray(L)) return null;
+  return L.find(b => b && b.id === goal.bookId && b.kind === 'reading') || null;
+}
+function glBookState(book) {
+  const ups = ((book && book.updates) || []).filter(u => u && u.date && Number(u.pages) > 0)
+    .slice().sort((a, b) => a.date < b.date ? -1 : a.date > b.date ? 1 : 0);
+  const read = goalRead(book || {});
+  const total = Number(book && book.total) || 0;
+  const complete = !!(book && (book.finishedDate || (total > 0 && read >= total)));
+  const reachedOn = n => { let c = 0; for (const u of ups) { c += Number(u.pages); if (c >= n) return u.date; } return null; };
+  return { read, total, complete, reachedOn };
+}
+function glReadingMsRule(m, goal, fctx) {
+  const rule = m.rule;
+  const finish = rule.measure === 'r-finish';
+  const spec = GL_RULE_MEASURES[finish ? 'r-finish' : 'r-reach'];
+  const tgt = finish ? null : ruleTarget(rule);
+  const base = { spec, target: tgt, unit: spec.unit, value: 0, met: false, pct: 0, ready: false, metOn: null, reading: true, book: true, finish };
+  if (!finish && tgt === null) return { ...base, why: 'Set a page' };
+  const book = glLinkedBook(goal, fctx && fctx.readingLog);
+  if (!book) return { ...base, why: 'Link a book to this project' };
+  const s = glBookState(book);
+  const info = { read: s.read, total: s.total, title: book.title || '' };
+  if (finish) {
+    if (!s.complete && s.total <= 0) return { ...base, ...info, why: "Set the book's page total" };
+    const target = s.total || s.read;
+    return { ...base, ...info, ready: true, target, value: Math.min(s.read, target), met: s.complete, pct: s.complete ? 1 : Math.min(1, s.read / target),
+      metOn: s.complete ? (book.finishedDate || s.reachedOn(s.total) || null) : null, why: '' };
+  }
+  const met = s.read >= tgt || s.complete;
+  return { ...base, ...info, ready: true, value: Math.min(s.read, tgt), met, pct: Math.min(1, s.read / tgt),
+    metOn: met ? (s.reachedOn(tgt) || book.finishedDate || null) : null, why: '' };
+}
 // Where a task's rule stands (fitness / habits: its scheduled day only; reading: the project's running total). null when the task has no rule.
 // `goal` is the project the task belongs to; only reading rules need it.
 function glTaskRule(task, fctx, goal) {
@@ -4595,6 +4640,7 @@ function glTaskRule(task, fctx, goal) {
 function glMsRule(m, goal, fctx, todayKey) {
   const rule = m && m.rule;
   if (!rule) return null;
+  if (ruleSource(rule) === 'reading') return glReadingMsRule(m, goal, fctx);   // v5.98.0 (milestones and, since v5.98.0, the project itself)
   const b = ruleBase(rule, fctx);
   if (!b.match) return b;
   const from = m.startDate || (goal && goal.startDate) || todayKey;
@@ -4629,6 +4675,7 @@ function glAutoComplete(projects, mctx, asOf) {
   const out = (projects || []).map(g => {
     if (g.status === 'done' || g.status === 'parked') return g;
     let touched = false;
+    const gOrig = g;
     const ms = (g.milestones || []).map(m => {
       let mm = m;
       if ((m.tasks || []).some(t => t.rule && !t.done && !t.ruleHold)) {
@@ -4655,9 +4702,17 @@ function glAutoComplete(projects, mctx, asOf) {
       if (mm !== m) touched = true;
       return mm;
     });
-    if (!touched) return g;
+    let gg = touched ? { ...g, milestones: ms } : g;
+    // v5.98.0 — the project itself can complete from weight, training, habits or its linked book (same pause/undo rules as milestones)
+    const pWeight = !gg.metricHold && gg.metric && glMetricMet(gg, gg, mctx, asOf);
+    const pRule = (!gg.ruleHold && gg.rule) ? glMsRule(gg, gg, fctx, todayKey) : null;
+    if (pWeight || (pRule && pRule.met)) {
+      reached.push({ kind: 'project', gid: gg.id, title: gg.title, goal: gg.title });
+      gg = { ...gg, status: 'done', completedAt: (!pWeight && pRule && pRule.metOn) ? glNoon(pRule.metOn) : Date.now(), autoDone: true };
+    }
+    if (gg === gOrig) return g;
     changed = true;
-    return { ...g, milestones: ms };
+    return gg;
   });
   return { projects: changed ? out : projects, reached };
 }
@@ -12926,6 +12981,15 @@ function glDoneExtra(item, done) {
   if (!done && item && item.rule && item.autoDone) e.ruleHold = true;
   return e;
 }
+// v5.98.0 — marking a whole project done / reopening it by hand. Like milestones: reopening something a rule completed pauses that rule
+// (ruleHold / metricHold) so the rule cannot simply complete it again; editing the rule clears the pause.
+function glProjDone(g) { return { ...g, status: 'done', completedAt: Date.now(), autoDone: false }; }
+function glProjReopen(g) {
+  const e = { ...g, status: 'active', completedAt: null, autoDone: false };
+  if (g.autoDone && g.rule) e.ruleHold = true;
+  if (g.autoDone && g.metric) e.metricHold = true;
+  return e;
+}
 function glPatchTask(gs, gid, mid, tid, patch) {
   return glPatchProject(gs, gid, g => glPatchMs(g, mid, m => ({
     ...m, tasks: (m.tasks || []).map(t => t.id === tid ? { ...t, ...patch, ...(('done' in patch) ? glDoneExtra(t, patch.done) : {}) } : t),
@@ -13626,7 +13690,8 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
   const habs = (fctx && fctx.habitGoals) || [];
   const habIds = (src.habitIds || []);
   const toggleHab = id => onPatch({ src: { ...src, habitIds: habIds.includes(id) ? habIds.filter(x => x !== id) : [...habIds, id] } });
-  const setSource = source => { if (source !== ruleSource(rule)) onPatch({ ...glNewRule(source), target: rule.target, window: rule.window }); };
+  const setSource = source => { if (source !== ruleSource(rule)) onPatch({ ...glNewRule(source, scope), target: (source === 'reading' || ruleSource(rule) === 'reading') ? '' : rule.target, window: rule.window }); };
+  const msLike = scope === 'ms' || scope === 'project';   // v5.98.0 — a project's own rule works like a milestone's
   const spec = GL_RULE_MEASURES[rule.measure] || GL_RULE_MEASURES[isHab ? 'h-days' : 'dist-sum'];
   const match = ruleMatchSet(rule, exs);
   const matched = exs.filter(e => match.has(e.id));
@@ -13643,6 +13708,8 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
   else if (done && auto) note = `Completed automatically${status && status.metOn ? ' · ' + glShortDay(status.metOn) : ''}.`;
   else if (status) {
     if (!status.ready) note = status.why + '.';
+    else if (status.book && status.finish) note = `${status.title ? '“' + status.title + '” is at ' : 'The book is at '}${mRound(status.read)} of ${mRound(status.total)} pages.`;
+    else if (status.book) note = `Book is at page ${mRound(status.read)}. Checks off at page ${mRound(status.target)}${status.read < status.target ? ' (' + mRound(status.target - status.read) + ' to go)' : ''}. Counts the whole book.`;
     else if (status.reading) note = `Book total ${mRound(status.total)} pp${status.from ? ' since ' + glShort(status.from) : ''}. Checks off at ${mRound(status.target)} pp${status.need > 0 ? ' (' + mRound(status.need) + ' to go)' : ''}.${status.unscheduled ? ' Not scheduled, so it counts after all scheduled tasks.' : ''}`;
     else if (status.notStarted) note = `Starts counting ${glShort(status.from)}.`;
     else if (status.weekly) note = `This week ${mRound(status.value)} of ${mRound(status.target)} ${status.unit}. Best week so far ${mRound(status.best)}.`;
@@ -13650,16 +13717,26 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
   }
   return (
     <div className="gl-rule">
-      {(scope === 'ms' || scope === 'task') && (
+      {(msLike || scope === 'task') && (
         <div className="gl-rule-row">
           <span className="gl-rule-label" style={{ minWidth: 62 }}>Reads from</span>
           <button className={`gl-chip ${!isHab && !isRead ? 'on' : ''}`} aria-pressed={!isHab && !isRead} onClick={() => setSource('fitness')}>Fitness log</button>
-          {scope === 'ms'
-            ? <button className={`gl-chip ${isHab ? 'on' : ''}`} aria-pressed={isHab} onClick={() => setSource('habits')}>Habits</button>
-            : <button className={`gl-chip ${isRead ? 'on' : ''}`} aria-pressed={isRead} onClick={() => setSource('reading')}>Reading log</button>}
+          {msLike && <button className={`gl-chip ${isHab ? 'on' : ''}`} aria-pressed={isHab} onClick={() => setSource('habits')}>Habits</button>}
+          <button className={`gl-chip ${isRead ? 'on' : ''}`} aria-pressed={isRead} onClick={() => setSource('reading')}>Reading log</button>
         </div>
       )}
-      {isRead ? (
+      {isRead && rule.measure === 'r-finish' ? (
+      <div className="gl-rule-row">
+        <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>Marks this project done when the linked book is finished: pages read reach its total, or you finish it in the Reading log.</span>
+      </div>
+      ) : isRead && rule.measure === 'r-reach' ? (
+      <div className="gl-rule-row">
+        <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>Reach page</span>
+        <input type="number" min="1" step="1" inputMode="numeric" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, width: 70 }}
+          aria-label="Page to reach" placeholder="page" value={rule.target} onChange={e => onPatch({ target: e.target.value })} />
+        <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>of this project's linked book</span>
+      </div>
+      ) : isRead ? (
       <div className="gl-rule-row">
         <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>Read</span>
         <input type="number" min="1" step="1" inputMode="numeric" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, width: 70 }}
@@ -13702,10 +13779,10 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
         <input type="number" min="0" step="0.1" inputMode="decimal" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, width: 70 }}
           aria-label="Target" placeholder="target" value={rule.target} onChange={e => onPatch({ target: e.target.value })} />
         <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>{spec.unit}</span>
-        {scope === 'ms'
+        {msLike
           ? <select className="gl-input" style={{ padding: '4px 6px', fontSize: 12 }} aria-label="Time window" value={rule.window === 'week' ? 'week' : 'since'}
               onChange={e => onPatch({ window: e.target.value })}>
-              <option value="since">since this milestone started</option>
+              <option value="since">{scope === 'project' ? 'since this project started' : 'since this milestone started'}</option>
               <option value="week">in a single Sun–Sat week</option>
             </select>
           : <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>on this task's day</span>}
@@ -13713,7 +13790,7 @@ function GlRuleEditor({ rule, scope, status, held, done, auto, fctx, onPatch, on
       {note && <span style={{ fontSize: 11.5, color: 'var(--ink-light)' }}>{note}</span>}
       {warn && <span style={{ fontSize: 11.5, color: '#b03a2e' }}>{warn}</span>}
       <div className="gl-rule-row" style={{ justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>{isRead ? "Pages add up across this project's reading tasks, scheduled ones first by day, then unscheduled ones. Checking or unchecking by hand always wins." : isHab ? 'A day counts when any chosen habit is checked off. Checking or unchecking by hand always wins.' : 'Counts completed sets only. Checking or unchecking by hand always wins.'}</span>
+        <span style={{ fontSize: 11, color: 'var(--ink-faint)' }}>{isRead && msLike ? 'Counts every page logged for the linked book. Checking or unchecking by hand always wins.' : isRead ? "Pages add up across this project's reading tasks, scheduled ones first by day, then unscheduled ones. Checking or unchecking by hand always wins." : isHab ? 'A day counts when any chosen habit is checked off. Checking or unchecking by hand always wins.' : 'Counts completed sets only. Checking or unchecking by hand always wins.'}</span>
         <button className="gl-btn ghost" style={{ fontSize: 12 }} onClick={onRemove}>Remove auto-check</button>
       </div>
     </div>
@@ -13849,7 +13926,7 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
   const msRule = m.rule ? glMsRule(m, goal, fctx, today) : null;
   const msChip = glMsChip(m, msRule);   // v5.82.0 — header chip + ring
   const ringP = m.rule ? (m.done ? 100 : msRule && msRule.ready && !msRule.notStarted ? Math.round((msRule.pct || 0) * 100) : 0) : null;
-  const setMsRule = patch => onChange(mm => ({ ...mm, rule: { ...(mm.rule || glNewRule()), ...patch }, ruleHold: false }));
+  const setMsRule = patch => onChange(mm => ({ ...mm, rule: { ...(mm.rule || glNewRule('fitness', 'ms')), ...patch }, ruleHold: false }));
   // v5.14.0 — which auto-complete links this goal offers, and how to switch each on/off for just this milestone.
   // A milestone with neither link set is a plain manual one and shows no extra rows (only the chips on the add-task line).
   const wtOffered = !!((goal && (goal.linkedMetrics || []).includes('weight')) || m.metric);
@@ -14025,11 +14102,75 @@ function GlMilestoneEditor({ m, goal, mctx, color, open, onToggleOpen, onChange,
             {((wtOffered && !m.metric) || (trOffered && !m.rule)) && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginLeft: 'auto' }}>
                 {wtOffered && !m.metric && <button type="button" className="gl-sched" title="Complete this milestone automatically from my weight" onClick={enableWeight}>⚖ Auto from weight</button>}
-                {trOffered && !m.rule && <button type="button" className="gl-sched" title="Complete this milestone automatically from my training or habits"
-                  onClick={() => { setMsRuleOpen(true); onChange(mm => ({ ...mm, rule: glNewRule(), ruleHold: false })); }}>↻ Auto from training or habits</button>}
+                {trOffered && !m.rule && <button type="button" className="gl-sched" title="Complete this milestone automatically from my training, habits or reading"
+                  onClick={() => { setMsRuleOpen(true); onChange(mm => ({ ...mm, rule: glNewRule(goal.bookId ? 'reading' : 'fitness', 'ms'), ruleHold: false })); }}>↻ Auto from training, habits or reading</button>}
               </div>
             )}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// v5.98.0 — the project's own auto-complete (the same switches that offer auto-check on milestones and tasks:
+// "Show auto-check options" for training / habits / reading, and a linked Weight for weight). One rule at most, plus an optional weight condition.
+function glWeightMetricDefault(goal, mctx) {
+  const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
+  const cur = mctx ? smoothWeight(mctx.metrics, asOf, goal && goal.startDate) : { n: 0, avg: null };
+  const tgt = mctx ? mNum(mctx.weightTarget) : null;
+  const b = mctx && goal ? weightBaseline(mctx.metrics, goal.startDate, asOf) : null;
+  const ref = b ? b.value : cur.avg;
+  const op = ref !== null && tgt !== null && ref < tgt ? '>=' : '<=';
+  return { id: 'weight', op, value: tgt !== null ? String(tgt) : '' };
+}
+function GlProjectAuto({ goal, onChange, mctx }) {
+  const today = glToday();
+  const fctx = { fitnessLog: mctx && mctx.fitnessLog, fitnessExercises: mctx && mctx.fitnessExercises, habitGoals: mctx && mctx.habitGoals, habitCompletions: mctx && mctx.habitCompletions, habitQty: mctx && mctx.habitQty, readingLog: mctx && mctx.readingLog, todayKey: today };
+  const wtOffered = !!((goal.linkedMetrics || []).includes('weight') || goal.metric);
+  const trOffered = !!goal.showAuto || !!goal.rule;
+  if (!wtOffered && !trOffered) return null;
+  const st = goal.rule ? glMsRule(goal, goal, fctx, today) : null;
+  const done = goal.status === 'done';
+  const setRule = patch => onChange(g => ({ ...g, rule: { ...(g.rule || glNewRule('fitness', 'project')), ...patch }, ruleHold: false }));
+  const dropRule = g => { const { rule, ruleHold, ...rest } = g; if (!rest.metric) delete rest.autoDone; return rest; };
+  const dropWeight = g => { const { metric, metricHold, ...rest } = g; if (!rest.rule) delete rest.autoDone; return rest; };
+  const setMetric = patch => onChange(g => ({ ...g, metric: { ...g.metric, ...patch }, metricHold: false }));
+  const c = goal.metric;
+  const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
+  const cur = c && mctx ? smoothWeight(mctx.metrics, asOf, goal.startDate) : { n: 0, avg: null };
+  return (
+    <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <span className="gl-label">Auto-complete</span>
+      {!goal.rule && !c && <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>Mark this whole project done by itself when something you log reaches a goal.</span>}
+      {goal.rule && (
+        <GlRuleEditor rule={goal.rule} scope="project" status={st} held={!!goal.ruleHold} done={done} auto={!!goal.autoDone}
+          fctx={fctx} onPatch={setRule} onRemove={() => onChange(dropRule)} />
+      )}
+      {c && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+          <span style={{ fontSize: 13, color: 'var(--ink)', flexBasis: '100%' }}>⚖ Completes automatically from my weight</span>
+          <select className="gl-input" style={{ padding: '4px 6px', fontSize: 12 }} aria-label="Direction" value={c.op} onChange={e => setMetric({ op: e.target.value })}>
+            <option value="<=">drops to</option>
+            <option value=">=">rises to</option>
+          </select>
+          <input type="number" step="0.1" inputMode="decimal" className="gl-input" style={{ padding: '4px 6px', fontSize: 12, width: 78 }}
+            aria-label="Weight to reach" placeholder="weight" value={c.value} onChange={e => setMetric({ value: e.target.value })} />
+          <button type="button" className="gl-sched" style={{ marginLeft: 'auto' }} aria-label="Remove weight auto-complete" onClick={() => onChange(dropWeight)}>Remove</button>
+          <span style={{ fontSize: 11.5, color: 'var(--ink-light)', flexBasis: '100%' }}>
+            {goal.metricHold ? 'Auto-complete is paused because you reopened this. Change the number to turn it back on.'
+              : goal.autoDone && done ? 'Completed automatically.'
+              : cur.avg !== null ? `Now ${mRound(cur.avg)} (7-day average).`
+              : `Needs ${GL_MIN_READINGS} weigh-ins in 7 days since the project started${cur.n ? ` — has ${cur.n}` : ''}. One reading never counts.`}
+          </span>
+        </div>
+      )}
+      {((trOffered && !goal.rule) || (wtOffered && !c)) && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {trOffered && !goal.rule && <button type="button" className="gl-sched" title="Complete this project automatically from my training, habits or reading"
+            onClick={() => onChange(g => ({ ...g, rule: glNewRule(g.bookId ? 'reading' : 'fitness', 'project'), ruleHold: false }))}>↻ Auto from training, habits or reading</button>}
+          {wtOffered && !c && <button type="button" className="gl-sched" title="Complete this project automatically from my weight"
+            onClick={() => onChange(g => ({ ...g, metric: glWeightMetricDefault(g, mctx), metricHold: false }))}>⚖ Auto from weight</button>}
         </div>
       )}
     </div>
@@ -14116,11 +14257,29 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
     });
     setOpenMs(o => ({ ...o, [copy.id]: true }));
   }
+  // v5.98.0 — a project linked to a Reading-log book (that still exists) is kept in step with it. Marking it done finishes the book
+  // (asking first, because the pages still unread are logged), and once it is done it can only be reopened from the Reading log.
+  const linkedBook = glLinkedBook(goal, books);
+  const reopenLocked = goal.status === 'done' && !!linkedBook;
+  function confirmDone() {
+    if (!linkedBook) return true;
+    const bs = glBookState(linkedBook);
+    if (bs.complete) return true;
+    const rem = Math.max(0, bs.total - bs.read);
+    return window.confirm(rem > 0
+      ? `Marking this project done will finish "${linkedBook.title}" in your Reading log and log the remaining ${rem} page${rem === 1 ? '' : 's'} (dated today). Continue?`
+      : `Marking this project done will finish "${linkedBook.title}" in your Reading log. Continue?`);
+  }
+  const reopenNote = (
+    <div style={{ flex: 1, fontSize: 12, color: 'var(--ink-light)', lineHeight: 1.4 }}>
+      Finished together with “{linkedBook ? linkedBook.title : 'its book'}”. To reopen it, change the book in the Reading log (remove pages, raise the total or reopen the book) and the project reopens by itself, or unlink the book.
+    </div>);
   const projActions = cls => (   // v5.79.3 — same buttons rendered in two spots; CSS shows one
     <div className={'gl-pa ' + cls}>
       {goal.status !== 'done'
-        ? <button className="gl-btn primary" style={{ flex: 1, minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'done', completedAt: Date.now() }))}>Mark Project Done</button>
-        : <button className="gl-btn" style={{ flex: 1, minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'active', completedAt: null }))}>Reopen project</button>}
+        ? <button className="gl-btn primary" style={{ flex: 1, minHeight: 42 }} onClick={() => { if (confirmDone()) onChange(glProjDone); }}>Mark Project Done</button>
+        : reopenLocked ? reopenNote
+        : <button className="gl-btn" style={{ flex: 1, minHeight: 42 }} onClick={() => onChange(glProjReopen)}>Reopen project</button>}
       {goal.status === 'active' && <button className="gl-btn" style={{ minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'parked' }))}>Park</button>}
       {goal.status === 'parked' && <button className="gl-btn" style={{ minHeight: 42 }} onClick={() => onChange(g => ({ ...g, status: 'active' }))}>Unpark</button>}
     </div>);
@@ -14193,7 +14352,8 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
               </label>
             </div>
             <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: 'var(--ink-light)' }}>Status
-              <select className="gl-input" value={goal.status} onChange={e => { const v = e.target.value; onChange(g => ({ ...g, status: v, completedAt: v === 'done' ? (g.completedAt || Date.now()) : null })); }}>
+              <select className="gl-input" value={goal.status} disabled={reopenLocked} title={reopenLocked ? 'Finished together with its book. Change the book in the Reading log to reopen it.' : undefined}
+                onChange={e => { const v = e.target.value; if (v === goal.status) return; if (v === 'done') { if (confirmDone()) onChange(glProjDone); } else if (v === 'active') onChange(glProjReopen); else onChange(g => ({ ...g, status: v, completedAt: null })); }}>
                 <option value="active">Active</option><option value="parked">Parked</option><option value="done">Done</option>
               </select>
             </label>
@@ -14222,6 +14382,8 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
             <div style={{ fontSize: 13, color: h.key === 'ontrack' || h.key === 'done' ? '#22573c' : h.key === 'atrisk' ? '#7a4f00' : h.key === 'behind' ? '#b03a2e' : 'var(--ink-light)' }}>{healthText}</div>
           </div>
 
+          <GlProjectAuto goal={goal} onChange={onChange} mctx={mctx} />
+
           <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <span className="gl-label">Linked</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -14234,7 +14396,7 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
             </div>
             <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--ink-light)', cursor: 'pointer' }}>
               <input type="checkbox" checked={!!goal.showAuto} onChange={e => { const v = e.target.checked; onChange(g => ({ ...g, showAuto: v })); }} />
-              Show auto-check options on milestones and tasks (training, habits, reading)
+              Show auto-check options on the project, milestones and tasks (training, habits, reading)
             </label>
             {((books || []).length > 0 || goal.bookId) && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -14243,7 +14405,7 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
                   <option value="">No reading log book</option>
                   {(books || []).filter(b => !b.finishedDate || b.id === goal.bookId).map(b => <option key={b.id} value={b.id}>{b.title}</option>)}
                 </select>
-                {goal.bookId && <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>When this project is marked done, the book is marked finished in your reading log.</span>}
+                {goal.bookId && <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>When this project is marked done, the book is marked finished in your reading log. A finished project can then only be reopened from the Reading log. Reading rules on milestones and the project itself count this book's pages.</span>}
               </div>
             )}
             {/* v5.65.0 — link this project to a General goal on the Goals sub-tab (the link is stored on the goal) */}
@@ -15300,6 +15462,19 @@ function App() {
       return changed ? out : l;
     });
   }, [projects]);
+  // v5.98.0 — the other half of the link: a project that was finished together with its book (the flag above is set) reopens by
+  // itself when the book is no longer complete (pages removed, total raised, book reopened). The flag is what stops this from
+  // firing in the moment between "project marked done" and "book finished". Nothing in the Reading log is deleted by this.
+  useEffect(() => {
+    const L = Array.isArray(readingLog) ? readingLog : [];
+    const back = (projects || []).filter(g => {
+      if (g.status !== 'done' || !g.bookId) return false;
+      const b = glLinkedBook(g, L);
+      return !!b && !!(b.autoDone || {})[g.id] && !glBookState(b).complete;
+    }).map(g => g.id);
+    if (!back.length) return;
+    setProjects(gs => gs.map(g => back.includes(g.id) && g.status === 'done' ? { ...g, status: 'active', completedAt: null, autoDone: false } : g));
+  }, [projects, readingLog]);
   // Weight / calorie readings and their targets, bundled for the goal views (v4.8.0)
   // v5.11.0: the fitness log and exercise library ride along so goal rules can read them
   const mctx = { metrics: habitMetrics, weightTarget, calsTarget, fitnessLog, fitnessExercises, habitGoals, habitCompletions, habitQty, readingLog };
@@ -15313,8 +15488,10 @@ function App() {
       const r = glAutoComplete(projects, ctx, asOf);
       if (r.projects === projects) return;
       setProjects(gs => glAutoComplete(gs, ctx, asOf).projects);
-      r.reached.forEach(x => Undo.push(`Reached: ${x.title || (x.kind === 'task' ? 'task' : 'milestone')}`, () => x.kind === 'task'
+      r.reached.forEach(x => Undo.push(`Reached: ${x.title || (x.kind === 'task' ? 'task' : x.kind === 'project' ? 'project' : 'milestone')}`, () => x.kind === 'task'
         ? setProjects(gs => glPatchTask(gs, x.gid, x.mid, x.tid, { done: false }))
+        : x.kind === 'project'
+        ? setProjects(gs => glPatchProject(gs, x.gid, g => ({ ...g, status: 'active', completedAt: null, autoDone: false, metricHold: true, ruleHold: true })))
         : setProjects(gs => glPatchProject(gs, x.gid, g =>
             glPatchMs(g, x.mid, m => ({ ...m, done: false, completedAt: null, autoDone: false, metricHold: true, ruleHold: true }))))));
     }, 2500);
@@ -15805,7 +15982,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.97.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.98.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
