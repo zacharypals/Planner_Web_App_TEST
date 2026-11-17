@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.96.0 -->
+<!-- LP Planner v5.97.0 -->
+<!-- v5.97.0 — Us: several photos per moment (up to 6). Pick more than one at a time when adding a moment; the timeline shows 1 photo large or 2–6 as a grid; tap one to open it and swipe or use ‹ › to move between that moment's photos. When editing your own moment you can add more photos or remove single ones. Moments store a `photos` list; older moments with one `photo` still show and are upgraded to the list the first time you add or remove a photo. No Worker change. -->
 <!-- v5.96.0 — Cleanup: the Goals tab's code names now match the screen. Projects are `projects` / ProjectsMain (were `goals` / GoalsMain), the Goals sub-tab is `goals` / GoalsView (was `targets` / TargetsView) and the Reading log is `readingLog`; the tab wrapper is GoalsTab. DATA: Projects are now stored in a new `projects` collection. On first load the old `goals` documents are copied across once (byte for byte); the old documents are left untouched as a safety copy and the live app still reads them. Old backups that hold the Projects under `goals` still import. Worker: backup.js now also lists `projects` (deploy needed). The sub-tab pref moved from `glSubTab` to `glSub` (a device opens on Projects once). The Goals sub-tab's data keys (`targets`, `targetLog`) are unchanged for now. -->
 <!-- v5.95.0 — Us: delete a check-in. A "Delete this check-in" link at the bottom of an open check-in (either of you can use it) asks for confirmation naming the date, then removes it for both of you. Check-ins you delete are gone from History and the Timeline; the nightly Drive backup of the shared space is the way back. No Worker change. -->
 <!-- v5.94.4 — Weekly: the day "Notes" toggle is now a full-width pill (icon, label, rotating chevron) that fills with the accent color when the day has a note, with a one-line preview when collapsed; the note box has a themed fill and border so it shows in dark mode. -->
@@ -1746,6 +1747,16 @@
   .us-photo.full { max-height: 78vh; max-width: 100%; cursor: default; }
   .us-photo-ph { min-height: 84px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--cream); color: var(--ink-faint); font-size: 13px; }
   .us-photo-rm { align-self: flex-start; }
+  .us-photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .us-photos.one { grid-template-columns: minmax(0, 220px); }
+  .us-photos.two { grid-template-columns: repeat(2, 1fr); }
+  .us-tile { position: relative; aspect-ratio: 1; min-width: 0; border-radius: 12px; overflow: hidden; background: var(--cream); }
+  .us-tile .us-photo, .us-tile .us-photo-ph { width: 100%; height: 100%; max-height: none; object-fit: cover; border-radius: 0; min-height: 0; }
+  .us-tile-x { position: absolute; top: 4px; right: 4px; width: 32px; height: 32px; border-radius: 50%; border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 14px; cursor: pointer; }
+  .us-previews { display: flex; flex-wrap: wrap; gap: 8px; }
+  .us-previews .us-preview img { width: 96px; height: 96px; object-fit: cover; max-height: none; }
+  .us-lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(255,255,255,.18); color: #fff; font-size: 26px; cursor: pointer; }
+  .us-lb-nav.prev { left: 10px; } .us-lb-nav.next { right: 10px; }
   .us-preview { position: relative; align-self: flex-start; }
   .us-preview img { display: block; max-width: 100%; max-height: 180px; border-radius: 12px; }
   .us-preview-x { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border-radius: 50%; border: 0; background: rgba(0,0,0,.6); color: #fff; font-size: 14px; cursor: pointer; }
@@ -15794,7 +15805,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.96.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.97.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -16198,6 +16209,18 @@ async function usShrinkPhoto(file) {
   if (bmp.close) bmp.close();
   return { full, thumb };
 }
+const US_MAX_PHOTOS = 6;   // v5.97.0 photos per moment
+// A moment's photo ids: `photos` (v5.97.0+) or the single `photo` older moments carry.
+function usMomentPhotos(m) {
+  if (Array.isArray(m && m.photos)) return m.photos.filter(Boolean);
+  return m && m.photo ? [m.photo] : [];
+}
+async function usUploadPhoto(p) {
+  const pid = 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  await usPhotoApi(pid, { method: 'PUT', variant: 'thumb', blob: p.thumb });
+  await usPhotoApi(pid, { method: 'PUT', variant: 'full', blob: p.full });
+  return pid;
+}
 function UsPhoto({ id, variant = 'thumb', onClick }) {
   const [url, setUrl] = useState(null);
   const [err, setErr] = useState(false);
@@ -16245,7 +16268,7 @@ function UsView({ sh, me, myName, onBack }) {
   const [openId, setOpenId] = useState(null);
   const [mDate, setMDate] = useState(todayKey);   // v5.93.0 timeline: new moment
   const [mNote, setMNote] = useState('');
-  const [mPhoto, setMPhoto] = useState(null);   // v5.94.0 { full, thumb, preview }
+  const [mPhotos, setMPhotos] = useState([]);   // v5.97.0 [{ full, thumb, preview }] (up to US_MAX_PHOTOS)
   const [mBusy, setMBusy] = useState(false);
   const [mErr, setMErr] = useState('');
   const [lightbox, setLightbox] = useState(null);
@@ -16310,41 +16333,76 @@ function UsView({ sh, me, myName, onBack }) {
     </>
   );
 
-  async function pickPhoto(file) {
-    if (!file) return;
+  // Shrink the picked files on the device. `room` = how many more photos fit.
+  async function shrinkPicked(files, room) {
+    const list = Array.from(files || []);
+    const out = [];
+    let skipped = list.length > room;
+    for (const f of list.slice(0, Math.max(0, room))) {
+      try { out.push(await usShrinkPhoto(f)); }
+      catch (e) { setMErr((e && e.message) || "Couldn't read that photo"); }
+    }
+    if (skipped) setMErr('Up to ' + US_MAX_PHOTOS + ' photos per moment — add the rest as another moment.');
+    return out;
+  }
+  async function pickPhotos(files) {
+    if (!files || !files.length) return;
     setMErr(''); setMBusy(true);
-    try {
-      const p = await usShrinkPhoto(file);
-      if (mPhoto && mPhoto.preview) URL.revokeObjectURL(mPhoto.preview);
-      setMPhoto({ ...p, preview: URL.createObjectURL(p.thumb) });
-    } catch (e) { setMErr((e && e.message) || "Couldn't read that photo"); }
+    const got = await shrinkPicked(files, US_MAX_PHOTOS - mPhotos.length);
+    setMPhotos(cur => [...cur, ...got.map(p => ({ ...p, preview: URL.createObjectURL(p.thumb) }))].slice(0, US_MAX_PHOTOS));
     setMBusy(false);
+  }
+  function dropNewPhoto(i) {
+    setMPhotos(cur => { if (cur[i] && cur[i].preview) URL.revokeObjectURL(cur[i].preview); return cur.filter((_, k) => k !== i); });
   }
   async function addMoment() {
     const note = mNote.trim();
-    if ((!note && !mPhoto) || mBusy) return;
+    if ((!note && !mPhotos.length) || mBusy) return;
     const id = 'm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     const doc = { id, date: mDate || todayKey, note, by: me, createdAt: Date.now() };
-    if (mPhoto) {
-      // Upload first, so your partner never sees a moment whose photo is missing.
-      const pid = 'p_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    if (mPhotos.length) {
+      // Upload first, so your partner never sees a moment whose photos are missing.
       setMErr(''); setMBusy(true);
+      const done = [];
       try {
-        await usPhotoApi(pid, { method: 'PUT', variant: 'thumb', blob: mPhoto.thumb });
-        await usPhotoApi(pid, { method: 'PUT', variant: 'full', blob: mPhoto.full });
-      } catch (e) { setMErr((e && e.message) || 'Photo upload failed'); setMBusy(false); return; }
-      doc.photo = pid;
-      if (mPhoto.preview) URL.revokeObjectURL(mPhoto.preview);
-      setMPhoto(null);
+        for (const p of mPhotos) done.push(await usUploadPhoto(p));
+      } catch (e) {
+        done.forEach(pid => usPhotoApi(pid, { method: 'DELETE' }).catch(() => {}));
+        setMErr((e && e.message) || 'Photo upload failed'); setMBusy(false); return;
+      }
+      doc.photos = done;
+      mPhotos.forEach(p => p.preview && URL.revokeObjectURL(p.preview));
+      setMPhotos([]);
       setMBusy(false);
     }
     sh.set('relMoments', id, [], doc);
     setMNote('');
   }
+  // Editing your own moment: add more photos (up to the cap) or remove one.
+  async function addPhotosTo(m, files) {
+    if (!files || !files.length) return;
+    const have = usMomentPhotos(m);
+    setMErr(''); setMBusy(true);
+    const got = await shrinkPicked(files, US_MAX_PHOTOS - have.length);
+    const added = [];
+    try { for (const p of got) added.push(await usUploadPhoto(p)); }
+    catch (e) { setMErr((e && e.message) || 'Photo upload failed'); }
+    if (added.length) {
+      sh.set('relMoments', m.id, ['photos'], [...have, ...added]);
+      if (m.photo) sh.set('relMoments', m.id, ['photo'], undefined);
+    }
+    setMBusy(false);
+  }
+  function removePhotoFrom(m, pid) {
+    if (!window.confirm('Remove this photo?')) return;
+    usPhotoApi(pid, { method: 'DELETE' }).catch(() => {});
+    sh.set('relMoments', m.id, ['photos'], usMomentPhotos(m).filter(x => x !== pid));
+    if (m.photo) sh.set('relMoments', m.id, ['photo'], undefined);
+  }
   function removeMoment(m) {
     if (!window.confirm('Delete this moment?')) return;
     sh.remove('relMoments', m.id);
-    if (m.photo) usPhotoApi(m.photo, { method: 'DELETE' }).catch(() => {});
+    usMomentPhotos(m).forEach(pid => usPhotoApi(pid, { method: 'DELETE' }).catch(() => {}));
   }
   let body;
   if (tab === 'timeline') {
@@ -16360,18 +16418,24 @@ function UsView({ sh, me, myName, onBack }) {
           <div className="ci-hint">A memory, a win, something you want to remember. It shows up here for both of you.</div>
           <div><span className="ci-lbl">Date</span><input type="date" className="ci-input" value={mDate} onChange={ev => setMDate(ev.target.value)} /></div>
           <UsField value={mNote} placeholder="What happened?" onChange={setMNote} />
-          {mPhoto && (
-            <div className="us-preview">
-              <img src={mPhoto.preview} alt="Photo to add" />
-              <button type="button" className="us-preview-x" aria-label="Remove photo" onClick={() => { URL.revokeObjectURL(mPhoto.preview); setMPhoto(null); }}>✕</button>
+          {mPhotos.length > 0 && (
+            <div className="us-previews">
+              {mPhotos.map((p, i) => (
+                <div className="us-preview" key={p.preview}>
+                  <img src={p.preview} alt={'Photo ' + (i + 1) + ' to add'} />
+                  <button type="button" className="us-preview-x" aria-label="Remove photo" onClick={() => dropNewPhoto(i)}>✕</button>
+                </div>
+              ))}
             </div>
           )}
-          <label className={`ci-btn us-filebtn ${mBusy ? 'busy' : ''}`}>
-            {mPhoto ? 'Change photo' : '＋ Add a photo'}
-            <input type="file" accept="image/*" hidden disabled={mBusy} onChange={ev => { const f = ev.target.files && ev.target.files[0]; ev.target.value = ''; pickPhoto(f); }} />
-          </label>
+          {mPhotos.length < US_MAX_PHOTOS && (
+            <label className={`ci-btn us-filebtn ${mBusy ? 'busy' : ''}`}>
+              {mPhotos.length ? '＋ Add more photos (' + mPhotos.length + '/' + US_MAX_PHOTOS + ')' : '＋ Add photos'}
+              <input type="file" accept="image/*" multiple hidden disabled={mBusy} onChange={ev => { const f = Array.from(ev.target.files || []); ev.target.value = ''; pickPhotos(f); }} />
+            </label>
+          )}
           {mErr && <div className="ci-hint us-err">{mErr}</div>}
-          <button type="button" className="ci-primary" onClick={addMoment} disabled={!sh.ready || mBusy || (!mNote.trim() && !mPhoto)}>{mBusy ? 'Working…' : 'Add to timeline'}</button>
+          <button type="button" className="ci-primary" onClick={addMoment} disabled={!sh.ready || mBusy || (!mNote.trim() && !mPhotos.length)}>{mBusy ? 'Working…' : 'Add to timeline'}</button>
         </div>
         {items.length === 0 && <div className="ci-card"><div className="ci-hint">Nothing here yet. Moments and finished check-ins will line up here, newest first.</div></div>}
         {items.map(it => {
@@ -16400,8 +16464,29 @@ function UsView({ sh, me, myName, onBack }) {
                     <UsField value={m.note} placeholder="What happened?" onChange={t => sh.set('relMoments', m.id, ['note'], t)} />
                   </>
                 ) : (m.note ? <div className="us-moment-note">{m.note}</div> : null)}
-                {m.photo && <UsPhoto id={m.photo} variant="thumb" onClick={() => setLightbox({ id: m.photo, note: m.note, who: nameOf(m.by), date: ciDayLabel(m.date, true) })} />}
-                {editing && m.photo && <button type="button" className="ci-link us-photo-rm" onClick={() => { if (window.confirm('Remove this photo?')) { usPhotoApi(m.photo, { method: 'DELETE' }).catch(() => {}); sh.set('relMoments', m.id, ['photo'], undefined); } }}>Remove photo</button>}
+                {(() => {
+                  const ids = usMomentPhotos(m);
+                  const open = (i) => setLightbox({ ids, idx: i, note: m.note, who: nameOf(m.by), date: ciDayLabel(m.date, true) });
+                  if (ids.length === 1 && !editing) return <UsPhoto id={ids[0]} variant="thumb" onClick={() => open(0)} />;
+                  if (!ids.length) return null;
+                  return (
+                    <div className={`us-photos ${ids.length === 1 ? 'one' : ids.length === 2 || ids.length === 4 ? 'two' : ''}`}>
+                      {ids.map((pid, i) => (
+                        <div className="us-tile" key={pid}>
+                          <UsPhoto id={pid} variant="thumb" onClick={() => open(i)} />
+                          {editing && <button type="button" className="us-tile-x" aria-label="Remove photo" onClick={() => removePhotoFrom(m, pid)}>✕</button>}
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+                {editing && usMomentPhotos(m).length < US_MAX_PHOTOS && (
+                  <label className={`ci-btn us-filebtn ${mBusy ? 'busy' : ''}`}>
+                    ＋ Add photos ({usMomentPhotos(m).length}/{US_MAX_PHOTOS})
+                    <input type="file" accept="image/*" multiple hidden disabled={mBusy} onChange={ev => { const f = Array.from(ev.target.files || []); ev.target.value = ''; addPhotosTo(m, f); }} />
+                  </label>
+                )}
+                {editing && mErr && <div className="ci-hint us-err">{mErr}</div>}
                 {mine && (
                   <div className="us-moment-btns">
                     <button type="button" className="ci-link" onClick={() => setEditId(editing ? null : m.id)}>{editing ? 'Done' : 'Edit'}</button>
@@ -16509,13 +16594,22 @@ function UsView({ sh, me, myName, onBack }) {
         {header}
         {body}
       </div></div>
-      {lightbox && (
-        <div className="us-lightbox" role="dialog" aria-label="Photo" onClick={() => setLightbox(null)}>
-          <UsPhoto id={lightbox.id} variant="full" />
-          <div className="us-lightbox-cap"><b>{lightbox.who}</b> · {lightbox.date}{lightbox.note ? <div>{lightbox.note}</div> : null}</div>
-          <button type="button" className="ci-btn" onClick={() => setLightbox(null)}>Close</button>
-        </div>
-      )}
+      {lightbox && (() => {
+        const n = lightbox.ids.length, cur = lightbox.ids[lightbox.idx];
+        const go = (d) => setLightbox(l => ({ ...l, idx: (l.idx + d + n) % n }));
+        let tx = null;
+        return (
+          <div className="us-lightbox" role="dialog" aria-label="Photo" onClick={() => setLightbox(null)}
+            onTouchStart={ev => { tx = ev.touches[0].clientX; }}
+            onTouchEnd={ev => { if (tx == null || n < 2) return; const dx = ev.changedTouches[0].clientX - tx; tx = null; if (Math.abs(dx) > 50) { ev.stopPropagation(); go(dx < 0 ? 1 : -1); } }}>
+            <UsPhoto id={cur} variant="full" />
+            {n > 1 && <button type="button" className="us-lb-nav prev" aria-label="Previous photo" onClick={ev => { ev.stopPropagation(); go(-1); }}>‹</button>}
+            {n > 1 && <button type="button" className="us-lb-nav next" aria-label="Next photo" onClick={ev => { ev.stopPropagation(); go(1); }}>›</button>}
+            <div className="us-lightbox-cap"><b>{lightbox.who}</b> · {lightbox.date}{n > 1 ? ' · ' + (lightbox.idx + 1) + ' of ' + n : ''}{lightbox.note ? <div>{lightbox.note}</div> : null}</div>
+            <button type="button" className="ci-btn" onClick={() => setLightbox(null)}>Close</button>
+          </div>
+        );
+      })()}
     </div>
   );
 }
