@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.98.2 -->
+<!-- LP Planner v5.99.0 -->
+<!-- v5.99.0 — Projects, Phase 2: a project linked to a Reading-log book that has a page total is the book. Its percentage is pages read ÷ total (done = 100%), and the health pill (On track / At risk / Behind), the progress bars on the project page, the project list, the timeline and the Goals tile, and the Weekly review all follow it. Those places show "N of T pages" instead of tasks or milestones. Milestones stay as checkpoints and do not change the percentage. Projects with no book, or a book with no total, work exactly as before. No data change, no Worker change. -->
 <!-- v5.98.2 — Project page: the Auto-complete card's caret is now the same rounded caret button as on milestones, and the Linked and Habits & training cards collapse the same way (open/shut remembered per project and card on this device; a one-line summary shows while shut). -->
 <!-- v5.98.1 — Project page: the Auto-complete card now sits below the Linked card, and can be collapsed (tap its header; a one-line summary shows while shut; remembered per project on this device). -->
 <!-- v5.98.0 — Projects: auto-complete on the whole project, and Reading-log rules on milestones. (1) A milestone can read from the Reading log: "Reach page N" of the project's linked book (counts the whole book; the task rule is unchanged). (2) The project page has an Auto-complete card, offered by the same switches as milestones and tasks (Show auto-check options for training / habits / reading; a linked Weight for weight). A reading rule on a project means "complete when the linked book is finished" (pages read reach its total, or it is finished in the Reading log). Fitness, habit and weight rules work like a milestone's, over the project's own start date. Same Undo toast and pause-on-reopen. (3) A project linked to a book that exists is kept in step with it: Mark Project Done asks first ("will finish the book and log the remaining N pages"); once done, the project can only be reopened from the Reading log: when the book is no longer complete (pages removed, total raised, book reopened) the project reopens by itself. Unlinking the book allows a hand reopen. Nothing in the Reading log is deleted. Data: optional rule / ruleHold / metric / metricHold / autoDone on a project, no new synced key, no Worker change. -->
@@ -6855,7 +6856,7 @@ function WeekReview({ weekStart, wd, projects, setProjects, habitGoals, habitCom
           ))}
 
           {step === 3 && (activeGoals.length ? activeGoals.map(g => {
-            const h = glHealth(g, glToday());
+            const h = glHealth(g, glToday(), mctx && mctx.readingLog);
             const m = glNextMilestone(g);
             return (
               <div key={g.id} className="wr-goal">
@@ -12941,8 +12942,19 @@ function glInk(hex) { const [r, g, b] = glRgb(hex); return `color-mix(in srgb, r
 // v4.4.0: text drawn in a user-picked color (habit names, chips) — lightened in dark mode so it stays readable
 function hcText(c) { return c ? `color-mix(in srgb, ${c} var(--hc-pct), #fff)` : c; }
 function glMsProgress(m) { if (m.done) return 1; const t = m.tasks || []; return t.length ? t.filter(x => x.done).length / t.length : 0; }
-function glProgress(g) {
+// v5.99.0 — a project linked to a Reading-log book (that exists and has a page total) is the book: its progress is pages read ÷ total,
+// and its milestones are checkpoints that do not feed the percentage. `L` = the reading log (or just its books); callers that
+// cannot pass it get the old milestone-based percentage.
+function glBookPages(g, L) {
+  const b = glLinkedBook(g, L);
+  if (!b) return null;
+  const s = glBookState(b);
+  return s.total > 0 ? { read: s.read, total: s.total, complete: s.complete, book: b } : null;
+}
+function glProgress(g, L) {
   if (g.status === 'done') return 1;
+  const bp = glBookPages(g, L);
+  if (bp) return bp.complete ? 1 : Math.max(0, Math.min(1, bp.read / bp.total));
   const ms = g.milestones || [];
   return ms.length ? ms.reduce((s, m) => s + glMsProgress(m), 0) / ms.length : 0;
 }
@@ -12959,9 +12971,9 @@ function glNextMilestone(g) {
 }
 // Health = work done vs. time used. An overdue milestone caps a goal at "At risk";
 // a passed target date with work left is "Behind".
-function glHealth(g, today) {
+function glHealth(g, today, L) {
   today = today || glToday();
-  const p = glProgress(g);
+  const p = glProgress(g, L);
   const span = glDays(g.startDate, g.targetDate);
   const used = span > 0 ? Math.min(1, Math.max(0, glDays(g.startDate, today) / span)) : 0;
   const base = { p, used, daysLeft: g.targetDate ? glDays(today, g.targetDate) : null };
@@ -13373,7 +13385,7 @@ function glRange(zoom, offset) {
   return { start: s, end: new Date(s.getFullYear(), s.getMonth() + count * per, 1), cols };
 }
 
-function GlTimeline({ projects, onOpenProject, onChangeProject }) {
+function GlTimeline({ projects, readingLog, onOpenProject, onChangeProject }) {
   const today = glToday();
   const [zoom, setZoom] = useState(() => sessionStorage.getItem('lp_glZoom') || 'month');
   const [offset, setOffset] = useState(0);
@@ -13557,7 +13569,7 @@ function GlTimeline({ projects, onOpenProject, onChangeProject }) {
                   onClick={() => setOpened(c => ({ ...c, [r.g.id]: !c[r.g.id] }))}>{opened[r.g.id] ? '▾' : '▸'}</button>
                 <span className="gl-dot" style={{ background: r.g.color }} />
                 <span className="t" style={{ fontWeight: 600, cursor: 'pointer', fontSize: 14 }} onClick={() => onOpenProject(r.g.id)}>{r.g.title || 'Untitled goal'}</span>
-                <span className="gl-mono" style={{ fontSize: 11, color: 'var(--ink-light)' }}>{Math.round(glProgress(r.g) * 100)}%</span>
+                <span className="gl-mono" style={{ fontSize: 11, color: 'var(--ink-light)' }}>{Math.round(glProgress(r.g, readingLog) * 100)}%</span>
               </div>
             ) : (
               <div key={r.m.id} className="gl-tl-row ms gl-tl-lab" style={{ paddingLeft: 10 }}>
@@ -13608,7 +13620,7 @@ function GlTimeline({ projects, onOpenProject, onChangeProject }) {
                 const [gs, ge] = glShift(g.startDate, g.targetDate, d);
                 const s = pct(gs), e = pct(ge, true);
                 const bar = clip(s, e);
-                const fill = (s != null && e != null) ? clip(s, s + (e - s) * glProgress(g)) : null;
+                const fill = (s != null && e != null) ? clip(s, s + (e - s) * glProgress(g, readingLog)) : null;
                 const dia = e != null && e - 0.0001 <= 100 && e >= 0 ? e : null;
                 const grab = canDrag && g.startDate && g.targetDate;
                 return (
@@ -14213,8 +14225,9 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
   const [linksOpen, setLinksOpen] = useState(false);
   const [linkedShut, setLinkedShut] = useGlCardShut(goal.id, 'linked');     // v5.98.2 collapsible cards
   const [habitsShut, setHabitsShut] = useGlCardShut(goal.id, 'habits');
-  const h = glHealth(goal, today);
+  const h = glHealth(goal, today, books);
   const counts = glTaskCounts(goal);
+  const bookPg = glBookPages(goal, books);   // v5.99.0 — pages-based progress when a book with a total is linked
   const c = goal.color || '#7c3f6e';
   const ms = goal.milestones || [];
   const pages = (pagesData || []).filter(p => p && p.id);
@@ -14337,8 +14350,8 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
               onChange={e => onChange(g => ({ ...g, why: e.target.value }))} />
             <GlTagEditor tags={goal.tags} all={allTags} onChange={t => onChange(g => ({ ...g, tags: t }))} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
-              <div className="gl-bar" style={{ flex: 1, height: 8, background: glTint(c, 0.15) }}><div style={{ width: Math.round(glProgress(goal) * 100) + '%', background: c }} /></div>
-              <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)' }}>{Math.round(glProgress(goal) * 100)}% · {counts.done} of {counts.total} tasks</span>
+              <div className="gl-bar" style={{ flex: 1, height: 8, background: glTint(c, 0.15) }}><div style={{ width: Math.round(h.p * 100) + '%', background: c }} /></div>
+              <span className="gl-mono" style={{ fontSize: 12, color: 'var(--ink-light)' }}>{Math.round(h.p * 100)}% · {bookPg ? `${mRound(bookPg.read)} of ${mRound(bookPg.total)} pages` : `${counts.done} of ${counts.total} tasks`}</span>
             </div>
             {projActions('gl-pa-head')}
           </div>
@@ -14401,7 +14414,7 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
           <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <span className="gl-label">Health</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-              <span style={{ width: 72, color: 'var(--ink-light)' }}>Work done</span>
+              <span style={{ width: 72, color: 'var(--ink-light)' }}>{bookPg ? 'Pages read' : 'Work done'}</span>
               <div className="gl-bar" style={{ flex: 1, height: 8, background: glTint(c, 0.15) }}><div style={{ width: Math.round(h.p * 100) + '%', background: c }} /></div>
               <span className="gl-mono" style={{ fontSize: 12, width: 36, textAlign: 'right' }}>{Math.round(h.p * 100)}%</span>
             </div>
@@ -14410,6 +14423,7 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
               <div className="gl-bar" style={{ flex: 1, height: 8 }}><div style={{ width: Math.round(h.used * 100) + '%', background: 'var(--ink-light)' }} /></div>
               <span className="gl-mono" style={{ fontSize: 12, width: 36, textAlign: 'right' }}>{Math.round(h.used * 100)}%</span>
             </div>
+            {bookPg && <div style={{ fontSize: 11.5, color: 'var(--ink-light)' }}>Progress follows the pages read in “{bookPg.book.title}”. Milestones are checkpoints and don't change the percentage.</div>}
             <div style={{ fontSize: 13, color: h.key === 'ontrack' || h.key === 'done' ? '#22573c' : h.key === 'atrisk' ? '#7a4f00' : h.key === 'behind' ? '#b03a2e' : 'var(--ink-light)' }}>{healthText}</div>
           </div>
 
@@ -14944,11 +14958,11 @@ function GoalsView({ goals, setGoals, readingLog, setReadingLog, projects, onOpe
           <span className="gl-mono" style={lab}>{t.scope === 'year' ? '' : goalScopeLabel(t)}</span>
         </div>
         {tag && <div style={{ ...lab, marginTop: 2, fontWeight: 600, color: pr.status === 'done' ? 'var(--accent)' : 'var(--ink-light)' }}>{tag}</div>}
-        {pr.project && (() => { const pj = pr.project, pc = Math.round(glProgress(pj) * 100), tc = glTaskCounts(pj); return (
+        {pr.project && (() => { const pj = pr.project, pc = Math.round(glProgress(pj, readingLog) * 100), tc = glTaskCounts(pj), bpg = glBookPages(pj, readingLog); return (
           <div style={{ marginTop: 8 }}>
             <div style={{ ...lab, display: 'flex', justifyContent: 'space-between', gap: 8 }}><span>Project: <b style={{ color: 'var(--ink)' }}>{pj.title || 'Untitled project'}</b></span><b style={{ color: 'var(--ink)' }}>{pc}%</b></div>
             <div className="gl-bar" style={{ margin: '4px 0', background: glTint('#2d6b4a', 0.15) }}><div style={{ width: pc + '%', background: accent }} /></div>
-            <div style={lab}>{tc.total > 0 ? `${tc.done} of ${tc.total} tasks done` : 'No tasks yet'}{pj.status === 'parked' ? ' · project parked' : ''}{pj.status !== 'done' ? ' · done when the project is marked done' : ''}</div>
+            <div style={lab}>{bpg ? `${mRound(bpg.read)} of ${mRound(bpg.total)} pages read` : tc.total > 0 ? `${tc.done} of ${tc.total} tasks done` : 'No tasks yet'}{pj.status === 'parked' ? ' · project parked' : ''}{pj.status !== 'done' ? ' · done when the project is marked done' : ''}</div>
             {onOpenProject && <button className="gl-btn ghost" style={{ padding: '2px 0', fontSize: 12, marginTop: 2 }} onClick={() => onOpenProject(pj.id)}>Open project →</button>}
           </div>); })()}
         {t.kind === 'general' && t.projectId && !pr.project && <div style={{ ...lab, marginTop: 6 }}>Linked project not found — using the Done box.</div>}
@@ -15275,7 +15289,8 @@ function ProjectsMain({ goals, setGoals, readingLog, projects, setProjects, page
           </div>
         )}
         {shownList.map(g => {
-          const h = glHealth(g, today);
+          const h = glHealth(g, today, readingLog);
+          const bpg = glBookPages(g, readingLog);
           const m = glNextMilestone(g);
           const doneMs = (g.milestones || []).filter(x => x.done).length;
           const late = m && glMsOverdue(m, today);
@@ -15289,7 +15304,7 @@ function ProjectsMain({ goals, setGoals, readingLog, projects, setProjects, page
               </div>
               <div className="gl-bar" style={{ margin: '9px 0 6px', background: glTint(g.color, 0.15) }}><div style={{ width: Math.round(h.p * 100) + '%', background: g.color }} /></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--ink-light)' }}>
-                <span>{Math.round(h.p * 100)}% · {doneMs} of {(g.milestones || []).length} milestones</span>
+                <span>{Math.round(h.p * 100)}% · {bpg ? `${mRound(bpg.read)} of ${mRound(bpg.total)} pages` : `${doneMs} of ${(g.milestones || []).length} milestones`}</span>
                 <span className="gl-mono">{glShort(g.targetDate)}</span>
               </div>
               {glTags(g).length > 0 && (
@@ -15328,7 +15343,7 @@ function ProjectsMain({ goals, setGoals, readingLog, projects, setProjects, page
             onDelete={() => { setProjects(gs => gs.filter(g => g.id !== sel.id)); setSelectedId(null); }} />
         ) : (
           <>
-            <GlTimeline projects={list} onOpenProject={setSelectedId} onChangeProject={changeProject} />
+            <GlTimeline projects={list} readingLog={readingLog} onOpenProject={setSelectedId} onChangeProject={changeProject} />
 
             {weekItems.length > 0 && (
               <section className="gl-card gl-mobile-only" style={{ flexDirection: 'column', overflow: 'hidden' }}>
@@ -16014,7 +16029,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.98.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.99.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
