@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.94.3 -->
+<!-- LP Planner v5.94.4 -->
+<!-- v5.94.4 — Weekly: the day "Notes" toggle is now a full-width pill (icon, label, rotating chevron) that fills with the accent color when the day has a note, with a one-line preview when collapsed; the note box has a themed fill and border so it shows in dark mode. -->
 <!-- v5.94.3 — Us: date field is fixed-height, centered, and clipped to the card on iPhone. -->
 <!-- v5.94.2 — Us: date field keeps its normal height and text position (v5.94.1 flattened it on iPhone). -->
 <!-- v5.94.1 — Us: the date field in "Add a moment" (and when editing a moment) no longer spills past the card edge on phones. -->
@@ -512,23 +513,34 @@
     margin-top: 6px;
   }
   .add-task-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-light); }
-  .day-note-wrap {
-    margin-top: 10px; border-top: 1px solid rgba(0,0,0,0.05); padding-top: 8px;
+  .day-note-wrap { margin-top: 10px; }
+  .day-note-pill {
+    display: flex; align-items: center; gap: 6px; width: 100%; min-height: 30px;
+    padding: 5px 9px 5px 10px; border: 1px solid var(--border); border-radius: 999px;
+    background: var(--surface); color: var(--ink-light); cursor: pointer; user-select: none;
+    font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 500; text-align: left;
+    -webkit-tap-highlight-color: transparent; transition: background 0.15s, border-color 0.15s, color 0.15s;
   }
-  .day-note-label {
-    font-family: 'DM Mono', monospace; font-size: 9px; color: var(--ink-faint);
-    text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px;
-    cursor: pointer; user-select: none; display: flex; align-items: center; gap: 4px;
+  .day-note-pill:hover { border-color: var(--accent); color: var(--accent); }
+  .day-note-pill.has { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+  .day-note-pill svg { flex-shrink: 0; }
+  .day-note-pill .dn-sp { flex: 1; }
+  .day-note-pill .dn-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+  .day-note-pill .dn-chev { transition: transform 0.15s; }
+  .day-note-pill .dn-chev.open { transform: rotate(90deg); }
+  .day-note-preview {
+    font-size: 11px; color: var(--ink-light); margin: 5px 0 0 12px; cursor: pointer;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .day-note-label:hover { color: var(--ink-light); }
   .day-note-textarea {
-    width: 100%; border: none; border-radius: 6px; background: rgba(0,0,0,0.03);
-    padding: 5px 7px; font-size: 11.5px; font-family: 'DM Sans', sans-serif;
+    width: 100%; margin-top: 6px; border: 1px solid var(--border); border-radius: 8px; background: var(--cream);
+    padding: 6px 8px; font-size: 11.5px; font-family: 'DM Sans', sans-serif;
     color: var(--ink); resize: none; outline: none; line-height: 1.5;
-    transition: background 0.15s; min-height: 48px;
+    transition: border-color 0.15s; min-height: 48px;
   }
-  .day-note-textarea:focus { background: rgba(0,0,0,0.06); }
+  .day-note-textarea:focus { border-color: var(--accent); }
   .day-note-textarea::placeholder { color: var(--ink-faint); font-style: italic; }
+  @media (max-width: 767px) { .day-note-pill { min-height: 40px; font-size: 13px; padding: 8px 12px; } .day-note-preview { font-size: 12px; } }
 
   /* ── DAILY HABITS IN PLANNER ── */
   .habit-task-section {
@@ -8797,11 +8809,16 @@ function DayNote({ dayKey, note, onChange }) {
 
   return (
     <div className="day-note-wrap">
-      <div className="day-note-label" onClick={handleToggle}>
-        <span>{expanded ? '▾' : '▸'}</span>
+      <div className={'day-note-pill' + (note ? ' has' : '')} role="button" tabIndex={0} aria-expanded={expanded}
+        onClick={handleToggle}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleToggle(); } }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 4h14v16H5z"/><path d="M9 9h6M9 13h6M9 17h3"/></svg>
         <span>Notes</span>
-        {!expanded && note && <span style={{color:'var(--accent)',fontSize:8}}>●</span>}
+        {!expanded && note && <span className="dn-dot" />}
+        <span className="dn-sp" />
+        <svg className={'dn-chev' + (expanded ? ' open' : '')} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
       </div>
+      {!expanded && note && <div className="day-note-preview" onClick={handleToggle}>{note.split('\n').find(l => l.trim()) || ''}</div>}
       {expanded && (
         <textarea ref={taRef} className="day-note-textarea"
           placeholder="Notes for the day…"
@@ -15748,7 +15765,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.94.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.94.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
