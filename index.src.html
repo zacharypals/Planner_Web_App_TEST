@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.92.0 -->
+<!-- LP Planner v5.93.0 -->
+<!-- v5.93.0 — Us: Timeline tab. Add a moment (date + a few words) any time, separate from a check-in; the timeline shows moments and completed check-ins together, newest first, grouped by month. You can edit or delete only your own moments (enforced in the app). New shared collection relMoments; no Worker change. -->
 <!-- v5.92.0 — Us: shared relationship check-ins. A new "Us" button sits beside Weekly review in the Weekly sidebar (Weekly review is narrower to make room; gold while no check-in is complete this week). Each of you answers the same editable questions on your own device and sees the other's answers appear; a shared Together section holds notes and action items; History lists every check-in; any time you like you can start another. Needs Worker 0.3.0 (shared space, /api/shared/*). New shared collections relMeta / relCheckins, synced by a small separate client (Shared) — your private sync engine is untouched. -->
 <!-- v5.91.1 — Pages toolbar: desktop/iPad icons a touch bigger (20px icons, 34px buttons, 14px letters); phones unchanged. -->
 <!-- v5.91.0 — Pages toolbar redesign: outline icons (same style as Undo/Redo) for lists, checklist, sort, quote, align, link, clear, ¶ and code; buttons grouped in rounded pills with a solid accent fill for the active state; chevrons instead of ▾. Mobile collapse (⋯) behaviour unchanged. -->
@@ -1712,6 +1713,11 @@
   .us-foot-btns { display: flex; gap: 8px; }
   .us-close { align-self: center; }
   .us-err { color: var(--red); }
+  .us-tabs { flex-wrap: wrap; }
+  @media (max-width: 480px) { .ci-pills.us-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; } .ci-pills.us-tabs button { padding: 0 4px; font-size: 13px; white-space: nowrap; } }
+  .us-month { font-family: 'Playfair Display', serif; font-size: 17px; font-weight: 700; color: var(--ink); margin: 8px 2px 0; }
+  .us-moment-note { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 1.45; color: var(--ink); }
+  .us-moment-btns { display: flex; gap: 6px; }
   @media (max-width: 767px) {
     .wr-overlay { padding: 0; align-items: stretch; }
     .wr-box { width: 100%; max-height: 100%; border-radius: 0; }
@@ -15722,7 +15728,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.92.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.93.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -16108,6 +16114,11 @@ function UsView({ sh, me, myName, onBack }) {
   const cks = sh.list('relCheckins').map(x => x.d).filter(d => d && d.id).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const [tab, setTab] = useState('now');
   const [openId, setOpenId] = useState(null);
+  const [mDate, setMDate] = useState(todayKey);   // v5.93.0 timeline: new moment
+  const [mNote, setMNote] = useState('');
+  const [editId, setEditId] = useState(null);
+  const nameOf = (email) => (meta.members && meta.members[email] && meta.members[email].name) || 'Someone';
+  const moments = sh.list('relMoments').map(x => x.d).filter(d => d && d.id);
   const myNameStored = meta.members && meta.members[me] && meta.members[me].name;
 
   // Once the first load has finished: put your name in the shared list, and add the starting questions if there are none.
@@ -16151,8 +16162,8 @@ function UsView({ sh, me, myName, onBack }) {
         <button type="button" className="ci-btn" onClick={onBack} aria-label="Back to the week">‹ Week</button>
         <div className="ci-title"><h1>Us</h1><span>Check-ins, together</span></div>
       </div>
-      <div className="ci-pills" role="tablist" aria-label="Us sections">
-        {[['now', 'Check-in'], ['history', 'History'], ['questions', 'Questions']].map(([k, label]) =>
+      <div className="ci-pills us-tabs" role="tablist" aria-label="Us sections">
+        {[['now', 'Check-in'], ['timeline', 'Timeline'], ['history', 'History'], ['questions', 'Questions']].map(([k, label]) =>
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>)}
       </div>
       {!sh.ready && <div className="ci-card"><div className="ci-hint">{sh.error || 'Loading your shared space…'}</div></div>}
@@ -16160,8 +16171,68 @@ function UsView({ sh, me, myName, onBack }) {
     </>
   );
 
+  function addMoment() {
+    const note = mNote.trim(); if (!note) return;
+    const id = 'm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    sh.set('relMoments', id, [], { id, date: mDate || todayKey, note, by: me, createdAt: Date.now() });
+    setMNote('');
+  }
   let body;
-  if (tab === 'questions') {
+  if (tab === 'timeline') {
+    const items = [
+      ...moments.map(m => ({ kind: 'moment', key: m.id, date: m.date || '', at: m.createdAt || 0, m })),
+      ...cks.filter(c => usComplete(c, members)).map(c => ({ kind: 'checkin', key: c.id, date: c.date || '', at: c.createdAt || 0, c })),
+    ].sort((a, b) => a.date < b.date ? 1 : a.date > b.date ? -1 : b.at - a.at);
+    let lastMonth = '';
+    body = (
+      <>
+        <div className="ci-card">
+          <div className="ci-card-title">Add a moment</div>
+          <div className="ci-hint">A memory, a win, something you want to remember. It shows up here for both of you.</div>
+          <div><span className="ci-lbl">Date</span><input type="date" className="ci-input" value={mDate} onChange={ev => setMDate(ev.target.value)} /></div>
+          <UsField value={mNote} placeholder="What happened?" onChange={setMNote} />
+          <button type="button" className="ci-primary" onClick={addMoment} disabled={!sh.ready || !mNote.trim()}>Add to timeline</button>
+        </div>
+        {items.length === 0 && <div className="ci-card"><div className="ci-hint">Nothing here yet. Moments and finished check-ins will line up here, newest first.</div></div>}
+        {items.map(it => {
+          const d = parseLocal(it.date);
+          const month = d ? d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Undated';
+          const head = month !== lastMonth ? <div className="us-month">{month}</div> : null;
+          lastMonth = month;
+          if (it.kind === 'checkin') {
+            return (
+              <React.Fragment key={'c' + it.key}>{head}
+                <button type="button" className="ci-card us-hist" onClick={() => { setOpenId(it.c.id); setTab('now'); }}>
+                  <div className="us-hist-top"><b>{ciDayLabel(it.date, true)}</b><span className="ci-chip ok">Check-in</span></div>
+                  {preview(it.c) && <div className="us-hist-prev">{preview(it.c)}</div>}
+                </button>
+              </React.Fragment>
+            );
+          }
+          const m = it.m, mine = m.by === me, editing = editId === m.id && mine;
+          return (
+            <React.Fragment key={'m' + it.key}>{head}
+              <div className="ci-card us-moment">
+                <div className="us-hist-top"><b>{ciDayLabel(m.date, true)}</b><span className="ci-chip habit">{nameOf(m.by)}</span></div>
+                {editing ? (
+                  <>
+                    <input type="date" className="ci-input" value={m.date || ''} onChange={ev => ev.target.value && sh.set('relMoments', m.id, ['date'], ev.target.value)} />
+                    <UsField value={m.note} placeholder="What happened?" onChange={t => sh.set('relMoments', m.id, ['note'], t)} />
+                  </>
+                ) : <div className="us-moment-note">{m.note}</div>}
+                {mine && (
+                  <div className="us-moment-btns">
+                    <button type="button" className="ci-link" onClick={() => setEditId(editing ? null : m.id)}>{editing ? 'Done' : 'Edit'}</button>
+                    <button type="button" className="ci-link" onClick={() => { if (window.confirm('Delete this moment?')) sh.remove('relMoments', m.id); }}>Delete</button>
+                  </div>
+                )}
+              </div>
+            </React.Fragment>
+          );
+        })}
+      </>
+    );
+  } else if (tab === 'questions') {
     body = (
       <div className="ci-card">
         <div className="ci-card-title">Check-in questions</div>

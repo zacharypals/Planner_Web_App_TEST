@@ -131,3 +131,21 @@ test('offline edits wait in the outbox, survive a restart, then upload', async (
   f.Shared.start(); await settle(f);
   assert.equal(f.Shared.get('relCheckins', 'ck9').answers['zach@example.com'].r.q1, 'typed offline, longer');
 });
+
+test('timeline moments: one doc per moment, edits and deletes propagate', async () => {
+  const env = makeEnv();
+  const z = await device(env, 'zach@example.com');
+  const f = await device(env, 'fam@example.com');
+  z.Shared.start(); f.Shared.start(); await settle(z, f);
+  z.Shared.set('relMoments', 'm1', [], { id: 'm1', date: '2026-11-10', note: 'Hike at sunrise', by: 'zach@example.com', createdAt: 1 });
+  f.Shared.set('relMoments', 'm2', [], { id: 'm2', date: '2026-11-12', note: 'Dinner out', by: 'fam@example.com', createdAt: 2 });
+  await z.Shared.flush(); await f.Shared.flush(); await z.Shared.pull(); await f.Shared.pull();
+  for (const d of [z, f]) assert.deepEqual(d.Shared.list('relMoments').map((x) => x.id).sort(), ['m1', 'm2']);
+  z.Shared.set('relMoments', 'm1', ['note'], 'Hike at sunrise, then pancakes');
+  f.Shared.remove('relMoments', 'm2');
+  await z.Shared.flush(); await f.Shared.flush(); await z.Shared.pull(); await f.Shared.pull();
+  for (const d of [z, f]) {
+    assert.deepEqual(d.Shared.list('relMoments').map((x) => x.id), ['m1']);
+    assert.equal(d.Shared.get('relMoments', 'm1').note, 'Hike at sunrise, then pancakes');
+  }
+});
