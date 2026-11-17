@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.98.0 -->
+<!-- LP Planner v5.98.1 -->
+<!-- v5.98.1 — Project page: the Auto-complete card now sits below the Linked card, and can be collapsed (tap its header; a one-line summary shows while shut; remembered per project on this device). -->
 <!-- v5.98.0 — Projects: auto-complete on the whole project, and Reading-log rules on milestones. (1) A milestone can read from the Reading log: "Reach page N" of the project's linked book (counts the whole book; the task rule is unchanged). (2) The project page has an Auto-complete card, offered by the same switches as milestones and tasks (Show auto-check options for training / habits / reading; a linked Weight for weight). A reading rule on a project means "complete when the linked book is finished" (pages read reach its total, or it is finished in the Reading log). Fitness, habit and weight rules work like a milestone's, over the project's own start date. Same Undo toast and pause-on-reopen. (3) A project linked to a book that exists is kept in step with it: Mark Project Done asks first ("will finish the book and log the remaining N pages"); once done, the project can only be reopened from the Reading log: when the book is no longer complete (pages removed, total raised, book reopened) the project reopens by itself. Unlinking the book allows a hand reopen. Nothing in the Reading log is deleted. Data: optional rule / ruleHold / metric / metricHold / autoDone on a project, no new synced key, no Worker change. -->
 <!-- v5.97.0 — Us: several photos per moment (up to 6). Pick more than one at a time when adding a moment; the timeline shows 1 photo large or 2–6 as a grid; tap one to open it and swipe or use ‹ › to move between that moment's photos. When editing your own moment you can add more photos or remove single ones. Moments store a `photos` list; older moments with one `photo` still show and are upgraded to the list the first time you add or remove a photo. No Worker change. -->
 <!-- v5.96.0 — Cleanup: the Goals tab's code names now match the screen. Projects are `projects` / ProjectsMain (were `goals` / GoalsMain), the Goals sub-tab is `goals` / GoalsView (was `targets` / TargetsView) and the Reading log is `readingLog`; the tab wrapper is GoalsTab. DATA: Projects are now stored in a new `projects` collection. On first load the old `goals` documents are copied across once (byte for byte); the old documents are left untouched as a safety copy and the live app still reads them. Old backups that hold the Projects under `goals` still import. Worker: backup.js now also lists `projects` (deploy needed). The sub-tab pref moved from `glSubTab` to `glSub` (a device opens on Projects once). The Goals sub-tab's data keys (`targets`, `targetLog`) are unchanged for now. -->
@@ -14124,8 +14125,12 @@ function glWeightMetricDefault(goal, mctx) {
   const op = ref !== null && tgt !== null && ref < tgt ? '>=' : '<=';
   return { id: 'weight', op, value: tgt !== null ? String(tgt) : '' };
 }
+// v5.98.1 — open/closed state of the card is remembered per project on this device (local key `projAutoShut`; open unless shut)
+function glAutoShutMap() { try { return JSON.parse(lsGet('projAutoShut') || '{}') || {}; } catch { return {}; } }
 function GlProjectAuto({ goal, onChange, mctx }) {
   const today = glToday();
+  const [shut, setShutRaw] = useState(() => !!glAutoShutMap()[goal.id]);
+  const setShut = v => { setShutRaw(v); const mp = glAutoShutMap(); if (v) mp[goal.id] = true; else delete mp[goal.id]; lsSet('projAutoShut', JSON.stringify(mp)); };
   const fctx = { fitnessLog: mctx && mctx.fitnessLog, fitnessExercises: mctx && mctx.fitnessExercises, habitGoals: mctx && mctx.habitGoals, habitCompletions: mctx && mctx.habitCompletions, habitQty: mctx && mctx.habitQty, readingLog: mctx && mctx.readingLog, todayKey: today };
   const wtOffered = !!((goal.linkedMetrics || []).includes('weight') || goal.metric);
   const trOffered = !!goal.showAuto || !!goal.rule;
@@ -14139,15 +14144,25 @@ function GlProjectAuto({ goal, onChange, mctx }) {
   const c = goal.metric;
   const asOf = new Date(); asOf.setHours(0, 0, 0, 0);
   const cur = c && mctx ? smoothWeight(mctx.metrics, asOf, goal.startDate) : { n: 0, avg: null };
+  // one line shown while the card is shut
+  const bits = [];
+  if (goal.rule) bits.push(goal.ruleHold ? '↻ paused' : st && st.ready ? `↻ ${st.finish ? Math.round((st.pct || 0) * 100) + '%' : mRound(st.value) + '/' + mRound(st.target) + ' ' + st.unit}` : '↻ set up');
+  if (c) bits.push(goal.metricHold ? '⚖ paused' : '⚖ weight');
+  const summary = bits.length ? bits.join(' · ') + (done && goal.autoDone ? ' · done automatically' : '') : 'Not set up';
   return (
     <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <span className="gl-label">Auto-complete</span>
-      {!goal.rule && !c && <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>Mark this whole project done by itself when something you log reaches a goal.</span>}
-      {goal.rule && (
+      <button type="button" className="gl-btn ghost" aria-expanded={!shut} aria-label={shut ? 'Show auto-complete' : 'Hide auto-complete'}
+        onClick={() => setShut(!shut)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 0, minHeight: 28, width: '100%', textAlign: 'left', justifyContent: 'flex-start' }}>
+        <span className="gl-label" style={{ flex: 1 }}>Auto-complete</span>
+        {shut && <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>{summary}</span>}
+        <span aria-hidden="true" style={{ fontSize: 14, color: 'var(--ink-light)', width: 16, textAlign: 'center' }}>{shut ? '▸' : '▾'}</span>
+      </button>
+      {!shut && !goal.rule && !c && <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>Mark this whole project done by itself when something you log reaches a goal.</span>}
+      {!shut && goal.rule && (
         <GlRuleEditor rule={goal.rule} scope="project" status={st} held={!!goal.ruleHold} done={done} auto={!!goal.autoDone}
           fctx={fctx} onPatch={setRule} onRemove={() => onChange(dropRule)} />
       )}
-      {c && (
+      {!shut && c && (
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
           <span style={{ fontSize: 13, color: 'var(--ink)', flexBasis: '100%' }}>⚖ Completes automatically from my weight</span>
           <select className="gl-input" style={{ padding: '4px 6px', fontSize: 12 }} aria-label="Direction" value={c.op} onChange={e => setMetric({ op: e.target.value })}>
@@ -14165,7 +14180,7 @@ function GlProjectAuto({ goal, onChange, mctx }) {
           </span>
         </div>
       )}
-      {((trOffered && !goal.rule) || (wtOffered && !c)) && (
+      {!shut && ((trOffered && !goal.rule) || (wtOffered && !c)) && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {trOffered && !goal.rule && <button type="button" className="gl-sched" title="Complete this project automatically from my training, habits or reading"
             onClick={() => onChange(g => ({ ...g, rule: glNewRule(g.bookId ? 'reading' : 'fitness', 'project'), ruleHold: false }))}>↻ Auto from training, habits or reading</button>}
@@ -14382,8 +14397,6 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
             <div style={{ fontSize: 13, color: h.key === 'ontrack' || h.key === 'done' ? '#22573c' : h.key === 'atrisk' ? '#7a4f00' : h.key === 'behind' ? '#b03a2e' : 'var(--ink-light)' }}>{healthText}</div>
           </div>
 
-          <GlProjectAuto goal={goal} onChange={onChange} mctx={mctx} />
-
           <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <span className="gl-label">Linked</span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -14430,6 +14443,8 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
               Show target date in Countdowns
             </label>
           </div>
+
+          <GlProjectAuto goal={goal} onChange={onChange} mctx={mctx} />
 
           {/* v4.7.0 — habits and training this goal is built on */}
           <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -15982,7 +15997,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.98.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.98.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
