@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.88.0 -->
+<!-- LP Planner v5.88.1 -->
+<!-- v5.88.1 — Desktop / iPad top-bar "Check in" pill now matches the phone: filled gold with dark text while today is not checked in (white-filled while open, and the quiet outlined "✓ Checked in" once Done). -->
 <!-- v5.88.0 — Daily check-in: a "Mark not done" button appears next to Done once a day is checked in, so you can reopen it (the pills go back to "Check in"). Fixes entries saved before v5.87.0 that were already counted as done. -->
 <!-- v5.87.0 — Daily check-in: an entry is no longer "checked in" just because something was typed. The Weekly / top-bar / Habits pills only turn to "✓ Checked in" after you tap Done for that day, so you can log sleep in the morning and finish the rest tonight; Back (‹ Week) leaves it as an in-progress entry. Existing entries count as done. Stored as `done` on the day's entry (no new sync key). -->
 <!-- v5.86.4 — Hover-to-delete ✕ is bigger (26px, same square as the caret) and sits exactly over the caret (anchored to the top of the card, where the caret is, instead of the bottom corner). -->
@@ -3295,6 +3296,8 @@
   .nav-tabs .nav-pill { margin-left:14px; display:inline-flex; align-items:center; gap:7px; padding:0 16px; min-height:34px; border-radius:999px; border:1.5px solid rgba(255,255,255,0.55); background:transparent; color:#fff; font-family:'DM Sans',sans-serif; font-size:13px; font-weight:700; letter-spacing:0.01em; cursor:pointer; align-self:center; transition:background .15s, border-color .15s; }
   .nav-tabs .nav-pill:hover { background:rgba(255,255,255,0.16); }
   .nav-tabs .nav-pill .nav-pill-dot { width:16px; height:16px; border-radius:50%; border:1.5px solid currentColor; display:inline-flex; align-items:center; justify-content:center; font-size:10px; line-height:1; flex:none; }
+  .nav-tabs .nav-pill:not(.done):not(.active) { border-color:transparent; background:linear-gradient(135deg,#f6d067,#e3a92c); color:#3b2700; box-shadow:0 1px 4px rgba(176,122,12,.35); font-weight:600; }
+  .nav-tabs .nav-pill:not(.done):not(.active):hover { background:linear-gradient(135deg,#f9da7e,#eab33a); }
   .nav-tabs .nav-pill.done { border-color:rgba(255,255,255,0.28); font-weight:600; }
   .nav-tabs .nav-pill.done .nav-pill-dot { background:#fff; color:#3a2960; border-color:#fff; }
   .nav-tabs .nav-pill.active { background:#fff; border-color:#fff; color:#3a2960; }
@@ -15449,7 +15452,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.88.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.88.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
