@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.94.4 -->
+<!-- LP Planner v5.95.0 -->
+<!-- v5.95.0 — Us: delete a check-in. A "Delete this check-in" link at the bottom of an open check-in (either of you can use it) asks for confirmation naming the date, then removes it for both of you. Check-ins you delete are gone from History and the Timeline; the nightly Drive backup of the shared space is the way back. No Worker change. -->
 <!-- v5.94.4 — Weekly: the day "Notes" toggle is now a full-width pill (icon, label, rotating chevron) that fills with the accent color when the day has a note, with a one-line preview when collapsed; the note box has a themed fill and border so it shows in dark mode. -->
 <!-- v5.94.3 — Us: date field is fixed-height, centered, and clipped to the card on iPhone. -->
 <!-- v5.94.2 — Us: date field keeps its normal height and text position (v5.94.1 flattened it on iPhone). -->
@@ -1728,6 +1729,7 @@
   .us-qbtns .ci-nav { width: 38px; height: 44px; border-radius: 10px; font-size: 16px; }
   .us-foot-btns { display: flex; gap: 8px; }
   .us-close { align-self: center; }
+  .us-del { color: var(--red); margin-top: 8px; min-height: 44px; }
   .us-err { color: var(--red); }
   .us-tabs { flex-wrap: wrap; }
   @media (max-width: 480px) { .ci-pills.us-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; } .ci-pills.us-tabs button { padding: 0 4px; font-size: 13px; white-space: nowrap; } }
@@ -15765,7 +15767,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.94.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.95.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -16242,6 +16244,12 @@ function UsView({ sh, me, myName, onBack }) {
   }
   const setMine = (ck, sub, val) => { sh.set('relCheckins', ck.id, ['answers', me, ...sub], val); sh.set('relCheckins', ck.id, ['answers', me, 'savedAt'], Date.now()); };
   const setQs = (list) => sh.set('relMeta', '_', ['questions'], list);
+  function deleteCheckin(ck) {
+    const when = ciDayLabel(ck.date, true);
+    if (!window.confirm(`Delete the check-in from ${when}?\n\nThis removes it for both you and ${partnerName}: all answers, notes and action items. It can't be undone from the app.`)) return;
+    sh.remove('relCheckins', ck.id);
+    setOpenId(null); setTab('history');
+  }
 
   function statusOf(ck) {
     const a = ck.answers || {};
@@ -16464,6 +16472,7 @@ function UsView({ sh, me, myName, onBack }) {
         {!complete && mine.done && <button type="button" className="ci-link us-close" onClick={() => sh.set('relCheckins', ck.id, ['closed'], true)}>Close without waiting for {partnerName}</button>}
         {ck.closed && <button type="button" className="ci-link us-close" onClick={() => sh.set('relCheckins', ck.id, ['closed'], false)}>Reopen this check-in</button>}
         <button type="button" className="ci-link us-close" onClick={startCheckin}>Start another check-in</button>
+        <button type="button" className="ci-link us-close us-del" onClick={() => deleteCheckin(ck)}>Delete this check-in</button>
       </>
     );
   }
