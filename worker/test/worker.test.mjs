@@ -399,3 +399,53 @@ test('exchange accepts any listed redirect URI and rejects others (0.2.2)', asyn
   const bad = await call(env, 'POST', '/auth/exchange', { body: { code: 'code:zach@example.com', redirect_uri: 'https://evil.example/oauth.html' } });
   assert.equal(bad.status, 400);
 });
+
+test('shared household space (0.3.0): both members share rel* docs, privately-owned data stays private', async () => {
+  const env = makeEnv();
+  const z = (await signIn(env, 'zach@example.com')).session_token;
+  const f = (await signIn(env, 'fam@example.com')).session_token;
+
+  // Zach writes a shared check-in doc; Fam sees it.
+  let r = await call(env, 'PUT', '/api/shared/docs', { token: z, body: { docs: [
+    { c: 'relCheckins', i: '2026-11-15', b: 0, j: JSON.stringify({ answers: { z: { done: true } } }) },
+  ] } });
+  assert.equal(r.status, 200, JSON.stringify(r.data));
+  assert.equal(r.data.results[0].ok, 1);
+  r = await call(env, 'GET', '/api/shared/docs', { token: f });
+  assert.equal(r.status, 200);
+  assert.equal(r.data.docs.length, 1);
+  assert.deepEqual(r.data.docs[0].d, { answers: { z: { done: true } } });
+  const cursor = r.data.cursor;
+
+  // Fam adds her half (based on version 1); Zach's change feed shows it.
+  r = await call(env, 'PUT', '/api/shared/docs', { token: f, body: { docs: [
+    { c: 'relCheckins', i: '2026-11-15', b: 1, j: JSON.stringify({ answers: { z: { done: true }, c: { done: true } } }) },
+  ] } });
+  assert.equal(r.data.results[0].v, 2);
+  r = await call(env, 'GET', `/api/shared/changes?since=${cursor}`, { token: z });
+  assert.equal(r.data.docs.length, 1);
+  assert.equal(r.data.docs[0].v, 2);
+
+  // A stale save comes back as a conflict with the server copy (same rules as private docs).
+  r = await call(env, 'PUT', '/api/shared/docs', { token: z, body: { docs: [
+    { c: 'relCheckins', i: '2026-11-15', b: 1, j: '{"stale":1}' },
+  ] } });
+  assert.equal(r.data.results[0].conflict, 1);
+
+  // Only rel* collections may be written to the shared space.
+  r = await call(env, 'PUT', '/api/shared/docs', { token: z, body: { docs: [{ c: 'weekData', i: 'x', b: 0, j: '{}' }] } });
+  assert.equal(r.status, 400);
+
+  // Shared and private spaces are separate: private docs don't leak in, shared docs don't leak out.
+  await call(env, 'PUT', '/api/docs', { token: z, body: { docs: [{ c: 'navColor', i: '_', b: 0, j: '"#111"' }] } });
+  r = await call(env, 'GET', '/api/shared/docs', { token: f });
+  assert.deepEqual(r.data.docs.map((d) => d.c), ['relCheckins']);
+  r = await call(env, 'GET', '/api/docs', { token: f });
+  assert.deepEqual(r.data.docs, []);
+
+  // Not a member → refused (HOUSEHOLD_EMAILS narrows membership), and no session → 401.
+  env.HOUSEHOLD_EMAILS = 'zach@example.com';
+  assert.equal((await call(env, 'GET', '/api/shared/docs', { token: f })).status, 403);
+  assert.equal((await call(env, 'GET', '/api/shared/docs', { token: z })).status, 200);
+  assert.equal((await call(env, 'GET', '/api/shared/docs')).status, 401);
+});

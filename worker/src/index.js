@@ -7,8 +7,9 @@ import { json, allowedEmails } from './util.js';
 import { authExchange, authLogout, authenticate, googleToken, googleScope } from './auth.js';
 import { backupNow, runNightlyBackups } from './backup.js';
 import { listDocs, listChanges, putDocs } from './docs.js';
+import { sharedApi } from './shared.js';
 
-const WORKER_VERSION = '0.2.3';
+const WORKER_VERSION = '0.3.0';
 
 export default {
   async fetch(req, env) {
@@ -64,6 +65,7 @@ async function routeApi(req, env, url, user) {
   if (path === '/api/docs' && method === 'GET') return listDocs(env, user);
   if (path === '/api/docs' && method === 'PUT') return putDocs(env, user, await req.json().catch(() => null));
   if (path === '/api/changes' && method === 'GET') return listChanges(env, user, url.searchParams.get('since'));
+  if (path.startsWith('/api/shared/')) return sharedApi(req, env, url, user);
   return json({ error: 'not_found' }, 404);
 }
 
