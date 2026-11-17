@@ -34,6 +34,10 @@ function device(env, name) {
     function lsKey(k) { return APP_CONFIG.STORAGE_PREFIX + k; }
     function lsGet(k) { return localStorage.getItem(lsKey(k)); }
     function lsSet(k, v) { localStorage.setItem(lsKey(k), v); return true; }
+    function lsSetRoom(k, v) { return lsSet(k, v); }   // the real one (outside the engine block) only adds make-room-when-full
+    const _lsCacheOff = new Set(), _lsMirrored = new Set();
+    const Idb = { get: async () => ({ ok: false }), set: async () => ({ ok: false }), del: async () => ({ ok: false }), clear() {}, setLatest: () => Promise.resolve(false) };   // no IndexedDB in tests
+    function lsCacheWrite(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} }
     function lsDel(k) { localStorage.removeItem(lsKey(k)); }
     function getSession() { return lsGet('session'); }
     class ApiError extends Error { constructor(s,c,m){super(m||c);this.status=s;this.code=c;} get isAuth(){return this.status===401||(this.status===403&&this.code==='not_allowed');} }
@@ -60,9 +64,9 @@ function device(env, name) {
     name, store, net, lib, state, statuses, Sync: lib.Sync,
     register(coll, init) {
       state[coll] = init;
-      lib.Sync.register(coll, init, (v) => { state[coll] = typeof v === 'function' ? v(state[coll]) : v; });
+      lib.Sync.register(coll, init, (v) => { state[coll] = typeof v === 'function' ? v(state[coll]) : v; store.set('lpt_' + coll, JSON.stringify(state[coll])); });   // the app's useSynced keeps this instant-start copy
     },
-    edit(coll, fn) { state[coll] = fn(state[coll]); lib.Sync.capture(coll, state[coll]); },
+    edit(coll, fn) { state[coll] = fn(state[coll]); store.set('lpt_' + coll, JSON.stringify(state[coll])); lib.Sync.capture(coll, state[coll]); },
     async signIn(email) {
       const r = await worker.fetch(new Request('https://api.test/auth/exchange', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://zacharypals.github.io' },
@@ -294,7 +298,8 @@ test('signing in as someone else on the same device clears the previous data', a
   for (const [c, init] of Object.entries(COLLS)) f.register(c, structuredClone(init));
   await f.signIn('fam@example.com');
   await f.Sync.start('fam@example.com');
-  assert.equal(f.store.get('lpt_navColor'), undefined, 'previous cache wiped');
+  assert.notEqual(f.store.get('lpt_navColor'), JSON.stringify('#abcdef'), 'previous cache wiped');
+  assert.equal(f.state.navColor, '#5c2d52', 'previous person\'s colour not shown');
   assert.equal(f.Sync.pendingCount(), 0, "previous person's unsent edits are not uploaded to this account");
   assert.deepEqual(f.state.weekData, {});
 });
@@ -349,7 +354,7 @@ test('import replaces everything, removes leftovers, and verifies', async () => 
   assert.equal(a.state.navColor, '#5c2d52');
   assert.deepEqual(a.state.fitnessLog, want.fitnessLog);
   assert.equal(a.Sync.pendingCount(), 0);
-  assert.equal(a.store.get('lpt_sync_outbox'), '{}', 'outbox not bloated');
+  assert.deepEqual(JSON.parse(a.store.get('lpt_sync_outbox2')).o, {}, 'outbox not bloated');
 
   await b.Sync.pull();
   assert.deepEqual(b.state.weekData, want.weekData, 'other device drops the test-only week');

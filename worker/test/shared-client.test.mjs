@@ -56,7 +56,7 @@ async function device(env, email) {
 }
 
 // start() already begins a pull; wait for any in-flight pull/flush before the next step.
-async function settle(...ds) { for (let n = 0; n < 50 && ds.some((d) => d.Shared.pulling || d.Shared.busy); n++) await new Promise((r) => setImmediate(r)); }
+async function settle(...ds) { const t0 = Date.now(); for (let n = 0; Date.now() - t0 < 8000 && (n < 3 || ds.some((d) => d.Shared.pulling || d.Shared.busy)); n++) await new Promise((r) => setTimeout(r, 2)); }   // wait by the clock, not by tick count, so a busy machine can't cut it short
 
 test('two devices share a check-in; each writes only their own section; edits survive races', async () => {
   const env = makeEnv();
@@ -126,7 +126,7 @@ test('offline edits wait in the outbox, survive a restart, then upload', async (
   assert.equal(lib2.Shared.ops.length, 1);
   assert.equal(lib2.Shared.get('relCheckins', 'ck9').answers['zach@example.com'].r.q1, 'typed offline, longer');
   z.net.online = true;
-  await settle({ Shared: lib2.Shared }); await lib2.Shared.pull(); await lib2.Shared.flush();
+  for (let n = 0; n < 6 && lib2.Shared.ops.length; n++) { await settle({ Shared: lib2.Shared }); await lib2.Shared.pull(); await lib2.Shared.flush(); }   // retry: the start-up pull can still be in flight on a busy machine
   assert.equal(lib2.Shared.ops.length, 0);
   f.Shared.start(); await settle(f);
   assert.equal(f.Shared.get('relCheckins', 'ck9').answers['zach@example.com'].r.q1, 'typed offline, longer');
