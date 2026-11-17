@@ -9,7 +9,7 @@ import { backupNow, runNightlyBackups } from './backup.js';
 import { listDocs, listChanges, putDocs } from './docs.js';
 import { sharedApi } from './shared.js';
 
-const WORKER_VERSION = '0.3.1';
+const WORKER_VERSION = '0.4.0';
 
 export default {
   async fetch(req, env) {
@@ -75,7 +75,7 @@ function corsHeaders(req, env) {
   if (origin && origin === env.ALLOWED_ORIGIN) {
     h['Access-Control-Allow-Origin'] = origin;
     h['Access-Control-Allow-Headers'] = 'Authorization, Content-Type';
-    h['Access-Control-Allow-Methods'] = 'GET, POST, PUT, OPTIONS';
+    h['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS';
     h['Access-Control-Max-Age'] = '86400';
   }
   return h;
@@ -84,6 +84,6 @@ function corsHeaders(req, env) {
 function withHeaders(res, extra) {
   const r = new Response(res.body, res);
   for (const [k, v] of Object.entries(extra)) r.headers.set(k, v);
-  r.headers.set('Cache-Control', 'no-store');
+  if (!r.headers.has('Cache-Control')) r.headers.set('Cache-Control', 'no-store');   // photos set their own (immutable, private)
   return r;
 }

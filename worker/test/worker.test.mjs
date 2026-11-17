@@ -533,3 +533,70 @@ test('backup 0.3.1: non-members get no shared file; a failing shared upload is r
   assert.equal((await backupUser(env, userRow(env, 'zach@example.com'))).status, 'ok', 'recovers next run');
   assert.equal(sharedBackups('zach@example.com').length, 1);
 });
+
+function fakeR2() {
+  const m = new Map();
+  return {
+    m,
+    async put(k, v, o) { m.set(k, { bytes: new Uint8Array(v), type: o && o.httpMetadata && o.httpMetadata.contentType }); },
+    async get(k) { const x = m.get(k); return x ? { body: new Blob([x.bytes]).stream(), httpEtag: '"e"' } : null; },
+    async delete(keys) { for (const k of [].concat(keys)) m.delete(k); },
+  };
+}
+const jpeg = (n = 100) => { const b = new Uint8Array(n); b[0] = 0xff; b[1] = 0xd8; b[2] = 0xff; return b; };
+async function rawCall(env, method, path, token, body) {
+  const res = await worker.fetch(new Request('https://planner-api.test' + path, { method, headers: { Origin: ORIGIN, ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body }), env);
+  return res;
+}
+
+test('photos (0.4.0): members upload/read/delete JPEGs in R2; validation and access rules', async () => {
+  const env = makeEnv();
+  env.PHOTOS = fakeR2();
+  const z = (await signIn(env, 'zach@example.com')).session_token;
+  const f = (await signIn(env, 'fam@example.com')).session_token;
+
+  let r = await rawCall(env, 'PUT', '/api/shared/photos/p_abc123xyz?v=full', z, jpeg(5000));
+  assert.equal(r.status, 200);
+  r = await rawCall(env, 'PUT', '/api/shared/photos/p_abc123xyz?v=thumb', z, jpeg(800));
+  assert.equal(r.status, 200);
+  assert.deepEqual([...env.PHOTOS.m.keys()].sort(), ['household/p_abc123xyz-t.jpg', 'household/p_abc123xyz.jpg']);
+
+  // The other member can read both sizes; caching is allowed but private + immutable.
+  r = await rawCall(env, 'GET', '/api/shared/photos/p_abc123xyz?v=thumb', f);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('Content-Type'), 'image/jpeg');
+  assert.match(r.headers.get('Cache-Control'), /private.*immutable/);
+  assert.equal((await r.arrayBuffer()).byteLength, 800);
+  r = await rawCall(env, 'GET', '/api/shared/photos/p_abc123xyz', f);
+  assert.equal((await r.arrayBuffer()).byteLength, 5000);
+  assert.equal((await rawCall(env, 'GET', '/api/shared/photos/p_nothere1234', f)).status, 404);
+  // Other endpoints are still never cached.
+  assert.equal((await call(env, 'GET', '/health')).headers.get('Cache-Control'), 'no-store');
+
+  // Validation: id shape, JPEG only, size limits, empty body.
+  assert.equal((await rawCall(env, 'PUT', '/api/shared/photos/%2e%2e%2fx', z, jpeg())).status, 400);
+  assert.equal((await rawCall(env, 'PUT', '/api/shared/photos/NOPE', z, jpeg())).status, 400);
+  assert.equal((await rawCall(env, 'PUT', '/api/shared/photos/p_abc123xyz', z, new Uint8Array([1, 2, 3, 4]))).status, 400);
+  assert.equal((await rawCall(env, 'PUT', '/api/shared/photos/p_abc123xyz', z, new Uint8Array(0))).status, 400);
+  assert.equal((await rawCall(env, 'PUT', '/api/shared/photos/p_abc123xyz?v=thumb', z, jpeg(700_000))).status, 413);
+  assert.equal((await rawCall(env, 'PUT', '/api/shared/photos/p_abc123xyz?v=full', z, jpeg(3_100_000))).status, 413);
+
+  // Delete removes both sizes.
+  r = await rawCall(env, 'DELETE', '/api/shared/photos/p_abc123xyz', f);
+  assert.equal(r.status, 200);
+  assert.equal(env.PHOTOS.m.size, 0);
+
+  // Access: no session → 401; not a household member → 403; no bucket bound → 501.
+  assert.equal((await rawCall(env, 'GET', '/api/shared/photos/p_abc123xyz', null)).status, 401);
+  env.HOUSEHOLD_EMAILS = 'zach@example.com';
+  assert.equal((await rawCall(env, 'PUT', '/api/shared/photos/p_abc123xyz', f, jpeg())).status, 403);
+  delete env.PHOTOS;
+  assert.equal((await rawCall(env, 'PUT', '/api/shared/photos/p_abc123xyz', z, jpeg())).status, 501);
+});
+
+test('CORS allows DELETE for the app origin (photos)', async () => {
+  const env = makeEnv();
+  const res = await worker.fetch(new Request('https://planner-api.test/api/shared/photos/p_abc123xyz', { method: 'OPTIONS', headers: { Origin: ORIGIN } }), env);
+  assert.equal(res.status, 204);
+  assert.match(res.headers.get('Access-Control-Allow-Methods'), /DELETE/);
+});

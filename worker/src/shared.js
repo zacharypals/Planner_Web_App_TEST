@@ -9,12 +9,14 @@
 //   GET  /api/shared/changes?since=N      only shared documents changed after N
 //   PUT  /api/shared/docs                 batch save (same rules as /api/docs)
 //
+// Photos (R2) live under /api/shared/photos/* — see photos.js.
 // Who is a member: HOUSEHOLD_EMAILS (comma-separated), falling back to ALLOWED_EMAILS.
 // Only collections whose names start with "rel" may be written here, so a bug can never
 // spill ordinary planner collections into the shared space.
 
 import { json } from './util.js';
 import { listDocs, listChanges, putDocs } from './docs.js';
+import { photosApi } from './photos.js';
 
 export const HOUSEHOLD_ID = 'household:home';
 const HOUSEHOLD_EMAIL = 'household-home@shared.invalid';
@@ -38,6 +40,8 @@ export async function sharedApi(req, env, url, user) {
   const path = url.pathname;
   const method = req.method;
   const space = { id: HOUSEHOLD_ID };
+
+  if (path.startsWith('/api/shared/photos/')) return photosApi(req, env, url);
 
   if (path === '/api/shared/docs' && method === 'GET') {
     await ensureHousehold(env);

@@ -23,5 +23,10 @@ database_name = "planner-db"
 database_id = "40279ea1-b79c-4950-a671-857fefbebf36"
 migrations_dir = "migrations"
 
+# Photos for the shared "Us" timeline (Worker 0.4.0). Create the bucket first:  npx wrangler r2 bucket create lp-planner-photos
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "lp-planner-photos"
+
 [triggers]
 crons = ["0 10 * * *"]
