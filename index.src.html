@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.98.1 -->
+<!-- LP Planner v5.98.2 -->
+<!-- v5.98.2 — Project page: the Auto-complete card's caret is now the same rounded caret button as on milestones, and the Linked and Habits & training cards collapse the same way (open/shut remembered per project and card on this device; a one-line summary shows while shut). -->
 <!-- v5.98.1 — Project page: the Auto-complete card now sits below the Linked card, and can be collapsed (tap its header; a one-line summary shows while shut; remembered per project on this device). -->
 <!-- v5.98.0 — Projects: auto-complete on the whole project, and Reading-log rules on milestones. (1) A milestone can read from the Reading log: "Reach page N" of the project's linked book (counts the whole book; the task rule is unchanged). (2) The project page has an Auto-complete card, offered by the same switches as milestones and tasks (Show auto-check options for training / habits / reading; a linked Weight for weight). A reading rule on a project means "complete when the linked book is finished" (pages read reach its total, or it is finished in the Reading log). Fitness, habit and weight rules work like a milestone's, over the project's own start date. Same Undo toast and pause-on-reopen. (3) A project linked to a book that exists is kept in step with it: Mark Project Done asks first ("will finish the book and log the remaining N pages"); once done, the project can only be reopened from the Reading log: when the book is no longer complete (pages removed, total raised, book reopened) the project reopens by itself. Unlinking the book allows a hand reopen. Nothing in the Reading log is deleted. Data: optional rule / ruleHold / metric / metricHold / autoDone on a project, no new synced key, no Worker change. -->
 <!-- v5.97.0 — Us: several photos per moment (up to 6). Pick more than one at a time when adding a moment; the timeline shows 1 photo large or 2–6 as a grid; tap one to open it and swipe or use ‹ › to move between that moment's photos. When editing your own moment you can add more photos or remove single ones. Moments store a `photos` list; older moments with one `photo` still show and are upgraded to the list the first time you add or remove a photo. No Worker change. -->
@@ -14125,12 +14126,30 @@ function glWeightMetricDefault(goal, mctx) {
   const op = ref !== null && tgt !== null && ref < tgt ? '>=' : '<=';
   return { id: 'weight', op, value: tgt !== null ? String(tgt) : '' };
 }
-// v5.98.1 — open/closed state of the card is remembered per project on this device (local key `projAutoShut`; open unless shut)
-function glAutoShutMap() { try { return JSON.parse(lsGet('projAutoShut') || '{}') || {}; } catch { return {}; } }
+// v5.98.2 — collapsible cards on the project page (Linked, Auto-complete, Habits & training). Open/shut is remembered per project and
+// card on this device (local key `projCardShut`, open unless shut). The caret is the same button as on milestones (`gl-caret lg`).
+function glCardShutMap() { try { return JSON.parse(lsGet('projCardShut') || '{}') || {}; } catch { return {}; } }
+function useGlCardShut(goalId, card) {
+  const k = goalId + ':' + card;
+  const [shut, setRaw] = useState(() => !!glCardShutMap()[k]);
+  const setShut = v => { setRaw(v); const mp = glCardShutMap(); if (v) mp[k] = true; else delete mp[k]; lsSet('projCardShut', JSON.stringify(mp)); };
+  return [shut, setShut];
+}
+function GlCardHead({ title, shut, onToggle, summary, right }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 32 }}>
+      <button type="button" className={`gl-caret lg${shut ? '' : ' open'}`} aria-expanded={!shut} aria-label={(shut ? 'Show ' : 'Hide ') + title} onClick={onToggle}>
+        <span className="gl-caret-glyph">{shut ? '▸' : '▾'}</span>
+        <svg className="gl-caret-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+      <span className="gl-label" style={{ cursor: 'pointer', flexShrink: 0 }} onClick={onToggle}>{title}</span>
+      {shut && summary ? <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--ink-light)', textAlign: 'right', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: 'pointer' }} onClick={onToggle}>{summary}</span> : <span style={{ flex: 1 }} />}
+      {!shut && right}
+    </div>);
+}
 function GlProjectAuto({ goal, onChange, mctx }) {
   const today = glToday();
-  const [shut, setShutRaw] = useState(() => !!glAutoShutMap()[goal.id]);
-  const setShut = v => { setShutRaw(v); const mp = glAutoShutMap(); if (v) mp[goal.id] = true; else delete mp[goal.id]; lsSet('projAutoShut', JSON.stringify(mp)); };
+  const [shut, setShut] = useGlCardShut(goal.id, 'auto');
   const fctx = { fitnessLog: mctx && mctx.fitnessLog, fitnessExercises: mctx && mctx.fitnessExercises, habitGoals: mctx && mctx.habitGoals, habitCompletions: mctx && mctx.habitCompletions, habitQty: mctx && mctx.habitQty, readingLog: mctx && mctx.readingLog, todayKey: today };
   const wtOffered = !!((goal.linkedMetrics || []).includes('weight') || goal.metric);
   const trOffered = !!goal.showAuto || !!goal.rule;
@@ -14151,12 +14170,7 @@ function GlProjectAuto({ goal, onChange, mctx }) {
   const summary = bits.length ? bits.join(' · ') + (done && goal.autoDone ? ' · done automatically' : '') : 'Not set up';
   return (
     <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <button type="button" className="gl-btn ghost" aria-expanded={!shut} aria-label={shut ? 'Show auto-complete' : 'Hide auto-complete'}
-        onClick={() => setShut(!shut)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: 0, minHeight: 28, width: '100%', textAlign: 'left', justifyContent: 'flex-start' }}>
-        <span className="gl-label" style={{ flex: 1 }}>Auto-complete</span>
-        {shut && <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>{summary}</span>}
-        <span aria-hidden="true" style={{ fontSize: 14, color: 'var(--ink-light)', width: 16, textAlign: 'center' }}>{shut ? '▸' : '▾'}</span>
-      </button>
+      <GlCardHead title="Auto-complete" shut={shut} onToggle={() => setShut(!shut)} summary={summary} />
       {!shut && !goal.rule && !c && <span style={{ fontSize: 12, color: 'var(--ink-light)' }}>Mark this whole project done by itself when something you log reaches a goal.</span>}
       {!shut && goal.rule && (
         <GlRuleEditor rule={goal.rule} scope="project" status={st} held={!!goal.ruleHold} done={done} auto={!!goal.autoDone}
@@ -14197,6 +14211,8 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
   const linkWeekStart = getWeekStart(new Date());
   const [openMs, setOpenMs] = useState(() => { const n = glNextMilestone(goal); return n ? { [n.id]: true } : {}; });
   const [linksOpen, setLinksOpen] = useState(false);
+  const [linkedShut, setLinkedShut] = useGlCardShut(goal.id, 'linked');     // v5.98.2 collapsible cards
+  const [habitsShut, setHabitsShut] = useGlCardShut(goal.id, 'habits');
   const h = glHealth(goal, today);
   const counts = glTaskCounts(goal);
   const c = goal.color || '#7c3f6e';
@@ -14398,7 +14414,9 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
           </div>
 
           <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <span className="gl-label">Linked</span>
+            <GlCardHead title="Linked" shut={linkedShut} onToggle={() => setLinkedShut(!linkedShut)}
+              summary={[goal.notesPageId && pages.some(p => p.id === goal.notesPageId) ? '📄 Page' : '', linkedBook ? '📖 ' + (linkedBook.title || 'Book') : '', goal.showCountdown ? 'Countdown' : ''].filter(Boolean).join(' · ') || 'Nothing linked'} />
+            {!linkedShut && <>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <select className="gl-input" style={{ flex: 1 }} value={goal.notesPageId || ''} aria-label="Linked notes page"
                 onChange={e => { const v = e.target.value || null; onChange(g => ({ ...g, notesPageId: v })); }}>
@@ -14442,18 +14460,17 @@ function GlDetail({ goals, setGoals, allTags, books, goal, onChange, onDelete, o
                 onChange={e => { const v = e.target.checked; onChange(g => ({ ...g, showCountdown: v })); }} />
               Show target date in Countdowns
             </label>
+            </>}
           </div>
 
           <GlProjectAuto goal={goal} onChange={onChange} mctx={mctx} />
 
           {/* v4.7.0 — habits and training this goal is built on */}
           <div className="gl-card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-              <span className="gl-label">Habits &amp; training</span>
-              <button className="gl-btn ghost" style={{ fontSize: 12, padding: '2px 6px' }}
-                onClick={() => setLinksOpen(o => !o)}>{linksOpen ? 'Done' : 'Edit'}</button>
-            </div>
-            {linksOpen ? (
+            <GlCardHead title="Habits & training" shut={habitsShut} onToggle={() => setHabitsShut(!habitsShut)}
+              summary={glHasLinks(goal) ? `${(goal.linkedHabitIds || []).length + (goal.linkedExerciseIds || []).length + (goal.linkedMetrics || []).length} linked` : 'Nothing linked'}
+              right={<button className="gl-btn ghost" style={{ fontSize: 12, padding: '2px 6px' }} onClick={() => setLinksOpen(o => !o)}>{linksOpen ? 'Done' : 'Edit'}</button>} />
+            {habitsShut ? null : linksOpen ? (
               <GlLinkPicker goal={goal} onChange={onChange} habitGoals={habitGoals} fitnessExercises={fitnessExercises} />
             ) : (
               <>
@@ -15997,7 +16014,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.98.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.98.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
