@@ -20,7 +20,7 @@ export const HOUSEHOLD_ID = 'household:home';
 const HOUSEHOLD_EMAIL = 'household-home@shared.invalid';
 const SHARED_COLLECTION_RE = /^rel[A-Za-z0-9_]{0,37}$/;
 
-function memberEmails(env) {
+export function memberEmails(env) {
   const raw = env.HOUSEHOLD_EMAILS || env.ALLOWED_EMAILS || '';
   return String(raw).split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
 }

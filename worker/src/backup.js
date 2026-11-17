@@ -10,15 +10,21 @@
 // (the newest 5 are kept), so the overnight snapshot can't be replaced by the state you may want to
 // recover from. The old planner-data.json is never touched.
 //
+// The shared household space (relationship check-ins, timeline — Worker 0.3.0) is backed up too:
+// each member gets lp-shared-backup-DATE.json in the same folder, same retention. It is a separate
+// file because it isn't part of the planner-data.json shape the app's importer understands.
+//
 // The JSON is assembled by joining the stored text — document bodies are never parsed — which
 // keeps CPU time low enough for the free plan.
 
 import { json } from './util.js';
 import { getGoogleAccess } from './auth.js';
+import { HOUSEHOLD_ID, memberEmails } from './shared.js';
 
 const FOLDER_NAME = 'LP Planner Backups';
 const FILE_RE = /^lp-planner-backup-(\d{4}-\d{2}-\d{2})\.json$/;
 const MANUAL_RE = /^lp-planner-backup-(\d{4}-\d{2}-\d{2})-manual-(\d{4})\.json$/;
+const SHARED_RE = /^lp-shared-backup-(\d{4}-\d{2}-\d{2})\.json$/;
 const KEEP_MANUAL = 5;
 const KEEP_DAYS = 7;
 const KEEP_MONTHS = 12;
@@ -78,6 +84,19 @@ export function assembleBackup(rows, at = new Date()) {
   return '{' + parts.join(',') + '}';
 }
 
+// rows: shared-space documents [{ collection, doc_id, data }]. Shape:
+// { _backupAt, _source, collections: { relCheckins: { <docId>: <doc>, … }, relMeta: { "_": <doc> }, … } }
+export function assembleSharedBackup(rows, at = new Date()) {
+  const by = new Map();
+  for (const r of rows) {
+    if (!by.has(r.collection)) by.set(r.collection, []);
+    by.get(r.collection).push(r);
+  }
+  const q = (s) => JSON.stringify(s);
+  const cols = [...by].map(([coll, list]) => `${q(coll)}:{${list.map((r) => `${q(r.doc_id)}:${r.data}`).join(',')}}`);
+  return `{"_backupAt":${q(at.toISOString())},"_source":"planner-api-shared","collections":{${cols.join(',')}}}`;
+}
+
 class DriveError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
@@ -132,6 +151,40 @@ async function record(env, userId, fields) {
     `UPDATE users SET last_backup_at = ?, last_backup_status = ?, last_backup_error = ?,
        last_backup_file = COALESCE(?, last_backup_file), backup_folder_id = COALESCE(?, backup_folder_id) WHERE id = ?`
   ).bind(Date.now(), fields.status, fields.error || null, fields.file || null, fields.folder || null, userId).run();
+}
+
+// Write (or overwrite) today's shared-space backup in the person's folder and trim old ones.
+// `files` is the folder listing already fetched for the private backup. Returns { file, docs } or null.
+async function backupShared(env, user, token, folder, files, now) {
+  if (!memberEmails(env).includes(String(user.email || '').toLowerCase())) return null;
+  const { results: rows } = await env.DB.prepare(
+    'SELECT collection, doc_id, data FROM docs WHERE user_id = ? AND deleted = 0 ORDER BY collection, seq'
+  ).bind(HOUSEHOLD_ID).all();
+  if (!rows.length) return null;
+  const today = ptDate(new Date(now));
+  const name = `lp-shared-backup-${today}.json`;
+  const text = assembleSharedBackup(rows, new Date(now));
+  const existing = files.find((f) => f.name === name);
+  if (existing) {
+    await drive(token, `${UPLOAD}/files/${encodeURIComponent(existing.id)}?uploadType=media`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: text,
+    });
+  } else {
+    const boundary = 'lpshared' + crypto.randomUUID().replace(/-/g, '');
+    const body = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
+      JSON.stringify({ name, parents: [folder], mimeType: 'application/json' }) +
+      `\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n` + text + `\r\n--${boundary}--`;
+    await drive(token, `${UPLOAD}/files?uploadType=multipart&fields=id`, {
+      method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body,
+    });
+  }
+  for (const f of files) {
+    const m = f.name.match(SHARED_RE);
+    if (!m || f.name === name || keepFile(m[1], today, now)) continue;
+    try { await drive(token, `${DRIVE}/files/${encodeURIComponent(f.id)}`, { method: 'DELETE' }); }
+    catch (e) { console.warn('Shared backup cleanup failed', f.name, e.message); }
+  }
+  return { file: name, docs: rows.length };
 }
 
 // Back up one person. Never throws; returns { status, file?, bytes?, docs?, deleted?, error? }.
@@ -200,8 +253,18 @@ export async function backupUser(env, user, now = Date.now(), opts = {}) {
       catch (e) { console.warn('Manual backup cleanup failed', f.name, e.message); }
     }
 
+    // Shared household data (v0.3.1). The private backup above has already succeeded; if this step
+    // fails, say so in the status the app shows rather than failing silently.
+    let shared = null;
+    try { shared = await backupShared(env, user, g.token, folder, files, now); }
+    catch (e) {
+      console.error('Shared backup failed', user.email, e && e.stack ? e.stack : e);
+      const out = { status: 'error', error: ('Your planner was backed up, but the shared (Us) backup failed: ' + String((e && e.message) || e)).slice(0, 300), file: name, folder };
+      await record(env, user.id, out);
+      return { ...out, bytes: text.length, docs: rows.length, deleted };
+    }
     await record(env, user.id, { status: 'ok', file: name, folder });
-    return { status: 'ok', file: name, bytes: text.length, docs: rows.length, deleted };
+    return { status: 'ok', file: name, bytes: text.length, docs: rows.length, deleted, shared };
   } catch (e) {
     console.error('Backup failed', user.email, e && e.stack ? e.stack : e);
     const out = { status: 'error', error: String((e && e.message) || e).slice(0, 300) };

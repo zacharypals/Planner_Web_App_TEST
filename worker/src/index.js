@@ -9,7 +9,7 @@ import { backupNow, runNightlyBackups } from './backup.js';
 import { listDocs, listChanges, putDocs } from './docs.js';
 import { sharedApi } from './shared.js';
 
-const WORKER_VERSION = '0.3.0';
+const WORKER_VERSION = '0.3.1';
 
 export default {
   async fetch(req, env) {

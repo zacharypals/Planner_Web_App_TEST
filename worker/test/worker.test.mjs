@@ -449,3 +449,87 @@ test('shared household space (0.3.0): both members share rel* docs, privately-ow
   assert.equal((await call(env, 'GET', '/api/shared/docs', { token: z })).status, 200);
   assert.equal((await call(env, 'GET', '/api/shared/docs')).status, 401);
 });
+
+const sharedBackups = (email) => [...driveOf(email).values()].filter((f) => /^lp-shared-backup-/.test(f.name));
+
+test('backup 0.3.1: shared (Us) data is written to each member\'s Drive folder; private backups unchanged', async () => {
+  google.drives.clear();
+  const env = makeEnv();
+  const z = (await signIn(env, 'zach@example.com')).session_token;
+  const f = (await signIn(env, 'fam@example.com')).session_token;
+  await call(env, 'PUT', '/api/docs', { token: z, body: { docs: [{ c: 'navColor', i: '_', b: 0, j: '"#z"' }] } });
+  await call(env, 'PUT', '/api/docs', { token: f, body: { docs: [{ c: 'navColor', i: '_', b: 0, j: '"#f"' }] } });
+  // Nothing shared yet → no shared file.
+  await backupUser(env, userRow(env, 'zach@example.com'));
+  assert.equal(sharedBackups('zach@example.com').length, 0);
+
+  await call(env, 'PUT', '/api/shared/docs', { token: z, body: { docs: [
+    { c: 'relMeta', i: '_', b: 0, j: JSON.stringify({ members: { 'zach@example.com': { name: 'Zach' } } }) },
+    { c: 'relCheckins', i: 'ck1', b: 0, j: JSON.stringify({ id: 'ck1', answers: { z: { r: { q1: 'high' } } } }) },
+    { c: 'relMoments', i: 'm1', b: 0, j: JSON.stringify({ id: 'm1', note: 'Sunrise hike' }) },
+    { c: 'relMoments', i: 'm2', b: 0, j: JSON.stringify({ id: 'm2', note: 'deleted one' }) },
+  ] } });
+  await call(env, 'PUT', '/api/shared/docs', { token: z, body: { docs: [{ c: 'relMoments', i: 'm2', b: 1, x: 1 }] } });
+
+  const r = await backupUser(env, userRow(env, 'zach@example.com'));
+  assert.equal(r.status, 'ok');
+  assert.equal(r.shared.docs, 3, 'deleted docs are not backed up');
+  await backupUser(env, userRow(env, 'fam@example.com'));
+  for (const email of ['zach@example.com', 'fam@example.com']) {
+    const files = sharedBackups(email);
+    assert.equal(files.length, 1, email);
+    assert.equal(files[0].name, `lp-shared-backup-${ptDate()}.json`);
+    const data = JSON.parse(files[0].content);
+    assert.equal(data._source, 'planner-api-shared');
+    assert.deepEqual(Object.keys(data.collections).sort(), ['relCheckins', 'relMeta', 'relMoments']);
+    assert.equal(data.collections.relCheckins.ck1.answers.z.r.q1, 'high');
+    assert.deepEqual(Object.keys(data.collections.relMoments), ['m1']);
+    assert.equal(data.collections.relMeta._.members['zach@example.com'].name, 'Zach');
+  }
+  // The private file is still its own thing and never contains shared collections.
+  const priv = JSON.parse(backups('zach@example.com')[0].content);
+  assert.equal(priv.navColor, '#z');
+  assert.ok(!('relCheckins' in priv) && !('collections' in priv));
+  // Same-day rerun overwrites rather than duplicating.
+  await backupUser(env, userRow(env, 'zach@example.com'));
+  assert.equal(sharedBackups('zach@example.com').length, 1);
+
+  // Retention: old shared files follow the same 7-day + monthly rule; other files untouched.
+  const drive = driveOf('zach@example.com');
+  const folder = [...drive.values()].find((x) => x.folder);
+  const day = 86400000, now = Date.now();
+  const names = [`lp-shared-backup-${ptDate(new Date(now - 3 * day))}.json`, `lp-shared-backup-${ptDate(new Date(now - 20 * day))}.json`, 'lp-shared-backup-2020-01-01.json', 'lp-shared-backup-2020-06-15.json'];
+  names.forEach((n) => drive.set('s' + n, { id: 's' + n, name: n, parents: [folder.id], content: '{}', modified: now }));
+  await backupUser(env, userRow(env, 'zach@example.com'));
+  const left = sharedBackups('zach@example.com').map((x) => x.name);
+  assert.ok(left.includes(names[0]), 'recent kept');
+  assert.ok(!left.includes(names[1]) || names[1].endsWith('-01.json'), '20-day-old non-monthly removed');
+  assert.ok(left.includes('lp-shared-backup-2020-01-01.json') === false, 'a 2020 monthly is older than a year');
+  assert.ok(!left.includes('lp-shared-backup-2020-06-15.json'));
+});
+
+test('backup 0.3.1: non-members get no shared file; a failing shared upload is reported, private backup still saved', async (t) => {
+  t.after(() => { google.driveFail = null; });
+  google.drives.clear();
+  const env = makeEnv();
+  env.HOUSEHOLD_EMAILS = 'zach@example.com';
+  const z = (await signIn(env, 'zach@example.com')).session_token;
+  const f = (await signIn(env, 'fam@example.com')).session_token;
+  await call(env, 'PUT', '/api/docs', { token: z, body: { docs: [{ c: 'navColor', i: '_', b: 0, j: '"#z"' }] } });
+  await call(env, 'PUT', '/api/docs', { token: f, body: { docs: [{ c: 'navColor', i: '_', b: 0, j: '"#f"' }] } });
+  await call(env, 'PUT', '/api/shared/docs', { token: z, body: { docs: [{ c: 'relMoments', i: 'm1', b: 0, j: '{"id":"m1"}' }] } });
+  await backupUser(env, userRow(env, 'fam@example.com'));
+  assert.equal(sharedBackups('fam@example.com').length, 0, 'not a household member');
+  assert.equal(backups('fam@example.com').length, 1, 'private backup still made');
+
+  let uploads = 0;
+  google.driveFail = (method, u) => method !== 'GET' && u.pathname.startsWith('/upload/') && ++uploads === 2;
+  const r = await backupUser(env, userRow(env, 'zach@example.com'));
+  assert.equal(r.status, 'error');
+  assert.match(r.error, /shared \(Us\) backup failed/);
+  assert.equal(backups('zach@example.com').length, 1, 'private file was written');
+  assert.equal(sharedBackups('zach@example.com').length, 0);
+  google.driveFail = null;
+  assert.equal((await backupUser(env, userRow(env, 'zach@example.com'))).status, 'ok', 'recovers next run');
+  assert.equal(sharedBackups('zach@example.com').length, 1);
+});
