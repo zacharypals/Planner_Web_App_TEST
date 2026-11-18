@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.100.0 -->
+<!-- LP Planner v5.101.0 -->
+<!-- v5.101.0 — Monthly: on desktop/iPad too, clicking a day selects it and lists its events in a panel below the calendar; "+ New event" is at the top of the panel (also moved to the top on phones). Event chips still open the edit window. Top bar: the Calendars button is icon-only below 1100px so it no longer crowds the bar on iPad. -->
 <!-- v5.100.0 — Other calendars: calendars on your Google account other than the primary one (e.g. a work calendar shared as free/busy) can show read-only in the planner. New "🗓 Calendars" button (next to Data) lists them with an on/off switch, an editable label and a color each (slate is the default for a work-style free/busy calendar; synced key `extCals`). They show as read-only blocks in Week > Time blocks (and the phone day view), one slim row per calendar per day in Week > List, and one chip per calendar per day on Monthly. Untitled events read "<label> (busy)". The events are fetched live and never saved, copied into the planner, or written back to Google; the primary calendar's two-way sync is untouched. Copies of these events that an outside sync tool had put in the primary calendar (same start and length, untitled or same title) are hidden. No Worker change. -->
 <!-- v5.99.0 — Projects, Phase 2: a project linked to a Reading-log book that has a page total is the book. Its percentage is pages read ÷ total (done = 100%), and the health pill (On track / At risk / Behind), the progress bars on the project page, the project list, the timeline and the Goals tile, and the Weekly review all follow it. Those places show "N of T pages" instead of tasks or milestones. Milestones stay as checkpoints and do not change the percentage. Projects with no book, or a book with no total, work exactly as before. No data change, no Worker change. -->
 <!-- v5.98.2 — Project page: the Auto-complete card's caret is now the same rounded caret button as on milestones, and the Linked and Habits & training cards collapse the same way (open/shut remembered per project and card on this device; a one-line summary shows while shut). -->
@@ -2725,12 +2726,16 @@
   .monthly-cal-wrap.compact .monthly-cell-dow { display: none; }
   .monthly-cal-wrap.compact .monthly-cell { min-height: 54px; padding: 4px 2px 3px; }
   .monthly-cal-wrap.compact .monthly-cell-date { font-size: 14px; margin-bottom: 3px; }
-  .monthly-cal-wrap.compact .monthly-cell.picked { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-light); }
   .monthly-cell-dots { display: flex; justify-content: center; align-items: center; gap: 2px; height: 8px; }
   .monthly-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.28); }
   .monthly-dot-more { font-family: 'DM Mono', monospace; font-size: 9px; line-height: 8px; color: var(--ink-light); }
   .monthly-day-panel { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
-  .monthly-day-panel-title { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+  .monthly-day-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; }
+  .monthly-day-panel-title { font-family: 'Playfair Display', serif; font-size: 16px; font-weight: 600; color: var(--ink); }
+  .monthly-day-new { min-height: 36px; padding: 6px 14px; border-radius: 99px; border: 1.5px solid var(--accent); background: var(--surface); color: var(--accent); font-size: 13px; font-weight: 600; font-family: 'DM Sans', sans-serif; cursor: pointer; flex-shrink: 0; white-space: nowrap; }
+  .monthly-day-new:hover { background: var(--accent-light); }
+  .monthly-day-event:hover { background: var(--cream); }
+  .monthly-cell.picked { box-shadow: inset 0 0 0 2px var(--accent); background: var(--accent-light); }
   .monthly-day-panel-title .today-tag { font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 400; color: var(--gold); margin-left: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
   .monthly-day-event { display: flex; align-items: stretch; gap: 10px; padding: 8px 2px; min-height: 44px; cursor: pointer; border-radius: var(--radius-sm); }
   .monthly-day-event:active { background: var(--cream); }
@@ -3076,6 +3081,7 @@
   [data-theme="dark"] ::placeholder { color: var(--ink-faint); }
   .theme-btn { min-width: 0; }
   @media (max-width: 767px) { .auth-btn.theme-btn { display: none; } }
+  @media (max-width: 1100px) { .auth-btn .auth-lbl { display: none; } } /* v5.101.0 — iPad widths: Calendars button is icon-only so the top bar fits */
 
   /* ── v5.16.0 TIME BLOCKS ── */
   .tb-switch { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--paper); }
@@ -12238,8 +12244,8 @@ function MonthlyCalendar({ extCals, weekData, setWeekData, monthlyGoals, setMont
               const upLate = upMonth.anyLate(upList);
               return (
                 <div key={dk}
-                  className={`monthly-cell ${isToday?'today':''} ${isDragOver?'drag-over':''} ${compact && dk===activeDayKey ? 'picked' : ''}`}
-                  onClick={()=>{ if (compact) setPickedDay(dk); else openAddEvent(dk); }}
+                  className={`monthly-cell ${isToday?'today':''} ${isDragOver?'drag-over':''} ${dk===activeDayKey ? 'picked' : ''}`}
+                  onClick={()=>setPickedDay(dk)}
                   onDragOver={e=>handleDragOver(e,dk)}
                   onDragLeave={()=>setDragOverDay(null)}
                   onDrop={e=>handleDrop(e,dk)}>
@@ -12299,8 +12305,8 @@ function MonthlyCalendar({ extCals, weekData, setWeekData, monthlyGoals, setMont
               );
             })}
           </div>
-          {/* v5.54.0 — compact (phone portrait): selected day's events, full titles */}
-          {compact && (() => {
+          {/* v5.54.0 selected day's events, full titles; v5.101.0 shown at every width */}
+          {(() => {
             const pd = new Date(activeDayKey + 'T00:00:00');
             const dayEvs = getEventsForDay(activeDayKey).slice()
               .sort((a,b) => (a.eventTime||'99:99').localeCompare(b.eventTime||'99:99'));
@@ -12308,9 +12314,12 @@ function MonthlyCalendar({ extCals, weekData, setWeekData, monthlyGoals, setMont
             const dayExt = ext.groupsFor(activeDayKey);
             return (
               <div className="monthly-day-panel">
-                <div className="monthly-day-panel-title">
-                  {pd.toLocaleDateString(undefined, {weekday:'long', month:'short', day:'numeric'})}
-                  {activeDayKey === todayDayKey && <span className="today-tag">Today</span>}
+                <div className="monthly-day-panel-head">
+                  <div className="monthly-day-panel-title">
+                    {pd.toLocaleDateString(undefined, {weekday:'long', month:'short', day:'numeric'})}
+                    {activeDayKey === todayDayKey && <span className="today-tag">Today</span>}
+                  </div>
+                  <button type="button" className="monthly-day-new" onClick={()=>openAddEvent(activeDayKey)}>+ New event</button>
                 </div>
                 {dayUp.map(it => {
                   const st = upStatus(it, upTodayKey);
@@ -12352,7 +12361,6 @@ function MonthlyCalendar({ extCals, weekData, setWeekData, monthlyGoals, setMont
                     </div>
                   </div>
                 ))}
-                <button className="monthly-day-add" onClick={()=>openAddEvent(activeDayKey)}>+ Add event</button>
               </div>
             );
           })()}
@@ -16328,7 +16336,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.100.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.101.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -16356,7 +16364,7 @@ function App() {
                 {syncing ? '↓ Syncing…' : '↓ Sync Calendar'}
               </button>
               {authUser.picture && <img className="user-avatar" src={authUser.picture} alt={authUser.name} title={authUser.email} />}
-              <button className="auth-btn data-btn" onClick={() => setShowExt(true)} title="Show other Google calendars (work, family…) read-only in the planner">🗓 Calendars</button>
+              <button className="auth-btn data-btn" onClick={() => setShowExt(true)} title="Show other Google calendars (work, family…) read-only in the planner" aria-label="Other calendars">🗓<span className="auth-lbl"> Calendars</span></button>
               <button className="auth-btn data-btn" onClick={() => { refreshMe(); setShowData(true); }} title="Backups and import from Google Drive">
                 ☁ Data{me && me.backup && me.backup.status !== 'ok' && me.backup.status !== 'skipped_empty' ? ' ⚠️' : ''}
               </button>
