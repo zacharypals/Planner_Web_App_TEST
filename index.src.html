@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.99.0 -->
+<!-- LP Planner v5.100.0 -->
+<!-- v5.100.0 — Other calendars: calendars on your Google account other than the primary one (e.g. a work calendar shared as free/busy) can show read-only in the planner. New "🗓 Calendars" button (next to Data) lists them with an on/off switch, an editable label and a color each (slate is the default for a work-style free/busy calendar; synced key `extCals`). They show as read-only blocks in Week > Time blocks (and the phone day view), one slim row per calendar per day in Week > List, and one chip per calendar per day on Monthly. Untitled events read "<label> (busy)". The events are fetched live and never saved, copied into the planner, or written back to Google; the primary calendar's two-way sync is untouched. Copies of these events that an outside sync tool had put in the primary calendar (same start and length, untitled or same title) are hidden. No Worker change. -->
 <!-- v5.99.0 — Projects, Phase 2: a project linked to a Reading-log book that has a page total is the book. Its percentage is pages read ÷ total (done = 100%), and the health pill (On track / At risk / Behind), the progress bars on the project page, the project list, the timeline and the Goals tile, and the Weekly review all follow it. Those places show "N of T pages" instead of tasks or milestones. Milestones stay as checkpoints and do not change the percentage. Projects with no book, or a book with no total, work exactly as before. No data change, no Worker change. -->
 <!-- v5.98.2 — Project page: the Auto-complete card's caret is now the same rounded caret button as on milestones, and the Linked and Habits & training cards collapse the same way (open/shut remembered per project and card on this device; a one-line summary shows while shut). -->
 <!-- v5.98.1 — Project page: the Auto-complete card now sits below the Linked card, and can be collapsed (tap its header; a one-line summary shows while shut; remembered per project on this device). -->
@@ -3449,6 +3450,54 @@
   /* ═══ v5.68.0 HOME UPKEEP ═══ */
   :root { --up-late-bg:#fbe4df; --up-late-fg:#9a3324; --up-soon-bg:#fdf0d2; --up-soon-fg:#7a5200; --up-ok-bg:#e6f3ef; --up-ok-fg:#1d6652; }
   :root[data-theme="dark"] { --up-late-bg:#4a2420; --up-late-fg:#f2a99e; --up-soon-bg:#3d2f0f; --up-soon-fg:#f0c878; --up-ok-bg:#16382f; --up-ok-fg:#8fd6bd; }
+  /* ===== v5.100.0 OTHER CALENDARS — read-only overlay colours (slate is #0). Not part of TASK_COLORS / EVENT_COLORS on purpose. ===== */
+  :root {
+    --ext-0-bg:#d9dee5; --ext-0-ink:#3b4452; --ext-0-edge:#8a95a6;
+    --ext-1-bg:#e4ded5; --ext-1-ink:#4d463c; --ext-1-edge:#a39886;
+    --ext-2-bg:#cfdedd; --ext-2-ink:#2f4b4b; --ext-2-edge:#7c9a99;
+    --ext-3-bg:#ecd9d0; --ext-3-ink:#5a3a2c; --ext-3-edge:#b58a76;
+    --ext-4-bg:#dbe0d2; --ext-4-ink:#3d4636; --ext-4-edge:#98a38a;
+    --ext-5-bg:#e2d9e3; --ext-5-ink:#4a3a4d; --ext-5-edge:#a38ba8;
+  }
+  :root[data-theme="dark"] {
+    --ext-0-bg:#3a4150; --ext-0-ink:#c9d0db; --ext-0-edge:#7b8698;
+    --ext-1-bg:#443f38; --ext-1-ink:#d8d1c6; --ext-1-edge:#8c8374;
+    --ext-2-bg:#2f4647; --ext-2-ink:#c3dada; --ext-2-edge:#6d8f8e;
+    --ext-3-bg:#4a3830; --ext-3-ink:#e6d2c8; --ext-3-edge:#9a7461;
+    --ext-4-bg:#3b4234; --ext-4-ink:#d3dac9; --ext-4-edge:#818d73;
+    --ext-5-bg:#403645; --ext-5-ink:#dccfe0; --ext-5-edge:#8f7a96;
+  }
+  .tb-block.ext { cursor: default; border-color: transparent; }
+  .tb-block.ext .tb-b-title { font-weight: 500; }
+  .monthly-event-chip.ext { cursor: default; user-select: none; }
+  .monthly-event-chip.ext:hover { filter: none; }
+  .ext-strip { display: flex; flex-direction: column; gap: 4px; margin: 0 0 6px; }
+  .ext-strip-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; box-sizing: border-box; text-align: left; border: 0; border-radius: 6px; padding: 5px 8px; font: inherit; font-size: 11px; line-height: 1.3; cursor: pointer; min-height: 28px; }
+  .ext-strip-main { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+  .ext-strip-car { flex-shrink: 0; opacity: 0.7; }
+  .ext-strip-list { margin: 3px 0 0; padding: 2px 8px; font-size: 11px; color: var(--ink); background: var(--surface); border-radius: 0 6px 6px 0; }
+  .ext-strip-item { padding: 2px 0; line-height: 1.3; }
+  .ext-strip-t { font-family: 'DM Mono', monospace; font-size: 10px; color: var(--ink-faint); margin-right: 4px; }
+  .ext-intro, .ext-note { font-size: 12px; color: var(--ink-faint); margin: 8px 0 12px; line-height: 1.45; }
+  .ext-row { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; background: var(--surface); }
+  .ext-row-top { display: flex; align-items: center; gap: 12px; }
+  .ext-row-name { min-width: 0; flex: 1; }
+  .ext-row-title { font-size: 13px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
+  .ext-row-sub { font-size: 11px; color: var(--ink-faint); margin-top: 2px; line-height: 1.35; }
+  .ext-row-err { font-size: 12px; color: #b3402f; margin: 8px 0 0; }
+  :root[data-theme="dark"] .ext-row-err { color: #f2a99e; }
+  .ext-switch { flex-shrink: 0; width: 44px; height: 26px; border-radius: 13px; border: 1px solid var(--border); background: var(--cream); position: relative; cursor: pointer; padding: 0; }
+  .ext-switch span { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--ink-faint); transition: transform .15s, background .15s; }
+  .ext-switch.on { background: var(--accent-light); border-color: var(--accent); }
+  .ext-switch.on span { transform: translateX(18px); background: var(--accent); }
+  .ext-row-edit { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 10px; }
+  .ext-lab { display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: var(--ink-faint); }
+  .ext-input { font: inherit; font-size: 14px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--cream); color: var(--ink); min-height: 38px; box-sizing: border-box; }
+  .ext-input:focus { outline: none; border-color: var(--accent); }
+  .ext-sw { display: flex; gap: 10px; flex-wrap: wrap; }
+  .ext-sw-btn { width: 32px; height: 32px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0; }
+  .ext-sw-btn.on { outline: 2px solid var(--accent); outline-offset: 2px; }
+  @media (max-width: 767px) { .ext-switch { width: 48px; height: 28px; } .ext-switch span { width: 22px; height: 22px; } .ext-switch.on span { transform: translateX(20px); } .ext-sw-btn { width: 40px; height: 40px; } }
   .up-link { width:100%; box-sizing:border-box; display:flex; align-items:center; gap:10px; min-height:48px; padding:9px 12px; border-radius:14px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font-family:'DM Sans',sans-serif; text-align:left; cursor:pointer; }
   .up-link:hover { border-color:var(--accent); }
   .up-link.empty, .up-link.clear { background:transparent; border-style:dashed; }
@@ -6229,6 +6278,217 @@ async function calFetch(url, opts = {}) {
   }
   return res;
 }
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+// v5.100.0 — OTHER CALENDARS (read-only overlay). Calendars on the signed-in Google account that are NOT the primary one
+// (a work calendar shared as free/busy, a family calendar, holidays…) are fetched LIVE and drawn read-only in Week (Time blocks and
+// List), Monthly and the phone day view. Nothing is copied into weekData, nothing is written back to Google, and the events are
+// never saved or backed up — only the per-calendar choices (on / label / color) are stored, in the small synced key `extCals`
+// = { [calendarId]: { on?, label?, ci? } }. The primary calendar keeps its existing two-way sync (pullNewFromCalendar & co).
+// Old copies of these events that an outside sync tool put in the primary calendar are HIDDEN at display time (extHides).
+// ═════════════════════════════════════════════════════════════════════════════════════════════════
+const EXT_SWATCHES = ['Slate', 'Stone', 'Teal', 'Clay', 'Sage', 'Plum'];   // colors live in CSS --ext-N-bg / -ink / -edge (light + dark)
+const EXT_TTL = 5 * 60 * 1000;
+const ExtCal = { list: null, listAt: 0, listLoading: false, listErr: '', months: {}, inflight: {}, errs: {}, subs: new Set() };
+function extNotify() { ExtCal.subs.forEach(f => { try { f(); } catch (e) {} }); }
+function extMonthKey(d) { return fmt(d).slice(0, 7); }
+async function extLoadList(force) {
+  if (!calReady() || ExtCal.listLoading) return;
+  if (!force && ExtCal.list && Date.now() - ExtCal.listAt < 30 * 60 * 1000) return;
+  ExtCal.listLoading = true; ExtCal.listErr = ''; extNotify();
+  try {
+    const res = await calFetch('https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=freeBusyReader&maxResults=250&fields=' + encodeURIComponent('items(id,summary,summaryOverride,accessRole,primary,deleted)'));
+    if (!res.ok) throw new Error('Google Calendar error ' + res.status);
+    const j = await res.json();
+    ExtCal.list = (j.items || []).filter(c => !c.primary && !c.deleted).map(c => ({ id: c.id, name: c.summaryOverride || c.summary || c.id, accessRole: c.accessRole }));
+    ExtCal.listAt = Date.now();
+  } catch (e) { ExtCal.listErr = (e && e.message) || 'Could not load your calendars'; }
+  ExtCal.listLoading = false; extNotify();
+}
+// Google's [start, end) → one entry per local day. Timed events are cut at midnight; all-day events become one entry per day.
+function extNormalize(calId, items, mk) {
+  const byDay = {};
+  const put = (dk, o) => { if (dk.slice(0, 7) !== mk) return; (byDay[dk] = byDay[dk] || []).push({ k: calId + ':' + o.id + ':' + dk + ':' + o.start, calId, dk, ...o }); };
+  const dayPlus = (dk, n) => { const [y, m, d] = dk.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10); };
+  items.forEach(ev => {
+    if (!ev || ev.status === 'cancelled' || ev.transparency === 'transparent' || !ev.start || !ev.end) return;
+    const title = ev.summary || '';
+    if (ev.start.date) {
+      let dk = ev.start.date, n = 0;
+      while (dk < (ev.end.date || dayPlus(ev.start.date, 1)) && n++ < 62) { put(dk, { id: ev.id, title, allDay: true, start: 0, dur: 0 }); dk = dayPlus(dk, 1); }
+      return;
+    }
+    if (!ev.start.dateTime || !ev.end.dateTime) return;
+    const sd = ev.start.dateTime.slice(0, 10), ed = ev.end.dateTime.slice(0, 10);
+    const sm = tbMin(ev.start.dateTime.slice(11, 16)), em = tbMin(ev.end.dateTime.slice(11, 16)) ?? 0;
+    if (sm == null) return;
+    if (sd === ed) { const dur = em - sm; if (dur > 0) put(sd, { id: ev.id, title, allDay: false, start: sm, dur }); return; }
+    let dk = sd, n = 0;
+    while (dk <= ed && n++ < 14) {
+      const a = dk === sd ? sm : 0, b = dk === ed ? em : 1440;
+      if (b - a > 0) put(dk, { id: ev.id, title, allDay: false, start: a, dur: b - a });
+      dk = dayPlus(dk, 1);
+    }
+  });
+  return byDay;
+}
+async function extLoadMonth(calId, mk, force) {
+  const key = calId + '|' + mk, cur = ExtCal.months[key];
+  if (!force && cur && Date.now() - cur.at < EXT_TTL) return;
+  if (ExtCal.inflight[key]) return;
+  ExtCal.inflight[key] = true;
+  try {
+    const [y, m] = mk.split('-').map(Number);
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const base = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(calId) + '/events?timeMin=' + encodeURIComponent(new Date(y, m - 1, 1).toISOString())
+      + '&timeMax=' + encodeURIComponent(new Date(y, m, 1).toISOString()) + '&singleEvents=true&orderBy=startTime&maxResults=2500&timeZone=' + encodeURIComponent(tz)
+      + '&fields=' + encodeURIComponent('items(id,status,summary,start,end,transparency),nextPageToken');
+    let events = [], pageToken = null;
+    do {
+      const res = await calFetch(base + (pageToken ? '&pageToken=' + encodeURIComponent(pageToken) : ''));
+      if (!res.ok) throw new Error('Google Calendar error ' + res.status);
+      const j = await res.json();
+      events = events.concat(j.items || []);
+      pageToken = j.nextPageToken || null;
+    } while (pageToken);
+    ExtCal.months[key] = { at: Date.now(), byDay: extNormalize(calId, events, mk) };
+    delete ExtCal.errs[calId];
+  } catch (e) {
+    ExtCal.errs[calId] = (e && e.message) || 'Could not load events';
+    // keep what we had; try again in about a minute
+    ExtCal.months[key] = { at: Date.now() - EXT_TTL + 60000, byDay: cur ? cur.byDay : {} };
+  }
+  delete ExtCal.inflight[key];
+  extNotify();
+}
+// Effective settings = saved choice, else a default. A calendar shared as free/busy from a non-Gmail (work) address defaults to ON,
+// labelled "Work", slate; everything else defaults to OFF with its own name and a color picked from the id.
+function extEffective(c, p) {
+  p = p || {};
+  const busyOnly = c.accessRole === 'freeBusyReader';
+  const domain = (c.id.split('@')[1] || '').toLowerCase();
+  const workLike = busyOnly && !!domain && domain !== 'gmail.com' && domain !== 'googlemail.com' && !domain.endsWith('calendar.google.com');
+  let h = 0; for (const ch of c.id) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const defCi = workLike ? 0 : 1 + (h % (EXT_SWATCHES.length - 1));
+  return { on: p.on !== undefined ? !!p.on : workLike, label: (p.label || '').trim() || (workLike ? 'Work' : c.name),
+           ci: Number.isInteger(p.ci) ? ((p.ci % EXT_SWATCHES.length) + EXT_SWATCHES.length) % EXT_SWATCHES.length : defCi, busyOnly };
+}
+function extTitle(ev, cal) { return ev.title || (cal.busyOnly ? cal.label + ' (busy)' : '(No title)'); }
+function extStyle(ci) { return { background: `var(--ext-${ci}-bg)`, color: `var(--ext-${ci}-ink)`, borderLeft: `3px solid var(--ext-${ci}-edge)` }; }
+function extSpan(ev) { return ev.allDay ? 'All day' : tbFmt12(ev.start) + '–' + tbFmt12(ev.start + ev.dur); }
+function useExtCalendars(prefs, anchorDates) {
+  const [, bump] = React.useReducer(x => x + 1, 0);
+  useEffect(() => { ExtCal.subs.add(bump); return () => { ExtCal.subs.delete(bump); }; }, []);
+  const ready = calReady();
+  useEffect(() => { if (ready) extLoadList(false); }, [ready]);
+  const cals = (ExtCal.list || []).map(c => ({ ...c, ...extEffective(c, (prefs || {})[c.id]) }));
+  const onIds = cals.filter(c => c.on).map(c => c.id);
+  const mks = [...new Set((anchorDates || []).map(extMonthKey))];
+  const sig = onIds.join(',') + '#' + mks.join(',');
+  useEffect(() => {
+    if (!ready) return;
+    const run = () => { onIds.forEach(id => mks.forEach(mk => extLoadMonth(id, mk))); };
+    run();
+    const t = setInterval(run, 60000);                       // only refetches a month once it is older than EXT_TTL
+    const vis = () => { if (document.visibilityState === 'visible') run(); };
+    document.addEventListener('visibilitychange', vis);
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', vis); };
+  }, [sig, ready]);
+  const forCal = (c, dk) => { const m = ExtCal.months[c.id + '|' + dk.slice(0, 7)]; return ((m && m.byDay[dk]) || []).slice().sort((a, b) => (a.allDay ? -1 : 0) - (b.allDay ? -1 : 0) || a.start - b.start); };
+  const groupsFor = dk => cals.filter(c => c.on).map(c => ({ cal: c, events: forCal(c, dk) })).filter(g => g.events.length);
+  // An outside tool had copied these events into the PRIMARY calendar (private, untitled, same start and length). Hide those copies.
+  const hides = (dk, t) => {
+    if (!t || !t.isEvent || !t.gcalId || !t.eventTime || !onIds.length) return false;
+    const s = tbMin(t.eventTime), d = tbTaskDur(t);
+    return cals.some(c => c.on && forCal(c, dk).some(e => !e.allDay && e.start === s && e.dur === d && (!t.title || t.title === e.title)));
+  };
+  return { cals, groupsFor, hides, errs: ExtCal.errs };
+}
+// One slim read-only row per calendar per day (Week List view, phone day view): "Work · 6 events", tap to list the times.
+function ExtDayStrip({ groups }) {
+  const [openId, setOpenId] = useState(null);
+  if (!groups || !groups.length) return null;
+  return (
+    <div className="ext-strip">
+      {groups.map(g => {
+        const evs = g.events, n = evs.length, open = openId === g.cal.id;
+        const one = n === 1 ? evs[0] : null;
+        return (
+          <div key={g.cal.id} className="ext-strip-grp">
+            <button type="button" className="ext-strip-row" style={extStyle(g.cal.ci)} aria-expanded={open}
+              onClick={() => setOpenId(open ? null : g.cal.id)}>
+              <span className="ext-strip-main">{one ? `${extSpan(one)} · ${extTitle(one, g.cal)}` : `${g.cal.label} · ${n} events`}</span>
+              {n > 1 && <span className="ext-strip-car" aria-hidden="true">{open ? '▾' : '▸'}</span>}
+            </button>
+            {open && n > 1 && (
+              <div className="ext-strip-list" style={{ borderLeft: `3px solid var(--ext-${g.cal.ci}-edge)` }}>
+                {evs.map(e => <div key={e.k} className="ext-strip-item"><span className="ext-strip-t">{extSpan(e)}</span> {extTitle(e, g.cal)}</div>)}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+function ExtCalRow({ c, prefs, setPrefs }) {
+  const [draft, setDraft] = useState(c.label);
+  useEffect(() => { setDraft(c.label); }, [c.label]);
+  const patch = p => setPrefs(all => ({ ...(all || {}), [c.id]: { ...((all || {})[c.id] || {}), ...p } }));
+  return (
+    <div className="ext-row">
+      <div className="ext-row-top">
+        <button type="button" className={`ext-switch ${c.on ? 'on' : ''}`} role="switch" aria-checked={c.on} aria-label={`Show ${c.name}`} onClick={() => patch({ on: !c.on })}><span /></button>
+        <div className="ext-row-name">
+          <div className="ext-row-title">{c.name}</div>
+          <div className="ext-row-sub">{c.busyOnly ? 'Shared with you as free/busy only — events have no titles' : c.accessRole === 'reader' ? 'Shared with you — titles are visible' : 'Titles are visible'}</div>
+        </div>
+      </div>
+      {c.on && (
+        <div className="ext-row-edit">
+          <label className="ext-lab">Label
+            <input className="ext-input" value={draft} maxLength={30} onChange={e => setDraft(e.target.value)}
+              onBlur={() => { const v = draft.trim(); patch({ label: v }); if (!v) setDraft(c.label); }}
+              onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
+          </label>
+          <div className="ext-lab">Color
+            <div className="ext-sw" role="radiogroup" aria-label="Color">
+              {EXT_SWATCHES.map((nm, i) => (
+                <button key={nm} type="button" role="radio" aria-checked={c.ci === i} aria-label={nm} title={nm} className={`ext-sw-btn ${c.ci === i ? 'on' : ''}`}
+                  style={{ background: `var(--ext-${i}-bg)`, borderColor: `var(--ext-${i}-edge)` }} onClick={() => patch({ ci: i })} />
+              ))}
+            </div>
+          </div>
+          {c.busyOnly && <div className="ext-row-sub">Untitled events show as “{(draft.trim() || c.label)} (busy)”.</div>}
+          {ExtCal.errs[c.id] && <div className="ext-row-err">{ExtCal.errs[c.id]}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+function ExtCalPanel({ prefs, setPrefs, onClose }) {
+  const [, bump] = React.useReducer(x => x + 1, 0);
+  useEffect(() => { ExtCal.subs.add(bump); extLoadList(true); return () => { ExtCal.subs.delete(bump); }; }, []);
+  const cals = (ExtCal.list || []).map(c => ({ ...c, ...extEffective(c, (prefs || {})[c.id]) }));
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-box ext-panel" onClick={e => e.stopPropagation()} style={{ width: 'min(560px, 94vw)', maxHeight: '88vh', overflowY: 'auto' }}>
+        <div className="modal-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+          <span>Other calendars</span>
+          <button className="modal-btn secondary" onClick={onClose} style={{ padding: '4px 10px' }}>Close</button>
+        </div>
+        <div className="ext-intro">Calendars on your Google account (including ones shared with you) can show in the planner so you can plan around them. They are read-only: nothing is copied into the planner or changed in Google.</div>
+        {ExtCal.listLoading && !ExtCal.list && <div className="ext-note">Loading your calendars…</div>}
+        {ExtCal.listErr && <div className="ext-row-err">{ExtCal.listErr} <button type="button" className="tb-link" onClick={() => extLoadList(true)}>Try again</button></div>}
+        {ExtCal.list && cals.length === 0 && <div className="ext-note">No other calendars on this Google account yet. Subscribe to one in Google Calendar and it will appear here.</div>}
+        {cals.map(c => <ExtCalRow key={c.id} c={c} prefs={prefs} setPrefs={setPrefs} />)}
+        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+          <button className="modal-btn secondary" onClick={() => { extLoadList(true); Object.keys(ExtCal.months).forEach(k => { ExtCal.months[k].at = 0; }); extNotify(); }}>Refresh</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Start/end for Google. Both forms name the field they are NOT using as null, so a PATCH can turn an
 // all-day event into a timed one (or back) instead of being rejected for carrying both.
 function calStartEnd(event, dateStr) {
@@ -7017,7 +7277,7 @@ function WeekTile({ kind, text, extra, onSave }) {
   );
 }
 
-function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, projects, setProjects, onOpenProject, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen, repeatSeries, seriesRun, upkeep, setUpkeep, onOpenUpkeep, onOpenCheckin, checkinDoneFor, onOpenUs, usDue }) {
+function WeeklyPlanner({ extCals, weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, projects, setProjects, onOpenProject, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen, repeatSeries, seriesRun, upkeep, setUpkeep, onOpenUpkeep, onOpenCheckin, checkinDoneFor, onOpenUs, usDue }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
@@ -7609,6 +7869,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   }
 
   const weekDays = Array.from({length:7}, (_,i)=>addDays(weekStart,i));
+  const ext = useExtCalendars(extCals, [weekDays[0], weekDays[6]]);   // v5.100.0 read-only other calendars
   const weekLabel = `${fmtDisplay(weekDays[0])} – ${fmtDisplay(weekDays[6])}`;
 
   // People to Connect With — new directory-backed model
@@ -7804,7 +8065,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
   }
 
   const mobileDayKey = fmt(weekDays[mobileDayIndex]);
-  const mobileDayTasks = getTasks(mobileDayKey);
+  const mobileDayTasks = getTasks(mobileDayKey).filter(t => !ext.hides(mobileDayKey, t));
   const mobileDayDate = weekDays[mobileDayIndex];
 
   // Mobile touch drag for task reordering
@@ -7865,6 +8126,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
     const dk = fmt(d), lk = fmtLocal(d);
     const items = [], untimed = [];
     getTasks(dk).forEach(t => {
+      if (ext.hides(dk, t)) return;   // v5.100.0 a copy of an other-calendar event that an outside tool put in the primary calendar
       const s = tbMin(tbTaskStart(t));
       if (s == null) { untimed.push(t); return; }
       items.push({ k: 't:' + t.id, kind: 'task', id: t.id, start: s, dur: Math.max(5, Math.min(tbTaskDur(t), 1440 - s)), title: t.title, done: !!t.done, event: !!t.isEvent,
@@ -7876,6 +8138,10 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
       items.push({ k: 'g:' + task.id, kind: 'goal', id: task.id, ref: { goalId: goal.id, msId: ms.id, taskId: task.id }, start: s, dur: Math.max(5, Math.min(task.durMin > 0 ? task.durMin : 30, 1440 - s)),
         title: task.title, done: !!task.done, event: false, color: goal.color || 'var(--accent)' });
     });
+    ext.groupsFor(dk).forEach(g => g.events.forEach(e => {
+      if (e.allDay) return;
+      items.push({ k: 'x:' + e.k, kind: 'ext', start: e.start, dur: Math.max(5, Math.min(e.dur, 1440 - e.start)), title: extTitle(e, g.cal), ci: g.cal.ci, label: g.cal.label });
+    }));
     const dailyHabits = (habitGoals || []).filter(g => g.schedule === 'daily' && habitActiveOn(g, dk));
     return { key: dk, lkey: lk, date: d, today: isSameDay(d, today), items, untimed,
       projectsTotal: gl.length, projectsDone: gl.filter(x => x.task.done).length,
@@ -8153,7 +8419,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
               ))}
               {(focusIdx===null ? weekDays : [weekDays[focusIdx]]).map((d,i)=>{
                 const dk = fmt(d);
-                const tasks = getTasks(dk);
+                const tasks = getTasks(dk).filter(t => !ext.hides(dk, t));   // v5.100.0 hide copies of other-calendar events
                 return (
                   <div key={'b'+i} className={`cal-day ${isSameDay(d,today)?'today':''}`}
                     onDragOver={e=>e.preventDefault()}
@@ -8168,6 +8434,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
                       }
                       setDragging(null); setDragOver(null);
                     }}>
+                    <ExtDayStrip groups={ext.groupsFor(dk)} />
                     <DailyHabitsSection dayKey={dk}
                       habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
                       habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />
@@ -8293,6 +8560,7 @@ function WeeklyPlanner({ weekData, setWeekData, pagesData, setPagesData, onGoToH
           <TbDay ctx={{...tbDayCtx, renderGoals: m => <div className="tb-goals">{tbProjectRows(m.lkey, false)}</div>}} />
         ) : (
         <div className="mobile-day-tasks" ref={mobileTasksContainerRef}>
+          <ExtDayStrip groups={ext.groupsFor(mobileDayKey)} />
           <DailyHabitsSection dayKey={mobileDayKey}
             habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions}
             habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} />
@@ -11417,6 +11685,15 @@ function TbGrid({ days, hourPx, h0, h1, labelEvery, canDrag, header, dropActive,
               {labels.slice(0, -1).map(h => <div key={h} className="tb-hl" style={{ top: (h - h0) * hourPx }} />)}
               {tbLayout(list).map(({ it, lane, n }) => {
                 const h = Math.max(it.dur / 60 * hourPx - 2, 13);
+                if (it.kind === 'ext') {   // v5.100.0 read-only block from another calendar: no drag, resize, open or tick
+                  return (
+                    <div key={it.k} className="tb-block ext" title={`${it.title} · ${tbFmt12(it.start)}–${tbFmt12(it.start + it.dur)}`}
+                      style={{ top: px(it.start) + 1, height: h, left: `calc(${lane / n * 100}% + 1px)`, width: `calc(${100 / n}% - 2px)`, ...extStyle(it.ci) }}>
+                      <div className="tb-b-title">{it.title}</div>
+                      {h >= 34 && <div className="tb-b-time">{tbFmt12(it.start)}–{tbFmt12(it.start + it.dur)}</div>}
+                    </div>
+                  );
+                }
                 const bg = it.kind === 'goal' ? `color-mix(in srgb, ${it.color} 24%, var(--surface))` : it.bg;
                 return (
                   <div key={it.k} className={`tb-block ${canDrag ? 'canDrag' : ''} ${it.dragging ? 'dragging' : ''} ${it.done ? 'done' : ''}`}
@@ -11576,7 +11853,7 @@ function TimeSelect({ value, onChange }) {
   );
 }
 
-function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals, upkeep, setUpkeep, onOpenUpkeep }) {
+function MonthlyCalendar({ extCals, weekData, setWeekData, monthlyGoals, setMonthlyGoals, upkeep, setUpkeep, onOpenUpkeep }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selectedDate, setSelectedDate] = useState(null);
@@ -11590,6 +11867,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals,
   // v5.54.0 — compact month for phones in portrait (<600px): dots + selected-day panel instead of text chips
   const [compact, setCompact] = useState(() => !!(window.matchMedia && window.matchMedia('(max-width: 599px)').matches));
   const [pickedDay, setPickedDay] = useState(null);
+  const ext = useExtCalendars(extCals, [viewDate]);   // v5.100.0 read-only other calendars (e.g. work busy blocks)
   useEffect(() => {
     if (!window.matchMedia) return;
     const mq = window.matchMedia('(max-width: 599px)');
@@ -11660,7 +11938,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals,
     const events = [];
     Object.values(weekData).forEach(wd => {
       const tasks = (wd.tasks || {})[dateKey] || [];
-      tasks.filter(t => t.isEvent).forEach(t => events.push({...t, dayKey: dateKey}));
+      tasks.filter(t => t.isEvent && !ext.hides(dateKey, t)).forEach(t => events.push({...t, dayKey: dateKey}));
     });
     return events;
   }
@@ -11955,7 +12233,8 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals,
               const upList = upMonth.byDay[dk] || [];
               const upCollapsed = upList.length >= 3;          // 3+ on one day → a single "N upkeep" chip
               const upSlots = upCollapsed ? 1 : upList.length;  // chip rows used out of the 3 visible
-              const evSlots = 3 - upSlots;
+              const extGroups = ext.groupsFor(dk);                  // v5.100.0 one chip per other calendar per day
+              const evSlots = Math.max(0, 3 - upSlots - extGroups.length);
               const upLate = upMonth.anyLate(upList);
               return (
                 <div key={dk}
@@ -11969,6 +12248,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals,
                   {compact ? (
                     <div className="monthly-cell-dots">
                       {upList.length > 0 && <span className={`monthly-dot up ${upLate?'late':''}`} title="Home upkeep" />}
+                      {extGroups.map(g => <span key={'x'+g.cal.id} className="monthly-dot" style={{background:`var(--ext-${g.cal.ci}-edge)`}} title={`${g.cal.label}: ${g.events.length}`} />)}
                       {dayEvents.slice(0, dayEvents.length > (upList.length ? 3 : 4) ? (upList.length ? 2 : 3) : (upList.length ? 3 : 4)).map(ev=>(
                         <span key={ev.id} className="monthly-dot" style={{background: taskBg(ev.colorIndex??3)}} />
                       ))}
@@ -11991,6 +12271,12 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals,
                             <span className="monthly-up-name">{it.name||'Untitled'}</span>
                           </div>
                         );
+                      })}
+                      {extGroups.map(g => {
+                        const one = g.events.length === 1 ? g.events[0] : null;
+                        const lab = one ? `${one.allDay ? '' : tbFmt12(one.start) + ' '}${extTitle(one, g.cal)}` : `${g.cal.label} · ${g.events.length}`;
+                        return <div key={'x'+g.cal.id} className="monthly-event-chip ext" style={extStyle(g.cal.ci)}
+                          title={g.events.map(e => `${extSpan(e)}  ${extTitle(e, g.cal)}`).join('\n')}>{lab}</div>;
                       })}
                       {dayEvents.slice(0,evSlots).map(ev=>(
                         <div key={ev.id} className="monthly-event-chip"
@@ -12019,6 +12305,7 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals,
             const dayEvs = getEventsForDay(activeDayKey).slice()
               .sort((a,b) => (a.eventTime||'99:99').localeCompare(b.eventTime||'99:99'));
             const dayUp = upMonth.byDay[activeDayKey] || [];
+            const dayExt = ext.groupsFor(activeDayKey);
             return (
               <div className="monthly-day-panel">
                 <div className="monthly-day-panel-title">
@@ -12037,7 +12324,16 @@ function MonthlyCalendar({ weekData, setWeekData, monthlyGoals, setMonthlyGoals,
                     </div>
                   );
                 })}
-                {dayEvs.length === 0 && dayUp.length === 0 && <div className="monthly-day-empty">No events this day</div>}
+                {dayEvs.length === 0 && dayUp.length === 0 && dayExt.length === 0 && <div className="monthly-day-empty">No events this day</div>}
+                {dayExt.flatMap(g => g.events.map(e => (
+                  <div key={e.k} className="monthly-day-event">
+                    <div className="monthly-day-event-bar" style={{background:`var(--ext-${g.cal.ci}-edge)`}} />
+                    <div className="monthly-day-event-body">
+                      <div style={{display:'flex',alignItems:'center',gap:6}}><span className="monthly-day-event-time">{extSpan(e)}</span></div>
+                      <div className="monthly-day-event-title">{extTitle(e, g.cal)}</div>
+                    </div>
+                  </div>
+                )))}
                 {dayEvs.map(ev => (
                   <div key={ev.id} className="monthly-day-event" onClick={()=>openEditEvent(ev)}>
                     <div className="monthly-day-event-bar" style={{background: taskBg(ev.colorIndex??3)}} />
@@ -15481,6 +15777,7 @@ function App() {
   const checkinDoneToday = ciIsDone((checkins || {})[glToday()]);
   const sh = useShared(); // v5.92.0 shared space (Us)
   const [upkeep, setUpkeep] = useSynced('upkeep', []); // v5.68.0 Home upkeep — see HOME UPKEEP section
+  const [extCals, setExtCals] = useSynced('extCals', {}); // v5.100.0 other-calendar overlay choices { [calendarId]: { on, label, ci } } — see OTHER CALENDARS
   const [projects, setProjects] = useSynced('projects', []); // [{id,title,why,color,status,startDate,targetDate,milestones:[{id,title,startDate,dueDate,done,tasks:[{id,title,scheduledDate,done}]}]}] — see PROJECTS section (stored under `goals` before v5.96.0)
   // v5.35.0 — a Project linked to a reading-log book finishes that book when the project is marked done.
   // b.autoDone[projectId] remembers it fired, so reopening the book by hand is not undone; it clears when the project is reopened.
@@ -15623,6 +15920,7 @@ function App() {
   const savedTimerRef = useRef(null);
   const [me, setMe] = useState(null);                 // /api/me: backup status, Drive/Calendar permission
   const [showData, setShowData] = useState(false);    // Data & backups panel
+  const [showExt, setShowExt] = useState(false);      // v5.100.0 Other calendars panel
   const [suggestImport, setSuggestImport] = useState(false);
   async function refreshMe() { try { setMe(await api('/api/me')); } catch {} }
 
@@ -15960,6 +16258,7 @@ function App() {
           </button>
         </div>
       )}
+      {showExt && authUser && <ExtCalPanel prefs={extCals} setPrefs={setExtCals} onClose={() => setShowExt(false)} />}
       {showData && authUser && (
         <DataPanel me={me} refreshMe={refreshMe} suggestImport={suggestImport}
           onClose={() => { setShowData(false); setSuggestImport(false); }} />
@@ -16029,7 +16328,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.99.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.100.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -16057,6 +16356,7 @@ function App() {
                 {syncing ? '↓ Syncing…' : '↓ Sync Calendar'}
               </button>
               {authUser.picture && <img className="user-avatar" src={authUser.picture} alt={authUser.name} title={authUser.email} />}
+              <button className="auth-btn data-btn" onClick={() => setShowExt(true)} title="Show other Google calendars (work, family…) read-only in the planner">🗓 Calendars</button>
               <button className="auth-btn data-btn" onClick={() => { refreshMe(); setShowData(true); }} title="Backups and import from Google Drive">
                 ☁ Data{me && me.backup && me.backup.status !== 'ok' && me.backup.status !== 'skipped_empty' ? ' ⚠️' : ''}
               </button>
@@ -16111,11 +16411,11 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} projects={projects} setProjects={setProjects} onOpenProject={openProject} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} onOpenCheckin={dk=>openCheckin('planner', dk)} checkinDoneFor={dk=>ciIsDone((checkins||{})[dk])} onOpenUs={()=>setPage('us')} usDue={usDueNow(sh)} />}
+      {page==='planner' && <WeeklyPlanner extCals={extCals} weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} projects={projects} setProjects={setProjects} onOpenProject={openProject} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} onOpenCheckin={dk=>openCheckin('planner', dk)} checkinDoneFor={dk=>ciIsDone((checkins||{})[dk])} onOpenUs={()=>setPage('us')} usDue={usDueNow(sh)} />}
       {page==='checkin' && <CheckinView checkins={checkins} setCheckins={setCheckins} habitGoals={habitGoals} habitCompletions={habitCompletions} fitnessLog={fitnessLog} tagDefs={checkinTags} setTagDefs={setCheckinTags} initialDay={checkinDay} backLabel={checkinFrom==='habit'?'Habits':'Week'} onBack={()=>setPage(checkinFrom)} />}
       {page==='upkeep' && <UpkeepView upkeep={upkeep} setUpkeep={setUpkeep} onBack={()=>setPage('planner')} />}
       {page==='us' && authUser && <UsView sh={sh} me={String(authUser.email||'').toLowerCase()} myName={String(authUser.name||authUser.email||'').split(' ')[0]} onBack={()=>setPage('planner')} />}
-      {page==='monthly' && <MonthlyCalendar weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} />}
+      {page==='monthly' && <MonthlyCalendar extCals={extCals} weekData={weekData} setWeekData={setWeekData} monthlyGoals={monthlyGoals} setMonthlyGoals={setMonthlyGoals} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} />}
       {page==='habit' && <HabitTracker
         goals={habitGoals} setGoals={setHabitGoals}
         completions={habitCompletions} setCompletions={setHabitCompletions}
