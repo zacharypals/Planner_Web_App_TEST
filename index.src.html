@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.101.0 -->
+<!-- LP Planner v5.102.0 -->
+<!-- v5.102.0 — Us: red notification dots. The Us button (and the phone ☰ button) shows a dot when the latest open check-in is waiting on you, or when your partner has added a moment / finished a check-in since you last opened the Timeline. Inside Us the Check-in and Timeline tabs each get their own dot, History rows you have not finished get a dot, and the status words are clearer ("Waiting on you", "Not started by you", "Waiting on <name>"). Timeline entries you have not seen carry a red New tag for that visit. "Last seen" is stored per person in relMeta/_ (seen[email].timeline). No Worker change. -->
 <!-- v5.101.0 — Monthly: on desktop/iPad too, clicking a day selects it and lists its events in a panel below the calendar; "+ New event" is at the top of the panel (also moved to the top on phones). Event chips still open the edit window. Top bar: the Calendars button is icon-only below 1100px so it no longer crowds the bar on iPad. -->
 <!-- v5.100.0 — Other calendars: calendars on your Google account other than the primary one (e.g. a work calendar shared as free/busy) can show read-only in the planner. New "🗓 Calendars" button (next to Data) lists them with an on/off switch, an editable label and a color each (slate is the default for a work-style free/busy calendar; synced key `extCals`). They show as read-only blocks in Week > Time blocks (and the phone day view), one slim row per calendar per day in Week > List, and one chip per calendar per day on Monthly. Untitled events read "<label> (busy)". The events are fetched live and never saved, copied into the planner, or written back to Google; the primary calendar's two-way sync is untouched. Copies of these events that an outside sync tool had put in the primary calendar (same start and length, untitled or same title) are hidden. No Worker change. -->
 <!-- v5.99.0 — Projects, Phase 2: a project linked to a Reading-log book that has a page total is the book. Its percentage is pages read ÷ total (done = 100%), and the health pill (On track / At risk / Behind), the progress bars on the project page, the project list, the timeline and the Goals tile, and the Weekly review all follow it. Those places show "N of T pages" instead of tasks or milestones. Milestones stay as checkpoints and do not change the percentage. Projects with no book, or a book with no total, work exactly as before. No data change, no Worker change. -->
@@ -1713,6 +1714,15 @@
   .wr-row .wr-review-btn { flex: 1 1 0; width: auto; min-width: 0; margin: 0; padding: 0 8px; gap: 5px; font-size: 12.5px; white-space: nowrap; overflow: hidden; }
   .wr-us-btn { display: flex; align-items: center; justify-content: center; gap: 5px; flex: 0 0 auto; min-height: 38px; padding: 0 13px; border-radius: var(--radius-md); cursor: pointer; font: 600 13px 'DM Sans', sans-serif; border: 1px solid var(--border); background: var(--surface); color: var(--ink-light); }
   .wr-us-btn:hover { border-color: var(--accent); color: var(--accent); }
+  /* v5.102.0 — Us notification dots */
+  .wr-us-btn, .ci-pills.us-tabs button { position: relative; }
+  .us-dot { position: absolute; top: -5px; right: -5px; width: 13px; height: 13px; border-radius: 50%; background: var(--red); border: 2px solid var(--surface); box-sizing: border-box; pointer-events: none; }
+  .ci-pills.us-tabs button .us-dot { top: -4px; right: 4px; width: 11px; height: 11px; }
+  .mobile-fab .us-dot { top: 0; right: 0; width: 15px; height: 15px; }
+  .us-hist.needs { position: relative; padding-left: 30px; }
+  .us-rowdot { position: absolute; left: 12px; top: 20px; width: 9px; height: 9px; border-radius: 50%; background: var(--red); }
+  .us-new { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--red); color: #fff; margin-left: 8px; letter-spacing: .02em; }
+  .ci-card.us-isnew { border-color: var(--red); }
   .wr-us-btn.due { background: var(--gold-light); border-color: var(--gold); color: #8a6a05; }
   /* v5.92.0 — Us (shared relationship check-ins) */
   .us-pair { display: grid; grid-template-columns: 1fr; gap: 10px; }
@@ -6253,6 +6263,37 @@ function usDueNow(sh) {
   return !sh.list('relCheckins').some(x => x.d && x.d.date >= wk && usComplete(x.d, members));
 }
 
+// v5.102.0 — Us notification dots. Everything is worked out from the shared documents; the only new data is each person's
+// "last opened the Timeline" time, kept in relMeta/_ as seen[email].timeline (milliseconds).
+function usNeedsMe(ck, me, members) {
+  if (!ck || !ck.id || !me || usComplete(ck, members)) return false;
+  const a = ck.answers || {};
+  return !(a[me] && a[me].done);
+}
+function usDoneAt(ck) { let t = 0; Object.values(ck.answers || {}).forEach(a => { if (a && a.savedAt > t) t = a.savedAt; }); return t || ck.createdAt || 0; }
+function usDoneBy(ck) { let t = 0, who = ck.createdBy || null; Object.entries(ck.answers || {}).forEach(([k, a]) => { if (a && a.savedAt > t) { t = a.savedAt; who = k; } }); return who; }
+function usSeenAt(meta, me) { return (meta && meta.seen && meta.seen[me] && meta.seen[me].timeline) || 0; }
+// Timeline entries (keys 'm<id>' moments, 'c<id>' completed check-ins) your partner added after `since`. Your own never count.
+function usNewTimeline(sh, me, members, since) {
+  const keys = new Set(); let newest = 0;
+  if (!since) return { keys, newest };
+  sh.list('relMoments').forEach(x => { const m = x.d; if (m && m.id && m.by !== me && (m.createdAt || 0) > since) { keys.add('m' + m.id); newest = Math.max(newest, m.createdAt || 0); } });
+  sh.list('relCheckins').forEach(x => { const c = x.d; if (c && c.id && usComplete(c, members) && usDoneBy(c) !== me && usDoneAt(c) > since) { keys.add('c' + c.id); newest = Math.max(newest, usDoneAt(c)); } });
+  return { keys, newest };
+}
+// { checkin, timeline, any } — checkin: the latest open check-in is waiting on you; timeline: something new from your partner.
+function usAlerts(sh, me) {
+  const out = { checkin: false, timeline: false, any: false };
+  if (!sh.ready || !me) return out;
+  const meta = sh.get('relMeta', '_') || {};
+  const members = Object.keys(meta.members || {});
+  const latestOpen = sh.list('relCheckins').map(x => x.d).filter(d => d && d.id && !usComplete(d, members)).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+  out.checkin = usNeedsMe(latestOpen, me, members);
+  out.timeline = usNewTimeline(sh, me, members, usSeenAt(meta, me)).keys.size > 0;
+  out.any = out.checkin || out.timeline;
+  return out;
+}
+
 // Like useStorage, but synced to the server. The localStorage copy is an instant-start cache.
 function useSynced(key, init) {
   const [val, set] = useStorage(lsKey(key), init);
@@ -7283,7 +7324,7 @@ function WeekTile({ kind, text, extra, onSave }) {
   );
 }
 
-function WeeklyPlanner({ extCals, weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, projects, setProjects, onOpenProject, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen, repeatSeries, seriesRun, upkeep, setUpkeep, onOpenUpkeep, onOpenCheckin, checkinDoneFor, onOpenUs, usDue }) {
+function WeeklyPlanner({ extCals, weekData, setWeekData, pagesData, setPagesData, onGoToHabit, calHeaderColor, setCalHeaderColor, habitGoals, habitCompletions, setHabitCompletions, habitQty, setHabitQty, habitNotes, setHabitNotes, peopleDirectory, setPeopleDirectory, projects, setProjects, onOpenProject, fitnessLog, fitnessExercises, mctx, reviewOpen, setReviewOpen, repeatSeries, seriesRun, upkeep, setUpkeep, onOpenUpkeep, onOpenCheckin, checkinDoneFor, onOpenUs, usDue, usDot }) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [weekStart, setWeekStartRaw] = useState(() => {
     const saved = parseLocal(sessionStorage.getItem('lp_weekStart'));
@@ -8323,6 +8364,7 @@ function WeeklyPlanner({ extCals, weekData, setWeekData, pagesData, setPagesData
         {onOpenUs && (
           <button className={`wr-us-btn ${usDue ? 'due' : ''}`} onClick={onOpenUs} title="Relationship check-ins — you and your partner">
             <UsHeart size={15} />Us
+            {usDot && <span className="us-dot" aria-label="Something is waiting in Us" />}
           </button>
         )}
       </div>
@@ -8669,7 +8711,7 @@ function WeeklyPlanner({ extCals, weekData, setWeekData, pagesData, setPagesData
       </div>
 
       {/* MOBILE: FAB to open sheet */}
-      <button className="mobile-fab mobile-fab-wk" onClick={()=>setSheetOpen(o=>!o)} title="Weekly notes & goals">☰</button>
+      <button className="mobile-fab mobile-fab-wk" onClick={()=>setSheetOpen(o=>!o)} title="Weekly notes & goals">☰{usDot && <span className="us-dot" aria-hidden="true" />}</button>
 
       {/* CONTEXT MENU for copy/paste */}
       {ctxMenu && (
@@ -15886,6 +15928,13 @@ function App() {
 
   // Auth & sync state
   const [authUser, setAuthUser] = useState(null); // {name, email, picture}
+  // v5.102.0 — first time on this build: start "last seen the Timeline" at now, so old entries don't all show as new.
+  const usMeEmail = String((authUser && authUser.email) || '').toLowerCase();
+  useEffect(() => {
+    if (!usMeEmail || !sh.synced) return;
+    const m = sh.get('relMeta', '_');
+    if (m && m.questions && !usSeenAt(m, usMeEmail)) sh.set('relMeta', '_', ['seen', usMeEmail, 'timeline'], Date.now());
+  }, [sh.synced, sh.ver, usMeEmail]);
   // v5.58.2: the installed-app window's title bar (<meta name="theme-color">) follows the banner. The banner is a gradient but the
   // title bar is one flat color, so use the gradient's first (darker) stop. Re-read whenever the light theme, banner color or dark/light changes.
   useEffect(() => {
@@ -16336,7 +16385,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.101.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.102.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -16419,7 +16468,7 @@ function App() {
           pullDeltaY.current = 0;
           pullActive.current = false;
         }}>
-      {page==='planner' && <WeeklyPlanner extCals={extCals} weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} projects={projects} setProjects={setProjects} onOpenProject={openProject} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} onOpenCheckin={dk=>openCheckin('planner', dk)} checkinDoneFor={dk=>ciIsDone((checkins||{})[dk])} onOpenUs={()=>setPage('us')} usDue={usDueNow(sh)} />}
+      {page==='planner' && <WeeklyPlanner extCals={extCals} weekData={weekData} setWeekData={setWeekData} pagesData={pagesData} setPagesData={setPagesData} onGoToHabit={()=>setPage('habit')} calHeaderColor={calHeaderColor} setCalHeaderColor={setCalHeaderColor} habitGoals={habitGoals} habitCompletions={habitCompletions} setHabitCompletions={setHabitCompletions} habitQty={habitQty} setHabitQty={setHabitQty} habitNotes={habitNotes} setHabitNotes={setHabitNotes} peopleDirectory={peopleDirectory} setPeopleDirectory={setPeopleDirectory} projects={projects} setProjects={setProjects} onOpenProject={openProject} fitnessLog={fitnessLog} fitnessExercises={fitnessExercises} mctx={mctx} reviewOpen={reviewOpen} setReviewOpen={setReviewOpen} repeatSeries={repeatSeries} seriesRun={seriesRun} upkeep={upkeep} setUpkeep={setUpkeep} onOpenUpkeep={()=>setPage('upkeep')} onOpenCheckin={dk=>openCheckin('planner', dk)} checkinDoneFor={dk=>ciIsDone((checkins||{})[dk])} onOpenUs={()=>setPage('us')} usDue={usDueNow(sh)} usDot={usAlerts(sh, String((authUser && authUser.email) || '').toLowerCase()).any} />}
       {page==='checkin' && <CheckinView checkins={checkins} setCheckins={setCheckins} habitGoals={habitGoals} habitCompletions={habitCompletions} fitnessLog={fitnessLog} tagDefs={checkinTags} setTagDefs={setCheckinTags} initialDay={checkinDay} backLabel={checkinFrom==='habit'?'Habits':'Week'} onBack={()=>setPage(checkinFrom)} />}
       {page==='upkeep' && <UpkeepView upkeep={upkeep} setUpkeep={setUpkeep} onBack={()=>setPage('planner')} />}
       {page==='us' && authUser && <UsView sh={sh} me={String(authUser.email||'').toLowerCase()} myName={String(authUser.name||authUser.email||'').split(' ')[0]} onBack={()=>setPage('planner')} />}
@@ -16805,6 +16854,9 @@ function UsView({ sh, me, myName, onBack }) {
   const [mErr, setMErr] = useState('');
   const [lightbox, setLightbox] = useState(null);
   const [editId, setEditId] = useState(null);
+  const [seenBase, setSeenBase] = useState(null);   // v5.102.0 "last seen" as it was when you opened the Timeline (so New tags stay for this visit)
+  const alerts = usAlerts(sh, me);
+  const seenAt = usSeenAt(meta, me);
   const nameOf = (email) => (meta.members && meta.members[email] && meta.members[email].name) || 'Someone';
   const moments = sh.list('relMoments').map(x => x.d).filter(d => d && d.id);
   const myNameStored = meta.members && meta.members[me] && meta.members[me].name;
@@ -16816,6 +16868,16 @@ function UsView({ sh, me, myName, onBack }) {
     if (!cur.questions) sh.set('relMeta', '_', ['questions'], US_DEFAULT_QS);
     if (myName && (!cur.members || !cur.members[me] || cur.members[me].name !== myName)) sh.set('relMeta', '_', ['members', me], { name: myName });
   }, [sh.synced, me, myName, !!meta.questions, myNameStored]);
+
+  // v5.102.0 — opening the Timeline marks it seen (clears the dots); the New tags use the earlier time until you leave.
+  useEffect(() => {
+    if (tab !== 'timeline') { if (seenBase !== null) setSeenBase(null); return; }
+    if (!sh.synced || !me || !seenAt) return;
+    if (seenBase === null) setSeenBase(seenAt);
+    const { keys, newest } = usNewTimeline(sh, me, members, seenAt);
+    if (keys.size) sh.set('relMeta', '_', ['seen', me, 'timeline'], Math.max(Date.now(), newest));
+  }, [tab, sh.synced, sh.ver, me, seenAt]);
+  const newKeys = (tab === 'timeline' && (seenBase !== null ? seenBase : seenAt)) ? usNewTimeline(sh, me, members, seenBase !== null ? seenBase : seenAt).keys : new Set();
 
   const current = cks.find(c => c.id === openId) || cks.find(c => !usComplete(c, members)) || null;
 
@@ -16837,9 +16899,10 @@ function UsView({ sh, me, myName, onBack }) {
     const a = ck.answers || {};
     if (usComplete(ck, members)) return ck.closed && !(members.length >= 2 && members.every(m => a[m] && a[m].done)) ? '✓ Closed' : '✓ Complete';
     const mine = a[me] && a[me].done, theirs = partnerKey && a[partnerKey] && a[partnerKey].done;
-    if (mine && !theirs) return 'Waiting for ' + partnerName;
-    if (!mine && theirs) return partnerName + ' is done';
-    return 'In progress';
+    if (mine && !theirs) return 'Waiting on ' + partnerName;
+    if (!mine && theirs) return 'Waiting on you';
+    const started = a[me] && (a[me].savedAt || (a[me].r && Object.values(a[me].r).some(v => v && String(v).trim())));
+    return started ? 'In progress' : 'Not started by you';
   }
   function preview(ck) {
     const a = ck.answers || {};
@@ -16858,7 +16921,7 @@ function UsView({ sh, me, myName, onBack }) {
       </div>
       <div className="ci-pills us-tabs" role="tablist" aria-label="Us sections">
         {[['now', 'Check-in'], ['timeline', 'Timeline'], ['history', 'History'], ['questions', 'Questions']].map(([k, label]) =>
-          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{label}</button>)}
+          <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{label}{((k === 'now' && alerts.checkin) || (k === 'timeline' && alerts.timeline)) && <span className="us-dot" aria-label="Needs you" />}</button>)}
       </div>
       {!sh.ready && <div className="ci-card"><div className="ci-hint">{sh.error || 'Loading your shared space…'}</div></div>}
       {sh.ready && sh.error && <div className="ci-hint us-err">{sh.error} — your edits are kept on this device and will upload when it works again.</div>}
@@ -16978,8 +17041,8 @@ function UsView({ sh, me, myName, onBack }) {
           if (it.kind === 'checkin') {
             return (
               <React.Fragment key={'c' + it.key}>{head}
-                <button type="button" className="ci-card us-hist" onClick={() => { setOpenId(it.c.id); setTab('now'); }}>
-                  <div className="us-hist-top"><b>{ciDayLabel(it.date, true)}</b><span className="ci-chip ok">Check-in</span></div>
+                <button type="button" className={`ci-card us-hist ${newKeys.has('c' + it.key) ? 'us-isnew' : ''}`} onClick={() => { setOpenId(it.c.id); setTab('now'); }}>
+                  <div className="us-hist-top"><b>{ciDayLabel(it.date, true)}{newKeys.has('c' + it.key) && <span className="us-new">New</span>}</b><span className="ci-chip ok">Check-in</span></div>
                   {preview(it.c) && <div className="us-hist-prev">{preview(it.c)}</div>}
                 </button>
               </React.Fragment>
@@ -16988,8 +17051,8 @@ function UsView({ sh, me, myName, onBack }) {
           const m = it.m, mine = m.by === me, editing = editId === m.id && mine;
           return (
             <React.Fragment key={'m' + it.key}>{head}
-              <div className="ci-card us-moment">
-                <div className="us-hist-top"><b>{ciDayLabel(m.date, true)}</b><span className="ci-chip habit">{nameOf(m.by)}</span></div>
+              <div className={`ci-card us-moment ${newKeys.has('m' + it.key) ? 'us-isnew' : ''}`}>
+                <div className="us-hist-top"><b>{ciDayLabel(m.date, true)}{newKeys.has('m' + it.key) && <span className="us-new">New</span>}</b><span className="ci-chip habit">{nameOf(m.by)}</span></div>
                 {editing ? (
                   <>
                     <input type="date" className="ci-input" value={m.date || ''} onChange={ev => ev.target.value && sh.set('relMoments', m.id, ['date'], ev.target.value)} />
@@ -17055,8 +17118,9 @@ function UsView({ sh, me, myName, onBack }) {
         <button type="button" className="ci-primary" onClick={startCheckin} disabled={!sh.ready || !qs.length}>Start a new check-in</button>
         {cks.length === 0 && <div className="ci-card"><div className="ci-hint">No check-ins yet. Your history will build up here.</div></div>}
         {cks.map(ck => (
-          <button type="button" key={ck.id} className="ci-card us-hist" onClick={() => { setOpenId(ck.id); setTab('now'); }}>
-            <div className="us-hist-top"><b>{ciDayLabel(ck.date, true)}</b><span className={`ci-chip ${usComplete(ck, members) ? 'ok' : ''}`}>{statusOf(ck)}</span></div>
+          <button type="button" key={ck.id} className={`ci-card us-hist ${usNeedsMe(ck, me, members) ? 'needs' : ''}`} onClick={() => { setOpenId(ck.id); setTab('now'); }}>
+            {usNeedsMe(ck, me, members) && <span className="us-rowdot" aria-hidden="true" />}
+            <div className="us-hist-top"><b>{ciDayLabel(ck.date, true)}</b><span className={`ci-chip ${usComplete(ck, members) ? 'ok' : usNeedsMe(ck, me, members) ? 'habit' : ''}`}>{statusOf(ck)}</span></div>
             {preview(ck) && <div className="us-hist-prev">{preview(ck)}</div>}
           </button>
         ))}
@@ -17079,7 +17143,7 @@ function UsView({ sh, me, myName, onBack }) {
     const acts = Object.entries((ck.together && ck.together.actions) || {}).map(([id, a]) => ({ id, ...a })).sort((a, b) => (a.at || 0) - (b.at || 0));
     body = (
       <>
-        <div className="us-when"><b>{ciDayLabel(ck.date, true)}</b><span className={`ci-chip ${complete ? 'ok' : ''}`}>{statusOf(ck)}</span></div>
+        <div className="us-when"><b>{ciDayLabel(ck.date, true)}</b><span className={`ci-chip ${complete ? 'ok' : usNeedsMe(ck, me, members) ? 'habit' : ''}`}>{statusOf(ck)}</span></div>
         {(ck.qs || []).map(q => (
           <div className="ci-card" key={q.id}>
             <div className="ci-card-title">{q.text}</div>
