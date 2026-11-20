@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.102.1 -->
+<!-- LP Planner v5.102.2 -->
+<!-- v5.102.2 — Fitness: the time stamped when you tap Done now includes seconds (pill reads like 2:41:07p; stored as `doneAt` "HH:MM:SS"). Older times without seconds are shown as before. The Time column is wider, so the Done circle sits a little further right. Editing a time in the sheet keeps its seconds. -->
 <!-- v5.102.1 — Fitness: deleting an exercise or a set now asks first (a themed sheet: bottom sheet on phones, centred card on larger screens). A completely empty set still deletes straight away. The Undo toast is kept. -->
 <!-- v5.102.0 — Us: red notification dots. The Us button (and the phone ☰ button) shows a dot when the latest open check-in is waiting on you, or when your partner has added a moment / finished a check-in since you last opened the Timeline. Inside Us the Check-in and Timeline tabs each get their own dot, History rows you have not finished get a dot, and the status words are clearer ("Waiting on you", "Not started by you", "Waiting on <name>"). Timeline entries you have not seen carry a red New tag for that visit. "Last seen" is stored per person in relMeta/_ (seen[email].timeline). No Worker change. -->
 <!-- v5.101.0 — Monthly: on desktop/iPad too, clicking a day selects it and lists its events in a panel below the calendar; "+ New event" is at the top of the panel (also moved to the top on phones). Event chips still open the edit window. Top bar: the Calendars button is icon-only below 1100px so it no longer crowds the bar on iPad. -->
@@ -718,7 +719,7 @@
   .set-check.done { background: var(--accent); border-color: var(--accent); }
   .set-check.done::after { content: '✓'; color: white; font-size: 12px; font-weight: 700; }
   /* v5.80.0: time the set was marked Done — small pill just before the check */
-  .set-time { width: 52px; height: 22px; flex-shrink: 0; margin-left: 4px; box-sizing: border-box; padding: 0; border: 1px solid var(--border); border-radius: 999px; background: var(--cream); color: var(--ink-light); font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 600; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; white-space: nowrap; }
+  .set-time { width: 66px; height: 22px; flex-shrink: 0; margin-left: 4px; box-sizing: border-box; padding: 0; border: 1px solid var(--border); border-radius: 999px; background: var(--cream); color: var(--ink-light); font-family: 'DM Mono', monospace; font-size: 10px; font-weight: 600; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; white-space: nowrap; }
   .set-time:hover { border-color: var(--accent); color: var(--accent); }
   .set-time.empty { background: transparent; border-style: dashed; color: var(--ink-faint); font-weight: 400; font-size: 9px; }
   .set-time-ph { visibility: hidden; pointer-events: none; }
@@ -729,8 +730,10 @@
     .set-cw-dist { width: 50px !important; }
     .set-cw-min, .set-cw-sec { width: 36px !important; margin-left: 0 !important; }
     .set-cw-pace { width: 42px !important; }
-    .set-time, .set-time-h { width: 44px !important; margin-left: 0 !important; }
+    .set-time, .set-time-h { width: 56px !important; margin-left: 0 !important; }
+    .set-time { font-size: 9px; }   /* v5.102.2: room for 2:41:07p */
   }
+  @media (max-width: 380px) { .set-time, .set-time-h { width: 50px !important; } }   /* v5.102.2: 360px phones — keeps the cardio row inside the screen */
   /* Exercise library in sidebar */
   .ex-lib-item {
     display: flex; align-items: center; gap: 6px;
@@ -16403,7 +16406,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.102.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.102.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -17574,17 +17577,21 @@ function ciSegments(days, vals, W, H, padL, padR, padT, padB) {
 }
 
 // v5.72.0 — Custom time picker (replaces the browser's <input type="time">): hour / minute (5-minute steps) / AM-PM as tappable pills, so nothing needs scrolling.
-function ciParseTime(v) {   // 'HH:MM' (24h) → { h:1-12, m, pm } | null
-  const mt = /^(\d{1,2}):(\d{2})$/.exec(v || '');
+function ciParseTime(v) {   // 'HH:MM' or 'HH:MM:SS' (24h) → { h:1-12, m, pm, s? } | null   (s only when seconds were stored — v5.102.2)
+  const mt = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(v || '');
   if (!mt) return null;
   const H = Number(mt[1]), m = Number(mt[2]);
   if (H > 23 || m > 59) return null;
-  return { h: H % 12 === 0 ? 12 : H % 12, m, pm: H >= 12 };
+  const out = { h: H % 12 === 0 ? 12 : H % 12, m, pm: H >= 12 };
+  if (mt[3] !== undefined) { const sec = Number(mt[3]); if (sec > 59) return null; out.s = sec; }
+  return out;
 }
-function ciTo24({ h, m, pm }) { return String((h % 12) + (pm ? 12 : 0)).padStart(2, '0') + ':' + String(m).padStart(2, '0'); }
-function fitNowHM() { const n = new Date(); return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0'); }   // v5.80.0
-function fitTimeShort(v) { const t = ciParseTime(v); return t ? `${t.h}:${String(t.m).padStart(2, '0')}${t.pm ? 'p' : 'a'}` : ''; }   // v5.80.0 — "2:41p"
-function ciFmt12(v) { const t = ciParseTime(v); return t ? `${t.h}:${String(t.m).padStart(2, '0')} ${t.pm ? 'PM' : 'AM'}` : ''; }
+function ciTo24({ h, m, pm, s }) { return String((h % 12) + (pm ? 12 : 0)).padStart(2, '0') + ':' + String(m).padStart(2, '0') + (s !== undefined ? ':' + String(s).padStart(2, '0') : ''); }
+function fitNowHM() { const n = new Date(); return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0'); }   // v5.80.0 (also the picker's starting point)
+function fitNowHMS() { return fitNowHM() + ':' + String(new Date().getSeconds()).padStart(2, '0'); }   // v5.102.2 — what Done stamps
+const fitSec = t => t.s !== undefined ? ':' + String(t.s).padStart(2, '0') : '';
+function fitTimeShort(v) { const t = ciParseTime(v); return t ? `${t.h}:${String(t.m).padStart(2, '0')}${fitSec(t)}${t.pm ? 'p' : 'a'}` : ''; }   // v5.80.0 — "2:41p", or "2:41:07p" when seconds are stored
+function ciFmt12(v) { const t = ciParseTime(v); return t ? `${t.h}:${String(t.m).padStart(2, '0')}${fitSec(t)} ${t.pm ? 'PM' : 'AM'}` : ''; }
 
 function CiTimeField({ id, label, value, onChange, fallback, triggerClass, triggerContent, portal }) {
   const [open, setOpen] = useState(false);
@@ -19433,7 +19440,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
               <span className="set-label" style={{visibility:'hidden'}}>×</span>
               <span className="set-label" style={{width:52,textAlign:'center'}}>Weight</span>
               <span className="set-label" style={{visibility:'hidden'}}>lbs</span></>)}
-            <span className="set-label set-time-h" style={{width:52,marginLeft:4,textAlign:'center'}}>Time</span>
+            <span className="set-label set-time-h" style={{width:66,marginLeft:4,textAlign:'center'}}>Time</span>
             <span className="set-label" style={{width:22,marginLeft:6,display:'flex',justifyContent:'center',whiteSpace:'nowrap'}}>Done</span>
           </div>
           {ex.sets.map((set,si)=>{
@@ -19485,7 +19492,7 @@ function FitnessView({ fitnessLog, setFitnessLog, fitnessExercises, setFitnessEx
                       triggerContent={set.doneAt?fitTimeShort(set.doneAt):'+ time'}/>
                   : <span className="set-time set-time-ph" aria-hidden="true"/>}
                 <div className={`set-check ${set.done?'done':''}`} style={{marginLeft:6}}
-                  onClick={()=>{const nd=!set.done; updateSet(dk,ex.id,set.id,{done:nd,doneAt:(nd&&dk===fmt(today))?fitNowHM():''});}}/>
+                  onClick={()=>{const nd=!set.done; updateSet(dk,ex.id,set.id,{done:nd,doneAt:(nd&&dk===fmt(today))?fitNowHMS():''});}}/>
                 <button className="set-del-btn" aria-label="Delete set" data-testid="set-del" onClick={()=>requestDeleteSet(dk,ex.id,set.id)}>✕</button>
                 </div>
                 <input type="text" className="set-note-input" placeholder="note…" value={set.note||''}
