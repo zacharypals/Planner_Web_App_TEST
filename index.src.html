@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.104.1 -->
+<!-- LP Planner v5.104.2 -->
+<!-- v5.104.2 — Upkeep editor: "Show in Week view" and "Track spares" can now be folded away WITHOUT turning them off. Tap the title (when the switch is on) to fold or open it; the folded line shows a short summary (e.g. "2 weeks ahead", "2 on hand · Hall closet"). The switch on the right is now the only thing that turns the setting on or off. Tapping the title while the switch is off turns it on, and turning a switch on opens its box. -->
 <!-- v5.104.1 — Upkeep: the "Need to buy" section can be folded away (tap its heading; it shows the count). In the task editor, Details (name and tags) and Schedule can now be folded too — they start open each time; collapsed, Details shows the name and Schedule shows the repeat and next due date. (Show in Week view and Track spares already open and close with their switch; Notes and History were already collapsible.) -->
 <!-- v5.104.0 — Upkeep: (1) the task editor is now laid out in outlined sections — Name and Tags; Schedule (Repeats every, Repeats from, Last done / Next due side by side, Done today); Show in Week view; Track spares; Notes; History. Switches are slim whole-row taps; inventory and location sit side by side; Notes and History start collapsed (Notes shows a one-line preview, History shows how many completions). (2) New per-task "Use one spare each time it's done" (inside Track spares; on by default when you switch Track spares on, off for tasks that already tracked spares): marking the task done takes one off the count, never below 0, and removing that completion from History gives it back. Only the newest completion counts — a backfilled older date or a repeat tap the same day does not. (3) New "Need to buy" section at the top of the Upkeep page: tasks that track spares and have a count of exactly 0 (a blank count never appears), each with a Bought button that adds 1. It follows the tag filter. New synced fields: `autoUse` on a task, `used` on history entries. No Worker change. -->
 <!-- v5.103.0 — Upkeep (was "Home upkeep"): the name drops "Home" everywhere it shows (sidebar tile, page title, calendar pills). New per-task "Repeats from" choice in the editor: Completion (the default, and how every existing task behaves) counts the next due date from the day you finish it; Original schedule keeps its own rhythm, so a task due every Thursday that you finish on Friday is next due the following Thursday (missed cycles are skipped, and finishing more than one interval early does not count toward the next one). Removing the latest history entry of a schedule task puts its due date back. New per-task "Track spares" switch: Inventory and Location are only shown (in the editor and in the list) when it is on; tasks that already have a count or a location start with it on, and switching it off keeps the stored values. New synced fields on a task: `repeatFrom`, `trackInv`, and `prevDue` on history entries. No Worker change. -->
@@ -3644,6 +3645,9 @@
   .up-static { min-height:44px; display:flex; align-items:center; padding:0 4px; font-size:16px; font-weight:700; }
   .up-section-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:36px; padding:0; border:0; background:transparent; font-family:'DM Sans',sans-serif; color:var(--ink-light); cursor:pointer; }
   .up-section-toggle .up-section-title { margin-top:0; }
+  .up-split { display:flex; align-items:center; gap:4px; }
+  .up-split-main { flex:1; min-width:0; display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:48px; padding:0; border:0; background:transparent; color:var(--ink); font-family:'DM Sans',sans-serif; text-align:left; cursor:pointer; }
+  .up-switch-btn { flex:none; min-height:48px; padding:0 0 0 12px; border:0; background:transparent; display:flex; align-items:center; cursor:pointer; }
   .up-buy-btn { min-height:40px; padding:0 14px; flex:none; border-radius:20px; border:2px solid var(--accent); background:var(--surface); color:var(--accent); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:700; cursor:pointer; }
   .up-sheet-foot { display:flex; align-items:center; gap:8px; padding:10px 16px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); }
 
@@ -16428,7 +16432,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.104.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.104.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -17433,6 +17437,21 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
   );
 }
 
+// v5.104.2 — a card header with TWO controls: the title area folds the card's contents (only when the switch is on); the switch alone turns the setting on/off.
+// Folding never changes the setting. Tapping the title while it is off turns it on.
+function UpSwitchHead({ label, on, onToggle, open, onFold, meta }) {
+  return (
+    <div className="up-split">
+      <button type="button" className="up-split-main" aria-expanded={on ? !!open : undefined} onClick={on ? onFold : onToggle}>
+        <span className="up-card-title">{label}</span>
+        <span className="up-card-meta">{on && !open ? meta : ''}{on && <span className={`up-chev ${open ? 'open' : ''}`} aria-hidden="true">›</span>}</span>
+      </button>
+      <button type="button" role="switch" aria-checked={!!on} aria-label={label} className="up-switch-btn" onClick={onToggle}>
+        <span className={`up-switch sm ${on ? 'on' : ''}`} aria-hidden="true"><i /></span>
+      </button>
+    </div>
+  );
+}
 // v5.103.1 — a whole-row switch (the row is the tap target, the switch is just the picture)
 function UpSwitchRow({ label, on, onToggle }) {
   return (
@@ -17461,6 +17480,8 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
   const [histOpen, setHistOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(true);   // v5.104.1 — Details and Schedule can be folded too (they start open)
   const [schedOpen, setSchedOpen] = useState(true);
+  const [weekOpen, setWeekOpen] = useState(true);   // v5.104.2 — Show in Week view and Track spares fold without turning off
+  const [spOpen, setSpOpen] = useState(true);
 
   function setEvery(patch) {
     setD(x => {
@@ -17593,8 +17614,10 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
           </div>
 
           <div className="up-card flush">
-            <UpSwitchRow label="Show in Week view" on={!!d.weekView} onToggle={() => setD(x => ({ ...x, weekView: !x.weekView }))} />
-            {d.weekView && (
+            <UpSwitchHead label="Show in Week view" on={!!d.weekView} open={weekOpen} onFold={() => setWeekOpen(o => !o)}
+              meta={`${(UP_LEADS.find(([n]) => n === upLead(d)) || [0, '30 days'])[1]} ahead`}
+              onToggle={() => { if (!d.weekView) setWeekOpen(true); setD(x => ({ ...x, weekView: !x.weekView })); }} />
+            {d.weekView && weekOpen && (
               <div className="up-card-body">
                 <div className="up-lbl">Show ahead</div>
                 <div className="up-pills" role="group" aria-label="How far ahead to show it">
@@ -17606,8 +17629,10 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
           </div>
 
           <div className="up-card flush">
-            <UpSwitchRow label="Track spares" on={upTracksInv(d)} onToggle={() => setD(x => { const on = !upTracksInv(x); return { ...x, trackInv: on, ...(on && x.autoUse == null ? { autoUse: true } : {}) }; })} />
-            {upTracksInv(d) && (
+            <UpSwitchHead label="Track spares" on={upTracksInv(d)} open={spOpen} onFold={() => setSpOpen(o => !o)}
+              meta={[upInvLabel(d), (d.location || '').trim()].filter(Boolean).join(' · ') || 'No count yet'}
+              onToggle={() => { if (!upTracksInv(d)) setSpOpen(true); setD(x => { const on = !upTracksInv(x); return { ...x, trackInv: on, ...(on && x.autoUse == null ? { autoUse: true } : {}) }; }); }} />
+            {upTracksInv(d) && spOpen && (
               <div className="up-card-body">
                 <div className="up-two">
                   <div>
