@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.102.2 -->
+<!-- LP Planner v5.102.3 -->
+<!-- v5.102.3 — Fitness: older set times (saved without seconds) now show with :00 so every Done pill has the same shape (9:00:00a). Display only — nothing saved is changed. -->
 <!-- v5.102.2 — Fitness: the time stamped when you tap Done now includes seconds (pill reads like 2:41:07p; stored as `doneAt` "HH:MM:SS"). Older times without seconds are shown as before. The Time column is wider, so the Done circle sits a little further right. Editing a time in the sheet keeps its seconds. -->
 <!-- v5.102.1 — Fitness: deleting an exercise or a set now asks first (a themed sheet: bottom sheet on phones, centred card on larger screens). A completely empty set still deletes straight away. The Undo toast is kept. -->
 <!-- v5.102.0 — Us: red notification dots. The Us button (and the phone ☰ button) shows a dot when the latest open check-in is waiting on you, or when your partner has added a moment / finished a check-in since you last opened the Timeline. Inside Us the Check-in and Timeline tabs each get their own dot, History rows you have not finished get a dot, and the status words are clearer ("Waiting on you", "Not started by you", "Waiting on <name>"). Timeline entries you have not seen carry a red New tag for that visit. "Last seen" is stored per person in relMeta/_ (seen[email].timeline). No Worker change. -->
@@ -16406,7 +16407,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.102.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.102.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -17590,7 +17591,7 @@ function ciTo24({ h, m, pm, s }) { return String((h % 12) + (pm ? 12 : 0)).padSt
 function fitNowHM() { const n = new Date(); return String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0'); }   // v5.80.0 (also the picker's starting point)
 function fitNowHMS() { return fitNowHM() + ':' + String(new Date().getSeconds()).padStart(2, '0'); }   // v5.102.2 — what Done stamps
 const fitSec = t => t.s !== undefined ? ':' + String(t.s).padStart(2, '0') : '';
-function fitTimeShort(v) { const t = ciParseTime(v); return t ? `${t.h}:${String(t.m).padStart(2, '0')}${fitSec(t)}${t.pm ? 'p' : 'a'}` : ''; }   // v5.80.0 — "2:41p", or "2:41:07p" when seconds are stored
+function fitTimeShort(v) { const t = ciParseTime(v); return t ? `${t.h}:${String(t.m).padStart(2, '0')}${t.s !== undefined ? fitSec(t) : ':00'}${t.pm ? 'p' : 'a'}` : ''; }   // v5.80.0 — "2:41:07p"; a time saved without seconds shows ":00" (v5.102.3, display only)
 function ciFmt12(v) { const t = ciParseTime(v); return t ? `${t.h}:${String(t.m).padStart(2, '0')}${fitSec(t)} ${t.pm ? 'PM' : 'AM'}` : ''; }
 
 function CiTimeField({ id, label, value, onChange, fallback, triggerClass, triggerContent, portal }) {
