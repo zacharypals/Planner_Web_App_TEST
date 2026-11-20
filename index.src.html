@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.104.4 -->
+<!-- LP Planner v5.104.5 -->
+<!-- v5.104.5 — Weekly: the daily Notes open/closed state is remembered per day (on this device) instead of one setting for all days. -->
 <!-- v5.104.4 — Weekly: the daily Notes open/closed state is now remembered (on this device, one setting for all days) instead of resetting on reload. -->
 <!-- v5.104.3 — Upkeep: the fold arrows (Need to buy, and every section in the task editor) are now a larger, rounded chevron button in the accent colour — points down when folded, flips up when open — instead of the small text arrow. -->
 <!-- v5.104.2 — Upkeep editor: "Show in Week view" and "Track spares" can now be folded away WITHOUT turning them off. Tap the title (when the switch is on) to fold or open it; the folded line shows a short summary (e.g. "2 weeks ahead", "2 on hand · Hall closet"). The switch on the right is now the only thing that turns the setting on or off. Tapping the title while the switch is off turns it on, and turning a switch on opens its box. -->
@@ -9247,25 +9248,32 @@ function PeoplePicker({ directory, existingPersonIds, onAdd, onClose }) {
     </div>
   );
 }
-// v5.104.4: the Notes open/closed state is remembered (device-local, one setting shared by every day). Until it has been toggled once, a day opens if it has a note.
+// v5.104.5: the Notes open/closed state is remembered per day (device-local, never synced): { 'YYYY-MM-DD': 1 (open) | 0 (closed) }. A day never toggled opens if it has a note.
 const DAYNOTE_OPEN_LS = 'dayNoteOpen';
-function useDayNoteOpen(hasNote) {
+function readDayNoteOpen() { try { const m = JSON.parse(lsGet(DAYNOTE_OPEN_LS) || '{}'); return (m && typeof m === 'object') ? m : {}; } catch { return {}; } }
+function useDayNoteOpen(dayKey, hasNote) {
   const [, bump] = React.useReducer(x => x + 1, 0);
   React.useEffect(() => {
     const h = () => bump();
     window.addEventListener('lp-daynoteopen', h);
     return () => window.removeEventListener('lp-daynoteopen', h);
   }, []);
-  const saved = lsGet(DAYNOTE_OPEN_LS);
-  const open = saved === '1' ? true : saved === '0' ? false : !!hasNote;
+  const saved = dayKey ? readDayNoteOpen()[dayKey] : undefined;
+  const open = saved === 1 ? true : saved === 0 ? false : !!hasNote;
   function toggle() {
-    lsSet(DAYNOTE_OPEN_LS, open ? '0' : '1');
+    if (!dayKey) return;
+    const m = readDayNoteOpen();
+    m[dayKey] = open ? 0 : 1;
+    const c = new Date(); c.setDate(c.getDate() - 90);
+    const cutoff = fmtLocal(c);
+    Object.keys(m).forEach(k => { if (k < cutoff) delete m[k]; });
+    lsSet(DAYNOTE_OPEN_LS, JSON.stringify(m));
     window.dispatchEvent(new Event('lp-daynoteopen'));
   }
   return [open, toggle];
 }
 function DayNote({ dayKey, note, onChange }) {
-  const [expanded, toggleExpanded] = useDayNoteOpen(!!note);
+  const [expanded, toggleExpanded] = useDayNoteOpen(dayKey, !!note);
   const taRef = useRef();
 
   function handleToggle() {
@@ -16447,7 +16455,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.104.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.104.5</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
