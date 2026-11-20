@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.104.2 -->
+<!-- LP Planner v5.104.3 -->
+<!-- v5.104.3 — Upkeep: the fold arrows (Need to buy, and every section in the task editor) are now a larger, rounded chevron button in the accent colour — points down when folded, flips up when open — instead of the small text arrow. -->
 <!-- v5.104.2 — Upkeep editor: "Show in Week view" and "Track spares" can now be folded away WITHOUT turning them off. Tap the title (when the switch is on) to fold or open it; the folded line shows a short summary (e.g. "2 weeks ahead", "2 on hand · Hall closet"). The switch on the right is now the only thing that turns the setting on or off. Tapping the title while the switch is off turns it on, and turning a switch on opens its box. -->
 <!-- v5.104.1 — Upkeep: the "Need to buy" section can be folded away (tap its heading; it shows the count). In the task editor, Details (name and tags) and Schedule can now be folded too — they start open each time; collapsed, Details shows the name and Schedule shows the repeat and next due date. (Show in Week view and Track spares already open and close with their switch; Notes and History were already collapsible.) -->
 <!-- v5.104.0 — Upkeep: (1) the task editor is now laid out in outlined sections — Name and Tags; Schedule (Repeats every, Repeats from, Last done / Next due side by side, Done today); Show in Week view; Track spares; Notes; History. Switches are slim whole-row taps; inventory and location sit side by side; Notes and History start collapsed (Notes shows a one-line preview, History shows how many completions). (2) New per-task "Use one spare each time it's done" (inside Track spares; on by default when you switch Track spares on, off for tasks that already tracked spares): marking the task done takes one off the count, never below 0, and removing that completion from History gives it back. Only the newest completion counts — a backfilled older date or a repeat tap the same day does not. (3) New "Need to buy" section at the top of the Upkeep page: tasks that track spares and have a count of exactly 0 (a blank count never appears), each with a Bought button that adds 1. It follows the tag filter. New synced fields: `autoUse` on a task, `used` on history entries. No Worker change. -->
@@ -3633,10 +3634,11 @@
   .up-card .up-lbl { margin-top:2px; }
   .up-card-title { font-size:15px; font-weight:700; }
   .up-card-row { display:flex; align-items:center; justify-content:space-between; gap:12px; width:100%; min-height:48px; padding:0; border:0; background:transparent; color:var(--ink); font-family:'DM Sans',sans-serif; text-align:left; cursor:pointer; }
-  .up-card-meta { font-size:13px; font-weight:400; color:var(--ink-light); min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .up-card-meta { display:flex; align-items:center; justify-content:flex-end; min-width:0; font-size:13px; font-weight:400; color:var(--ink-light); }
+  .up-card-meta-t { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .up-card-body { display:flex; flex-direction:column; gap:6px; padding:0 0 10px; }
   .up-card-body .up-card-row { min-height:44px; }
-  .up-chev { display:inline-block; margin-left:6px; transition:transform .15s; } .up-chev.open { transform:rotate(90deg); }
+  .up-chev { display:inline-flex; align-items:center; justify-content:center; flex:none; width:30px; height:30px; margin-left:8px; border-radius:50%; background:var(--accent-light); color:var(--accent); transition:transform .18s ease; } .up-chev.open { transform:rotate(180deg); }
   .up-switch.sm { width:40px; height:24px; padding:2px; border-radius:12px; } .up-switch.sm i { width:20px; height:20px; }
   .up-two { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px; }
   .up-two > div { display:flex; flex-direction:column; gap:4px; min-width:0; }
@@ -16432,7 +16434,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.104.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.104.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -17412,7 +17414,7 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
             <div className="up-section">
               <button type="button" className="up-section-toggle" aria-expanded={buyOpen} onClick={() => setBuyOpen(o => !o)}>
                 <span className="up-section-title late">Need to buy · {buy.length}</span>
-                <span className={`up-chev ${buyOpen ? 'open' : ''}`} aria-hidden="true">›</span>
+                <UpChev open={buyOpen} />
               </button>
               {buyOpen && buy.map(it => (
                 <div key={it.id} className="up-row">
@@ -17437,6 +17439,10 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
   );
 }
 
+// v5.104.3 — the fold chevron: a round accent-tinted button look, points down when folded and flips up when open
+function UpChev({ open }) {
+  return <span className={`up-chev ${open ? 'open' : ''}`} aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></span>;
+}
 // v5.104.2 — a card header with TWO controls: the title area folds the card's contents (only when the switch is on); the switch alone turns the setting on/off.
 // Folding never changes the setting. Tapping the title while it is off turns it on.
 function UpSwitchHead({ label, on, onToggle, open, onFold, meta }) {
@@ -17444,7 +17450,7 @@ function UpSwitchHead({ label, on, onToggle, open, onFold, meta }) {
     <div className="up-split">
       <button type="button" className="up-split-main" aria-expanded={on ? !!open : undefined} onClick={on ? onFold : onToggle}>
         <span className="up-card-title">{label}</span>
-        <span className="up-card-meta">{on && !open ? meta : ''}{on && <span className={`up-chev ${open ? 'open' : ''}`} aria-hidden="true">›</span>}</span>
+        <span className="up-card-meta"><span className="up-card-meta-t">{on && !open ? meta : ''}</span>{on && <UpChev open={open} />}</span>
       </button>
       <button type="button" role="switch" aria-checked={!!on} aria-label={label} className="up-switch-btn" onClick={onToggle}>
         <span className={`up-switch sm ${on ? 'on' : ''}`} aria-hidden="true"><i /></span>
@@ -17535,7 +17541,7 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
           <div className="up-card flush">
             <button type="button" className="up-card-row" aria-expanded={detailsOpen} onClick={() => setDetailsOpen(o => !o)}>
               <span className="up-card-title">Details</span>
-              <span className="up-card-meta">{detailsOpen ? '' : ((d.name || '').trim() || 'Untitled')}<span className={`up-chev ${detailsOpen ? 'open' : ''}`} aria-hidden="true">›</span></span>
+              <span className="up-card-meta"><span className="up-card-meta-t">{detailsOpen ? '' : ((d.name || '').trim() || 'Untitled')}</span><UpChev open={detailsOpen} /></span>
             </button>
             {err && !detailsOpen && <div className="up-err" style={{ paddingBottom: 10 }}>{err}</div>}
             {detailsOpen && (
@@ -17553,7 +17559,7 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
           <div className="up-card flush">
             <button type="button" className="up-card-row" aria-expanded={schedOpen} onClick={() => setSchedOpen(o => !o)}>
               <span className="up-card-title">Schedule</span>
-              <span className="up-card-meta">{schedOpen ? '' : `${upEveryLabel(d.every)}${dueShown ? ' · due ' + upShort(dueShown, today) : ''}`}<span className={`up-chev ${schedOpen ? 'open' : ''}`} aria-hidden="true">›</span></span>
+              <span className="up-card-meta"><span className="up-card-meta-t">{schedOpen ? '' : `${upEveryLabel(d.every)}${dueShown ? ' · due ' + upShort(dueShown, today) : ''}`}</span><UpChev open={schedOpen} /></span>
             </button>
             {schedOpen && (
               <div className="up-card-body">
@@ -17663,7 +17669,7 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
           <div className="up-card flush">
             <button type="button" className="up-card-row" aria-expanded={notesOpen} onClick={() => setNotesOpen(o => !o)}>
               <span className="up-card-title">Notes</span>
-              <span className="up-card-meta">{notesOpen ? '' : ((d.notes || '').trim() ? (d.notes.trim().split('\n')[0].slice(0, 26) + ((d.notes.trim().length > 26 || d.notes.trim().includes('\n')) ? '…' : '')) : 'Add a note')}<span className={`up-chev ${notesOpen ? 'open' : ''}`} aria-hidden="true">›</span></span>
+              <span className="up-card-meta"><span className="up-card-meta-t">{notesOpen ? '' : ((d.notes || '').trim() ? (d.notes.trim().split('\n')[0].slice(0, 26) + ((d.notes.trim().length > 26 || d.notes.trim().includes('\n')) ? '…' : '')) : 'Add a note')}</span><UpChev open={notesOpen} /></span>
             </button>
             {notesOpen && (
               <div className="up-card-body">
@@ -17676,7 +17682,7 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
             <div className="up-card flush">
               <button type="button" className="up-card-row" aria-expanded={histOpen} onClick={() => setHistOpen(o => !o)}>
                 <span className="up-card-title">History</span>
-                <span className="up-card-meta">{d.history.length} {d.history.length === 1 ? 'completion' : 'completions'}<span className={`up-chev ${histOpen ? 'open' : ''}`} aria-hidden="true">›</span></span>
+                <span className="up-card-meta"><span className="up-card-meta-t">{d.history.length} {d.history.length === 1 ? 'completion' : 'completions'}</span><UpChev open={histOpen} /></span>
               </button>
               {histOpen && (
                 <div className="up-card-body">
