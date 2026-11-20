@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.104.3 -->
+<!-- LP Planner v5.104.4 -->
+<!-- v5.104.4 — Weekly: the daily Notes open/closed state is now remembered (on this device, one setting for all days) instead of resetting on reload. -->
 <!-- v5.104.3 — Upkeep: the fold arrows (Need to buy, and every section in the task editor) are now a larger, rounded chevron button in the accent colour — points down when folded, flips up when open — instead of the small text arrow. -->
 <!-- v5.104.2 — Upkeep editor: "Show in Week view" and "Track spares" can now be folded away WITHOUT turning them off. Tap the title (when the switch is on) to fold or open it; the folded line shows a short summary (e.g. "2 weeks ahead", "2 on hand · Hall closet"). The switch on the right is now the only thing that turns the setting on or off. Tapping the title while the switch is off turns it on, and turning a switch on opens its box. -->
 <!-- v5.104.1 — Upkeep: the "Need to buy" section can be folded away (tap its heading; it shows the count). In the task editor, Details (name and tags) and Schedule can now be folded too — they start open each time; collapsed, Details shows the name and Schedule shows the repeat and next due date. (Show in Week view and Track spares already open and close with their switch; Notes and History were already collapsible.) -->
@@ -9246,18 +9247,30 @@ function PeoplePicker({ directory, existingPersonIds, onAdd, onClose }) {
     </div>
   );
 }
+// v5.104.4: the Notes open/closed state is remembered (device-local, one setting shared by every day). Until it has been toggled once, a day opens if it has a note.
+const DAYNOTE_OPEN_LS = 'dayNoteOpen';
+function useDayNoteOpen(hasNote) {
+  const [, bump] = React.useReducer(x => x + 1, 0);
+  React.useEffect(() => {
+    const h = () => bump();
+    window.addEventListener('lp-daynoteopen', h);
+    return () => window.removeEventListener('lp-daynoteopen', h);
+  }, []);
+  const saved = lsGet(DAYNOTE_OPEN_LS);
+  const open = saved === '1' ? true : saved === '0' ? false : !!hasNote;
+  function toggle() {
+    lsSet(DAYNOTE_OPEN_LS, open ? '0' : '1');
+    window.dispatchEvent(new Event('lp-daynoteopen'));
+  }
+  return [open, toggle];
+}
 function DayNote({ dayKey, note, onChange }) {
-  const [expanded, setExpanded] = useState(!!note);
+  const [expanded, toggleExpanded] = useDayNoteOpen(!!note);
   const taRef = useRef();
 
-  // Auto-expand if note has content
-  useEffect(() => { if (note && !expanded) setExpanded(true); }, [note]);
-
   function handleToggle() {
-    setExpanded(e => {
-      if (!e && taRef.current) setTimeout(()=>taRef.current?.focus(), 50);
-      return !e;
-    });
+    if (!expanded) setTimeout(()=>taRef.current?.focus(), 50);
+    toggleExpanded();
   }
 
   return (
@@ -16434,7 +16447,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.104.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.104.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
