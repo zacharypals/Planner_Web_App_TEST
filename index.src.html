@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.104.5 -->
+<!-- LP Planner v5.104.6 -->
+<!-- v5.104.6 — Upkeep: fold state is remembered. The "Need to buy" heading remembers open/closed, and each task remembers which of its editor sections (Details, Schedule, Show in Week view, Track spares, Notes, History) you left folded or open, so it comes back the way you left it. Stored per device (localStorage `upFold`), not synced, so your phone and PC each keep their own; deleting a task forgets its choices. Sections you have never touched keep the old defaults (Notes and History folded, the rest open). -->
 <!-- v5.104.5 — Weekly: the daily Notes open/closed state is remembered per day (on this device) instead of one setting for all days. -->
 <!-- v5.104.4 — Weekly: the daily Notes open/closed state is now remembered (on this device, one setting for all days) instead of resetting on reload. -->
 <!-- v5.104.3 — Upkeep: the fold arrows (Need to buy, and every section in the task editor) are now a larger, rounded chevron button in the accent colour — points down when folded, flips up when open — instead of the small text arrow. -->
@@ -16455,7 +16456,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.104.5</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.104.6</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -17359,11 +17360,11 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
     setUpkeep(l => (l || []).some(i => i.id === item.id) ? l.map(i => i.id === item.id ? item : i) : [...(l || []), item]);
     if (!keepOpen) setEditId(null);
   }
-  function removeItem(id) { setUpkeep(l => (l || []).filter(i => i.id !== id)); setEditId(null); }
+  function removeItem(id) { setUpkeep(l => (l || []).filter(i => i.id !== id)); upFoldForget(id); setEditId(null); }
   function doneToday(id) { setUpkeep(l => (l || []).map(i => i.id === id ? upMarkDone(i, glToday()) : i)); }
   function bought(id) { setUpkeep(l => (l || []).map(i => i.id === id ? { ...i, inventory: (Number(i.inventory) || 0) + 1 } : i)); }   // v5.103.1
   const buy = shown.filter(upNeedsBuy);
-  const [buyOpen, setBuyOpen] = useState(true);   // v5.104.1 — Need to buy can be folded away
+  const [buyOpen, setBuyOpen] = useState(() => upBuyOpenGet());   // v5.104.1 — Need to buy can be folded away; v5.104.6 remembers it
 
   function Row({ it }) {
     const st = upStatus(it, today);
@@ -17433,7 +17434,7 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
           {all.length > 0 && shown.length === 0 && <div className="up-empty"><span>Nothing tagged “{tagName}” yet.</span></div>}
           {buy.length > 0 && (
             <div className="up-section">
-              <button type="button" className="up-section-toggle" aria-expanded={buyOpen} onClick={() => setBuyOpen(o => !o)}>
+              <button type="button" className="up-section-toggle" aria-expanded={buyOpen} onClick={() => { setBuyOpen(!buyOpen); upBuyOpenSet(!buyOpen); }}>
                 <span className="up-section-title late">Need to buy · {buy.length}</span>
                 <UpChev open={buyOpen} />
               </button>
@@ -17460,6 +17461,14 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
   );
 }
 
+// v5.104.6 — remembered fold state, per device (localStorage `upFold`, not synced): { buy: bool (Need to buy open), t: { [taskId]: { details, sched, week, spares, notes, hist: bool open } } }
+const UP_FOLD_DEFAULTS = { details: true, sched: true, week: true, spares: true, notes: false, hist: false };
+function upFoldRead() { try { const v = JSON.parse(lsGet('upFold') || '{}'); return v && typeof v === 'object' ? v : {}; } catch { return {}; } }
+function upFoldGet(id, sec) { const m = (upFoldRead().t || {})[id]; return m && typeof m[sec] === 'boolean' ? m[sec] : UP_FOLD_DEFAULTS[sec]; }
+function upFoldSet(id, sec, open) { if (!id) return; const v = upFoldRead(); v.t = v.t || {}; v.t[id] = { ...(v.t[id] || {}), [sec]: !!open }; lsSet('upFold', JSON.stringify(v)); }
+function upFoldForget(id) { const v = upFoldRead(); if (v.t && v.t[id]) { delete v.t[id]; lsSet('upFold', JSON.stringify(v)); } }
+function upBuyOpenGet() { const v = upFoldRead(); return typeof v.buy === 'boolean' ? v.buy : true; }
+function upBuyOpenSet(open) { const v = upFoldRead(); v.buy = !!open; lsSet('upFold', JSON.stringify(v)); }
 // v5.104.3 — the fold chevron: a round accent-tinted button look, points down when folded and flips up when open
 function UpChev({ open }) {
   return <span className={`up-chev ${open ? 'open' : ''}`} aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg></span>;
@@ -17503,12 +17512,14 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
   const [confirmDel, setConfirmDel] = useState(false);
   const [newLast, setNewLast] = useState('');   // new items only: optional "last done" date
   const [err, setErr] = useState('');
-  const [notesOpen, setNotesOpen] = useState(false);   // v5.103.1 — Notes and History start collapsed
-  const [histOpen, setHistOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(true);   // v5.104.1 — Details and Schedule can be folded too (they start open)
-  const [schedOpen, setSchedOpen] = useState(true);
-  const [weekOpen, setWeekOpen] = useState(true);   // v5.104.2 — Show in Week view and Track spares fold without turning off
-  const [spOpen, setSpOpen] = useState(true);
+  // Fold state (v5.103.1 Notes/History, v5.104.1 Details/Schedule, v5.104.2 Show in Week view/Track spares). v5.104.6: remembered per task on this device (upFold*).
+  const [notesOpen, setNotesOpen] = useState(() => upFoldGet(d.id, 'notes'));
+  const [histOpen, setHistOpen] = useState(() => upFoldGet(d.id, 'hist'));
+  const [detailsOpen, setDetailsOpen] = useState(() => upFoldGet(d.id, 'details'));
+  const [schedOpen, setSchedOpen] = useState(() => upFoldGet(d.id, 'sched'));
+  const [weekOpen, setWeekOpen] = useState(() => upFoldGet(d.id, 'week'));
+  const [spOpen, setSpOpen] = useState(() => upFoldGet(d.id, 'spares'));
+  function foldTo(sec, set, open) { set(open); upFoldSet(d.id, sec, open); }
 
   function setEvery(patch) {
     setD(x => {
@@ -17560,7 +17571,7 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
         </div>
         <div className="up-sheet-body">
           <div className="up-card flush">
-            <button type="button" className="up-card-row" aria-expanded={detailsOpen} onClick={() => setDetailsOpen(o => !o)}>
+            <button type="button" className="up-card-row" aria-expanded={detailsOpen} onClick={() => foldTo('details', setDetailsOpen, !detailsOpen)}>
               <span className="up-card-title">Details</span>
               <span className="up-card-meta"><span className="up-card-meta-t">{detailsOpen ? '' : ((d.name || '').trim() || 'Untitled')}</span><UpChev open={detailsOpen} /></span>
             </button>
@@ -17578,7 +17589,7 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
           </div>
 
           <div className="up-card flush">
-            <button type="button" className="up-card-row" aria-expanded={schedOpen} onClick={() => setSchedOpen(o => !o)}>
+            <button type="button" className="up-card-row" aria-expanded={schedOpen} onClick={() => foldTo('sched', setSchedOpen, !schedOpen)}>
               <span className="up-card-title">Schedule</span>
               <span className="up-card-meta"><span className="up-card-meta-t">{schedOpen ? '' : `${upEveryLabel(d.every)}${dueShown ? ' · due ' + upShort(dueShown, today) : ''}`}</span><UpChev open={schedOpen} /></span>
             </button>
@@ -17641,9 +17652,9 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
           </div>
 
           <div className="up-card flush">
-            <UpSwitchHead label="Show in Week view" on={!!d.weekView} open={weekOpen} onFold={() => setWeekOpen(o => !o)}
+            <UpSwitchHead label="Show in Week view" on={!!d.weekView} open={weekOpen} onFold={() => foldTo('week', setWeekOpen, !weekOpen)}
               meta={`${(UP_LEADS.find(([n]) => n === upLead(d)) || [0, '30 days'])[1]} ahead`}
-              onToggle={() => { if (!d.weekView) setWeekOpen(true); setD(x => ({ ...x, weekView: !x.weekView })); }} />
+              onToggle={() => { if (!d.weekView) foldTo('week', setWeekOpen, true); setD(x => ({ ...x, weekView: !x.weekView })); }} />
             {d.weekView && weekOpen && (
               <div className="up-card-body">
                 <div className="up-lbl">Show ahead</div>
@@ -17656,9 +17667,9 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
           </div>
 
           <div className="up-card flush">
-            <UpSwitchHead label="Track spares" on={upTracksInv(d)} open={spOpen} onFold={() => setSpOpen(o => !o)}
+            <UpSwitchHead label="Track spares" on={upTracksInv(d)} open={spOpen} onFold={() => foldTo('spares', setSpOpen, !spOpen)}
               meta={[upInvLabel(d), (d.location || '').trim()].filter(Boolean).join(' · ') || 'No count yet'}
-              onToggle={() => { if (!upTracksInv(d)) setSpOpen(true); setD(x => { const on = !upTracksInv(x); return { ...x, trackInv: on, ...(on && x.autoUse == null ? { autoUse: true } : {}) }; }); }} />
+              onToggle={() => { if (!upTracksInv(d)) foldTo('spares', setSpOpen, true); setD(x => { const on = !upTracksInv(x); return { ...x, trackInv: on, ...(on && x.autoUse == null ? { autoUse: true } : {}) }; }); }} />
             {upTracksInv(d) && spOpen && (
               <div className="up-card-body">
                 <div className="up-two">
@@ -17688,7 +17699,7 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
           </div>
 
           <div className="up-card flush">
-            <button type="button" className="up-card-row" aria-expanded={notesOpen} onClick={() => setNotesOpen(o => !o)}>
+            <button type="button" className="up-card-row" aria-expanded={notesOpen} onClick={() => foldTo('notes', setNotesOpen, !notesOpen)}>
               <span className="up-card-title">Notes</span>
               <span className="up-card-meta"><span className="up-card-meta-t">{notesOpen ? '' : ((d.notes || '').trim() ? (d.notes.trim().split('\n')[0].slice(0, 26) + ((d.notes.trim().length > 26 || d.notes.trim().includes('\n')) ? '…' : '')) : 'Add a note')}</span><UpChev open={notesOpen} /></span>
             </button>
@@ -17701,7 +17712,7 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
 
           {!isNew && (d.history || []).length > 0 && (
             <div className="up-card flush">
-              <button type="button" className="up-card-row" aria-expanded={histOpen} onClick={() => setHistOpen(o => !o)}>
+              <button type="button" className="up-card-row" aria-expanded={histOpen} onClick={() => foldTo('hist', setHistOpen, !histOpen)}>
                 <span className="up-card-title">History</span>
                 <span className="up-card-meta"><span className="up-card-meta-t">{d.history.length} {d.history.length === 1 ? 'completion' : 'completions'}</span><UpChev open={histOpen} /></span>
               </button>
