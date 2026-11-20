@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.104.0 -->
+<!-- LP Planner v5.104.1 -->
+<!-- v5.104.1 — Upkeep: the "Need to buy" section can be folded away (tap its heading; it shows the count). In the task editor, Details (name and tags) and Schedule can now be folded too — they start open each time; collapsed, Details shows the name and Schedule shows the repeat and next due date. (Show in Week view and Track spares already open and close with their switch; Notes and History were already collapsible.) -->
 <!-- v5.104.0 — Upkeep: (1) the task editor is now laid out in outlined sections — Name and Tags; Schedule (Repeats every, Repeats from, Last done / Next due side by side, Done today); Show in Week view; Track spares; Notes; History. Switches are slim whole-row taps; inventory and location sit side by side; Notes and History start collapsed (Notes shows a one-line preview, History shows how many completions). (2) New per-task "Use one spare each time it's done" (inside Track spares; on by default when you switch Track spares on, off for tasks that already tracked spares): marking the task done takes one off the count, never below 0, and removing that completion from History gives it back. Only the newest completion counts — a backfilled older date or a repeat tap the same day does not. (3) New "Need to buy" section at the top of the Upkeep page: tasks that track spares and have a count of exactly 0 (a blank count never appears), each with a Bought button that adds 1. It follows the tag filter. New synced fields: `autoUse` on a task, `used` on history entries. No Worker change. -->
 <!-- v5.103.0 — Upkeep (was "Home upkeep"): the name drops "Home" everywhere it shows (sidebar tile, page title, calendar pills). New per-task "Repeats from" choice in the editor: Completion (the default, and how every existing task behaves) counts the next due date from the day you finish it; Original schedule keeps its own rhythm, so a task due every Thursday that you finish on Friday is next due the following Thursday (missed cycles are skipped, and finishing more than one interval early does not count toward the next one). Removing the latest history entry of a schedule task puts its due date back. New per-task "Track spares" switch: Inventory and Location are only shown (in the editor and in the list) when it is on; tasks that already have a count or a location start with it on, and switching it off keeps the stored values. New synced fields on a task: `repeatFrom`, `trackInv`, and `prevDue` on history entries. No Worker change. -->
 <!-- v5.102.2 — Fitness: the time stamped when you tap Done now includes seconds (pill reads like 2:41:07p; stored as `doneAt` "HH:MM:SS"). Older times without seconds are shown as before. The Time column is wider, so the Done circle sits a little further right. Editing a time in the sheet keeps its seconds. -->
@@ -3641,6 +3642,8 @@
   .up-two .up-lbl { margin-top:0; }
   .up-two .up-inv { max-width:none; }
   .up-static { min-height:44px; display:flex; align-items:center; padding:0 4px; font-size:16px; font-weight:700; }
+  .up-section-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:36px; padding:0; border:0; background:transparent; font-family:'DM Sans',sans-serif; color:var(--ink-light); cursor:pointer; }
+  .up-section-toggle .up-section-title { margin-top:0; }
   .up-buy-btn { min-height:40px; padding:0 14px; flex:none; border-radius:20px; border:2px solid var(--accent); background:var(--surface); color:var(--accent); font-family:'DM Sans',sans-serif; font-size:14px; font-weight:700; cursor:pointer; }
   .up-sheet-foot { display:flex; align-items:center; gap:8px; padding:10px 16px calc(10px + env(safe-area-inset-bottom)); border-top:1px solid var(--border); }
 
@@ -16425,7 +16428,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.104.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.104.1</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -17333,6 +17336,7 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
   function doneToday(id) { setUpkeep(l => (l || []).map(i => i.id === id ? upMarkDone(i, glToday()) : i)); }
   function bought(id) { setUpkeep(l => (l || []).map(i => i.id === id ? { ...i, inventory: (Number(i.inventory) || 0) + 1 } : i)); }   // v5.103.1
   const buy = shown.filter(upNeedsBuy);
+  const [buyOpen, setBuyOpen] = useState(true);   // v5.104.1 — Need to buy can be folded away
 
   function Row({ it }) {
     const st = upStatus(it, today);
@@ -17402,8 +17406,11 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
           {all.length > 0 && shown.length === 0 && <div className="up-empty"><span>Nothing tagged “{tagName}” yet.</span></div>}
           {buy.length > 0 && (
             <div className="up-section">
-              <div className="up-section-title late">Need to buy</div>
-              {buy.map(it => (
+              <button type="button" className="up-section-toggle" aria-expanded={buyOpen} onClick={() => setBuyOpen(o => !o)}>
+                <span className="up-section-title late">Need to buy · {buy.length}</span>
+                <span className={`up-chev ${buyOpen ? 'open' : ''}`} aria-hidden="true">›</span>
+              </button>
+              {buyOpen && buy.map(it => (
                 <div key={it.id} className="up-row">
                   <button type="button" className="up-row-main" onClick={() => setEditId(it.id)}>
                     <span className="up-row-name">{it.name || 'Untitled'}</span>
@@ -17452,6 +17459,8 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
   const [err, setErr] = useState('');
   const [notesOpen, setNotesOpen] = useState(false);   // v5.103.1 — Notes and History start collapsed
   const [histOpen, setHistOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(true);   // v5.104.1 — Details and Schedule can be folded too (they start open)
+  const [schedOpen, setSchedOpen] = useState(true);
 
   function setEvery(patch) {
     setD(x => {
@@ -17502,66 +17511,83 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
           <button type="button" className="up-x" aria-label="Close" onClick={onClose}>✕</button>
         </div>
         <div className="up-sheet-body">
-          <div className="up-card">
-            <label className="up-lbl" htmlFor="up-name">Name</label>
-            <input id="up-name" className="up-input" type="text" value={d.name} placeholder="Replace HVAC filter" autoFocus={isNew}
-              onChange={e => { setErr(''); setD(x => ({ ...x, name: e.target.value })); }} />
-            {err && <div className="up-err">{err}</div>}
-            <div className="up-lbl">Tags <span className="up-opt">(optional)</span></div>
-            <GlTagEditor tags={d.tags} all={allTags} onChange={t => setD(x => ({ ...x, tags: t }))} placeholder="+ Add tags (e.g. Condo, HOA)" />
+          <div className="up-card flush">
+            <button type="button" className="up-card-row" aria-expanded={detailsOpen} onClick={() => setDetailsOpen(o => !o)}>
+              <span className="up-card-title">Details</span>
+              <span className="up-card-meta">{detailsOpen ? '' : ((d.name || '').trim() || 'Untitled')}<span className={`up-chev ${detailsOpen ? 'open' : ''}`} aria-hidden="true">›</span></span>
+            </button>
+            {err && !detailsOpen && <div className="up-err" style={{ paddingBottom: 10 }}>{err}</div>}
+            {detailsOpen && (
+              <div className="up-card-body">
+                <label className="up-lbl" htmlFor="up-name">Name</label>
+                <input id="up-name" className="up-input" type="text" value={d.name} placeholder="Replace HVAC filter" autoFocus={isNew}
+                  onChange={e => { setErr(''); setD(x => ({ ...x, name: e.target.value })); }} />
+                {err && <div className="up-err">{err}</div>}
+                <div className="up-lbl">Tags <span className="up-opt">(optional)</span></div>
+                <GlTagEditor tags={d.tags} all={allTags} onChange={t => setD(x => ({ ...x, tags: t }))} placeholder="+ Add tags (e.g. Condo, HOA)" />
+              </div>
+            )}
           </div>
 
-          <div className="up-card">
-            <div className="up-card-title">Schedule</div>
-            <div className="up-every">
-              <button type="button" className="up-step" aria-label="Decrease" onClick={() => setEvery({ n: Math.max(1, d.every.n - 1) })}>−</button>
-              <span className="up-every-n">{d.every.n}</span>
-              <button type="button" className="up-step" aria-label="Increase" onClick={() => setEvery({ n: Math.min(60, d.every.n + 1) })}>+</button>
-              <div className="up-pills">
-                {UP_UNITS.map(([u, label]) => <button key={u} type="button" aria-pressed={d.every.unit === u} className={d.every.unit === u ? 'on' : ''} onClick={() => setEvery({ unit: u })}>{label}</button>)}
-              </div>
-            </div>
-
-            <div className="up-lbl">Repeats from</div>
-            <div className="up-pills" role="group" aria-label="What the next due date is counted from">
-              {[['done', 'Completion'], ['schedule', 'Original schedule']].map(([k, label]) => <button key={k} type="button" aria-pressed={upRepeatFrom(d) === k} className={upRepeatFrom(d) === k ? 'on' : ''} onClick={() => setD(x => ({ ...x, repeatFrom: k }))}>{label}</button>)}
-            </div>
-            <div className="up-hint">{upRepeatFrom(d) === 'schedule' ? 'Keeps its own rhythm. If it is due every Thursday and you finish it on Friday, the next one is still due next Thursday.' : 'Counts from the day you finish it. Finish it late and the next one moves later too.'}</div>
-
-            <div className="up-two" style={{ marginTop: 4 }}>
-              {isNew ? (
-                <div>
-                  <label className="up-lbl" htmlFor="up-last">Last done <span className="up-opt">(optional)</span></label>
-                  <input id="up-last" className="up-input" type="date" max={today} value={newLast}
-                    onChange={e => { const v = e.target.value; setNewLast(v); if (v && !dueTouched) setD(x => ({ ...x, dueDate: upAddInterval(v, x.every.n, x.every.unit) })); }} />
+          <div className="up-card flush">
+            <button type="button" className="up-card-row" aria-expanded={schedOpen} onClick={() => setSchedOpen(o => !o)}>
+              <span className="up-card-title">Schedule</span>
+              <span className="up-card-meta">{schedOpen ? '' : `${upEveryLabel(d.every)}${dueShown ? ' · due ' + upShort(dueShown, today) : ''}`}<span className={`up-chev ${schedOpen ? 'open' : ''}`} aria-hidden="true">›</span></span>
+            </button>
+            {schedOpen && (
+              <div className="up-card-body">
+              <div className="up-every">
+                <button type="button" className="up-step" aria-label="Decrease" onClick={() => setEvery({ n: Math.max(1, d.every.n - 1) })}>−</button>
+                <span className="up-every-n">{d.every.n}</span>
+                <button type="button" className="up-step" aria-label="Increase" onClick={() => setEvery({ n: Math.min(60, d.every.n + 1) })}>+</button>
+                <div className="up-pills">
+                  {UP_UNITS.map(([u, label]) => <button key={u} type="button" aria-pressed={d.every.unit === u} className={d.every.unit === u ? 'on' : ''} onClick={() => setEvery({ unit: u })}>{label}</button>)}
                 </div>
-              ) : (
+              </div>
+
+              <div className="up-lbl">Repeats from</div>
+              <div className="up-pills" role="group" aria-label="What the next due date is counted from">
+                {[['done', 'Completion'], ['schedule', 'Original schedule']].map(([k, label]) => <button key={k} type="button" aria-pressed={upRepeatFrom(d) === k} className={upRepeatFrom(d) === k ? 'on' : ''} onClick={() => setD(x => ({ ...x, repeatFrom: k }))}>{label}</button>)}
+              </div>
+              <div className="up-hint">{upRepeatFrom(d) === 'schedule' ? 'Keeps its own rhythm. If it is due every Thursday and you finish it on Friday, the next one is still due next Thursday.' : 'Counts from the day you finish it. Finish it late and the next one moves later too.'}</div>
+
+              <div className="up-two" style={{ marginTop: 4 }}>
+                {isNew ? (
+                  <div>
+                    <label className="up-lbl" htmlFor="up-last">Last done <span className="up-opt">(optional)</span></label>
+                    <input id="up-last" className="up-input" type="date" max={today} value={newLast}
+                      onChange={e => { const v = e.target.value; setNewLast(v); if (v && !dueTouched) setD(x => ({ ...x, dueDate: upAddInterval(v, x.every.n, x.every.unit) })); }} />
+                  </div>
+                ) : (
+                  <div>
+                    <div className="up-lbl">Last done</div>
+                    <div className="up-static">{d.lastDone ? upShort(d.lastDone, today) : 'Not yet'}</div>
+                  </div>
+                )}
                 <div>
-                  <div className="up-lbl">Last done</div>
-                  <div className="up-static">{d.lastDone ? upShort(d.lastDone, today) : 'Not yet'}</div>
+                  <label className="up-lbl" htmlFor="up-due">Next due</label>
+                  <input id="up-due" className="up-input" type="date" value={dueShown || ''}
+                    onChange={e => { setDueTouched(true); setD(x => ({ ...x, dueDate: e.target.value })); }} />
+                </div>
+              </div>
+              {!dueShown && <div className="up-hint">Leave blank to make it due today.</div>}
+
+              {!isNew && (
+                <div className="up-actions">
+                  <button type="button" className="up-primary" onClick={() => done(today)}>Done today</button>
+                  {!otherDate
+                    ? <button type="button" className="up-secondary" onClick={() => setOtherDate(true)}>Done on another date…</button>
+                    : (
+                      <div className="up-other">
+                        <input className="up-input" type="date" max={today} value={otherVal} aria-label="Date it was done" onChange={e => { setOtherMsg(''); setOtherVal(e.target.value); }} />
+                        <button type="button" className="up-secondary" onClick={doneOther}>Save</button>
+                      </div>
+                    )}
+                  {otherMsg && <div className="up-err" role="status">{otherMsg}</div>}
+                  <div className="up-hint" style={{ textAlign: 'center' }}>{upRepeatFrom(d) === 'schedule' ? 'Next due follows the original schedule, not the day you finish.' : 'Next due is counted from the day you finish it.'}</div>
                 </div>
               )}
-              <div>
-                <label className="up-lbl" htmlFor="up-due">Next due</label>
-                <input id="up-due" className="up-input" type="date" value={dueShown || ''}
-                  onChange={e => { setDueTouched(true); setD(x => ({ ...x, dueDate: e.target.value })); }} />
-              </div>
-            </div>
-            {!dueShown && <div className="up-hint">Leave blank to make it due today.</div>}
-
-            {!isNew && (
-              <div className="up-actions">
-                <button type="button" className="up-primary" onClick={() => done(today)}>Done today</button>
-                {!otherDate
-                  ? <button type="button" className="up-secondary" onClick={() => setOtherDate(true)}>Done on another date…</button>
-                  : (
-                    <div className="up-other">
-                      <input className="up-input" type="date" max={today} value={otherVal} aria-label="Date it was done" onChange={e => { setOtherMsg(''); setOtherVal(e.target.value); }} />
-                      <button type="button" className="up-secondary" onClick={doneOther}>Save</button>
-                    </div>
-                  )}
-                {otherMsg && <div className="up-err" role="status">{otherMsg}</div>}
-                <div className="up-hint" style={{ textAlign: 'center' }}>{upRepeatFrom(d) === 'schedule' ? 'Next due follows the original schedule, not the day you finish.' : 'Next due is counted from the day you finish it.'}</div>
+          
               </div>
             )}
           </div>
