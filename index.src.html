@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.102.2 -->
+<!-- LP Planner v5.103.0 -->
+<!-- v5.103.0 — Upkeep (was "Home upkeep"): the name drops "Home" everywhere it shows (sidebar tile, page title, calendar pills). New per-task "Repeats from" choice in the editor: Completion (the default, and how every existing task behaves) counts the next due date from the day you finish it; Original schedule keeps its own rhythm, so a task due every Thursday that you finish on Friday is next due the following Thursday (missed cycles are skipped, and finishing more than one interval early does not count toward the next one). Removing the latest history entry of a schedule task puts its due date back. New per-task "Track spares" switch: Inventory and Location are only shown (in the editor and in the list) when it is on; tasks that already have a count or a location start with it on, and switching it off keeps the stored values. New synced fields on a task: `repeatFrom`, `trackInv`, and `prevDue` on history entries. No Worker change. -->
 <!-- v5.102.2 — Fitness: the time stamped when you tap Done now includes seconds (pill reads like 2:41:07p; stored as `doneAt` "HH:MM:SS"). Older times without seconds are shown as before. The Time column is wider, so the Done circle sits a little further right. Editing a time in the sheet keeps its seconds. -->
 <!-- v5.102.1 — Fitness: deleting an exercise or a set now asks first (a themed sheet: bottom sheet on phones, centred card on larger screens). A completely empty set still deletes straight away. The Undo toast is kept. -->
 <!-- v5.102.0 — Us: red notification dots. The Us button (and the phone ☰ button) shows a dot when the latest open check-in is waiting on you, or when your partner has added a moment / finished a check-in since you last opened the Timeline. Inside Us the Check-in and Timeline tabs each get their own dot, History rows you have not finished get a dot, and the status words are clearer ("Waiting on you", "Not started by you", "Waiting on <name>"). Timeline entries you have not seen carry a red New tag for that visit. "Last seen" is stored per person in relMeta/_ (seen[email].timeline). No Worker change. -->
@@ -12316,7 +12317,7 @@ function MonthlyCalendar({ extCals, weekData, setWeekData, monthlyGoals, setMont
                   <div className="monthly-cell-date">{d.getDate()}</div>
                   {compact ? (
                     <div className="monthly-cell-dots">
-                      {upList.length > 0 && <span className={`monthly-dot up ${upLate?'late':''}`} title="Home upkeep" />}
+                      {upList.length > 0 && <span className={`monthly-dot up ${upLate?'late':''}`} title="Upkeep" />}
                       {extGroups.map(g => <span key={'x'+g.cal.id} className="monthly-dot" style={{background:`var(--ext-${g.cal.ci}-edge)`}} title={`${g.cal.label}: ${g.events.length}`} />)}
                       {dayEvents.slice(0, dayEvents.length > (upList.length ? 3 : 4) ? (upList.length ? 2 : 3) : (upList.length ? 3 : 4)).map(ev=>(
                         <span key={ev.id} className="monthly-dot" style={{background: taskBg(ev.colorIndex??3)}} />
@@ -12391,7 +12392,7 @@ function MonthlyCalendar({ extCals, weekData, setWeekData, monthlyGoals, setMont
                       <button type="button" className="monthly-day-up-tick" aria-label={`Mark ${it.name||'task'} done`} onClick={()=>upDoneTap(it)} />
                       <div className="monthly-day-event-body" onClick={upOpen}>
                         <div className="monthly-day-event-title">{it.name || 'Untitled'}</div>
-                        <span className="monthly-day-up-pill"><UpHouse size={12} /> Home upkeep · {upDueLabel(it, upTodayKey)}</span>
+                        <span className="monthly-day-up-pill"><UpHouse size={12} /> Upkeep · {upDueLabel(it, upTodayKey)}</span>
                       </div>
                     </div>
                   );
@@ -16406,7 +16407,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.102.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.103.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
@@ -16577,7 +16578,8 @@ function App() {
 // Recurring maintenance that repeats N weeks/months/years after it was last DONE (not on a fixed calendar day).
 // One small synced collection `upkeep` (whole document, so no SYNC_SPLITS / backup.js entry is needed):
 //   [{ id, name, tags:[string] (v5.85.0; older items carry area:'Condo'|'HOA'|'Appliances', read as one tag), every:{n, unit:'weeks'|'months'|'years'},
-//      dueDate:'YYYY-MM-DD', lastDone:'YYYY-MM-DD'|'', history:[{date}] newest first, notes, weekView:bool, createdAt }]
+//      dueDate:'YYYY-MM-DD', lastDone:'YYYY-MM-DD'|'', history:[{date, prevDue?}] newest first, notes, weekView:bool, createdAt,
+//      repeatFrom:'done'|'schedule' (v5.103.0, absent = 'done'), trackInv:bool (v5.103.0; absent = on when the task already has inventory/location) }]
 // `dueDate` is always stored; marking done sets lastDone = newest history date and dueDate = lastDone + every.
 // With weekView on, the task also shows in the Weekly planner on (dueDate − 7 days) — or today, if that has passed.
 // ─────────────────────────────────────────────
@@ -16647,16 +16649,49 @@ function upStats(list, todayKey) {
   });
   return out;
 }
-// Record a completion on `dateStr`; lastDone follows the newest history date, and the next due date is counted from it.
-function upMarkDone(item, dateStr) {
+// v5.103.0 — "Repeats from": 'done' (default, also for tasks saved before this) counts the next due date from the day it was finished;
+// 'schedule' keeps the original rhythm (e.g. every Thursday) even when it is finished late.
+function upRepeatFrom(it) { return it && it.repeatFrom === 'schedule' ? 'schedule' : 'done'; }
+// Next due date on the original schedule. Done on/after the due date → the first scheduled date after the completion (missed cycles are skipped,
+// not piled up). Done early → the next occurrence, but only within one interval before the due date; earlier than that it does not count, so a
+// second tick the same week cannot push the task weeks ahead. Returns '' when there is no due date to follow.
+function upNextOnSchedule(dueDate, doneStr, every) {
+  if (!dueDate) return '';
+  const n = (every && every.n) || 1, unit = (every && every.unit) || 'months';
+  if (doneStr < dueDate) return upAddInterval(doneStr, n, unit) <= dueDate ? dueDate : upAddInterval(dueDate, n, unit);
+  for (let k = 1; k <= 2000; k++) {
+    const c = upAddInterval(dueDate, n * k, unit);
+    if (c > doneStr) return c;
+  }
+  return upAddInterval(doneStr, n, unit);
+}
+// Record a completion on `dateStr`; lastDone follows the newest history date. 'done' tasks count the next due date from it; 'schedule' tasks
+// follow their own schedule (the completion's previous due date is kept on the history entry as `prevDue`, so removing that entry can undo it).
+// `forceDone` (new tasks only) counts the first due date from the completion either way.
+function upMarkDone(item, dateStr, forceDone) {
+  const every = item.every || {};
+  if (!forceDone && upRepeatFrom(item) === 'schedule' && item.dueDate) {
+    if ((item.history || []).some(h => h.date === dateStr)) return item;   // already recorded that day — a second tap changes nothing
+    const next = upNextOnSchedule(item.dueDate, dateStr, every);
+    const entry = next !== item.dueDate && dateStr >= (item.lastDone || '') ? { date: dateStr, prevDue: item.dueDate } : { date: dateStr };
+    const hist = [entry, ...(item.history || [])].sort((a, b) => (a.date < b.date ? 1 : -1));
+    const last = hist[0].date;
+    return { ...item, history: hist, lastDone: last, dueDate: last === dateStr ? next : item.dueDate };   // an older backfilled date never moves the due date
+  }
   const hist = [{ date: dateStr }, ...((item.history || []).filter(h => h.date !== dateStr))].sort((a, b) => (a.date < b.date ? 1 : -1));
   const last = hist[0].date;
-  return { ...item, history: hist, lastDone: last, dueDate: upAddInterval(last, item.every && item.every.n, item.every && item.every.unit) };
+  return { ...item, history: hist, lastDone: last, dueDate: upAddInterval(last, every.n, every.unit) };
+}
+// v5.103.0 — Inventory & Location are only shown for tasks that track spares. Tasks that already have a count or a location keep showing them.
+function upTracksInv(it) {
+  if (!it) return false;
+  if (it.trackInv != null) return !!it.trackInv;
+  return (it.inventory !== '' && it.inventory != null && !isNaN(Number(it.inventory))) || !!(it.location || '').trim();
 }
 // v5.70.0 — Locations are free text; the "saved options" are just the distinct locations already used on other items (nothing extra to store or sync).
 function upLocations(list) {
   const seen = new Map();
-  (list || []).forEach(i => { const l = ((i && i.location) || '').trim(); if (l && !seen.has(l.toLowerCase())) seen.set(l.toLowerCase(), l); });
+  (list || []).forEach(i => { const l = ((i && i.location) || '').trim(); if (l && upTracksInv(i) && !seen.has(l.toLowerCase())) seen.set(l.toLowerCase(), l); });
   return [...seen.values()].sort((a, b) => a.localeCompare(b));
 }
 function upInvLabel(it) {   // '' when no count has been entered
@@ -16669,6 +16704,10 @@ function upRemoveHistory(item, dateStr) {
   const hist = (item.history || []).filter(h => h.date !== dateStr);
   if (item.lastDone !== dateStr) return { ...item, history: hist };
   const last = hist.length ? hist[0].date : '';
+  if (upRepeatFrom(item) === 'schedule') {   // v5.103.0 — put the due date back to what it was before that completion (when known); otherwise leave it
+    const gone = (item.history || []).find(h => h.date === dateStr);
+    return { ...item, history: hist, lastDone: last, dueDate: gone && gone.prevDue ? gone.prevDue : item.dueDate };
+  }
   return { ...item, history: hist, lastDone: last, dueDate: last ? upAddInterval(last, item.every && item.every.n, item.every && item.every.unit) : item.dueDate };
 }
 function upSort(list, todayKey) {   // most overdue first, then soonest due; undated last
@@ -16716,7 +16755,7 @@ function UpkeepLink({ upkeep, onOpen }) {
   return (
     <button type="button" className={`up-link ${kind}`} onClick={onOpen}>
       <span className="up-link-ic" aria-hidden="true">{kind === 'clear' ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : <UpHouse />}</span>
-      <span className="up-link-txt"><b>Home upkeep</b><span>{sub}</span></span>
+      <span className="up-link-txt"><b>Upkeep</b><span>{sub}</span></span>
       {badge > 0 && <span className="up-badge">{badge}</span>}
       <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--ink-light)', flex: 'none' }}><path d="M9 5l7 7-7 7" /></svg>
     </button>
@@ -16734,7 +16773,7 @@ function UpWeekTask({ item, todayKey, onDone, onOpen }) {
           onClick={e => { e.stopPropagation(); onDone(); }} />
         <button type="button" className="up-wtask-title" onClick={onOpen}>{item.name || 'Untitled'}</button>
       </div>
-      <span className="up-wtask-pill"><UpHouse size={12} /> Home upkeep · {upDueLabel(item, todayKey)}</span>
+      <span className="up-wtask-pill"><UpHouse size={12} /> Upkeep · {upDueLabel(item, todayKey)}</span>
     </div>
   );
 }
@@ -17265,11 +17304,11 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
             <span className={`up-chip ${st.kind}`}>{upDueLabel(it, today)}</span>
             <span className="up-row-every">{upEveryLabel(it.every)}</span>
           </span>
-          {(it.location || upInvLabel(it) || upTags(it).length > 0) && (
+          {((upTracksInv(it) && (it.location || upInvLabel(it))) || upTags(it).length > 0) && (
             <span className="up-row-sub">
               {upTags(it).length > 0 && <span className="up-row-tags">{upTags(it).map(t => <span key={t} className="gl-tag">{t}</span>)}</span>}
-              {it.location && <span>{it.location}</span>}
-              {upInvLabel(it) && <span className={Number(it.inventory) === 0 ? 'none' : ''}>{upInvLabel(it)}</span>}
+              {upTracksInv(it) && it.location && <span>{it.location}</span>}
+              {upTracksInv(it) && upInvLabel(it) && <span className={Number(it.inventory) === 0 ? 'none' : ''}>{upInvLabel(it)}</span>}
             </span>
           )}
         </button>
@@ -17295,7 +17334,7 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
         <div className="up-inner">
           <div className="up-top">
             <button type="button" className="up-back" onClick={onBack} aria-label="Back to Weekly planner">‹ Week</button>
-            <div className="up-title"><h1>Home upkeep</h1><span>Maintenance &amp; upkeep</span></div>
+            <div className="up-title"><h1>Upkeep</h1><span>Maintenance &amp; upkeep</span></div>
             <button type="button" className="up-add" onClick={() => setEditId('new')}>+ Add</button>
           </div>
           {allTags.length > 0 && (
@@ -17316,7 +17355,7 @@ function UpkeepView({ upkeep, setUpkeep, onBack }) {
           {all.length === 0 && (
             <div className="up-empty">
               <b>Nothing here yet</b>
-              <span>Add things like “Replace HVAC filter — every 3 months”. Each one counts from the day you finish it.</span>
+              <span>Add things like “Replace HVAC filter — every 3 months”. Each one counts from the day you finish it, or keeps its own schedule if you choose.</span>
               <button type="button" className="up-add" onClick={() => setEditId('new')}>+ Add your first task</button>
             </div>
           )}
@@ -17353,13 +17392,13 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
       const every = { ...x.every, ...patch };
       let due = x.dueDate;
       const basis = isNew ? newLast : x.lastDone;
-      if (basis && !dueTouched) due = upAddInterval(basis, every.n, every.unit);
+      if (basis && !dueTouched && (isNew || upRepeatFrom(x) !== 'schedule')) due = upAddInterval(basis, every.n, every.unit);   // a "from schedule" task keeps its own due date when the interval changes
       return { ...x, every, dueDate: due };
     });
   }
   function build() {
     let out = { ...d, name: (d.name || '').trim(), location: (d.location || '').trim(), inventory: (d.inventory === '' || d.inventory == null || isNaN(Number(d.inventory))) ? '' : Math.max(0, Math.floor(Number(d.inventory))) };
-    if (isNew && newLast) out = upMarkDone(out, newLast);
+    if (isNew && newLast) out = upMarkDone(out, newLast, true);
     if (!out.dueDate) out.dueDate = today;
     return out;
   }
@@ -17381,7 +17420,7 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
       const next = upMarkDone(build(), otherVal);
       setD(x => ({ ...x, history: next.history }));
       onSave(next, true);
-      setOtherMsg(`Added to History. Next due stays based on ${upShort(ld, today)}, your most recent completion.`);
+      setOtherMsg(upRepeatFrom(d) === 'schedule' ? `Added to History. Next due stays as it is, because ${upShort(ld, today)} is your most recent completion.` : `Added to History. Next due stays based on ${upShort(ld, today)}, your most recent completion.`);
       return;
     }
     done(otherVal);
@@ -17406,21 +17445,29 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
           <GlTagEditor tags={d.tags} all={allTags} onChange={t => setD(x => ({ ...x, tags: t }))} placeholder="+ Add tags (e.g. Condo, HOA)" />
 
 
-          <label className="up-lbl" htmlFor="up-inv">Inventory <span className="up-opt">(spares on hand)</span></label>
-          <input id="up-inv" className="up-input up-inv" type="number" inputMode="numeric" min="0" step="1" value={d.inventory === undefined || d.inventory === null ? '' : d.inventory} placeholder="e.g. 2"
-            onChange={e => setD(x => ({ ...x, inventory: e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))) }))} />
-          {d.inventory === 0 && <div className="up-hint">None on hand, so you will need to buy one.</div>}
+          <div className="up-toggle-row">
+            <div><b>Track spares</b><span>Keep a count of spares on hand and where they are</span></div>
+            <button type="button" role="switch" aria-checked={upTracksInv(d)} aria-label="Track spares" className={`up-switch ${upTracksInv(d) ? 'on' : ''}`} onClick={() => setD(x => ({ ...x, trackInv: !upTracksInv(x) }))}><i /></button>
+          </div>
+          {upTracksInv(d) && (
+            <>
+              <label className="up-lbl" htmlFor="up-inv">Inventory <span className="up-opt">(spares on hand)</span></label>
+              <input id="up-inv" className="up-input up-inv" type="number" inputMode="numeric" min="0" step="1" value={d.inventory === undefined || d.inventory === null ? '' : d.inventory} placeholder="e.g. 2"
+                onChange={e => setD(x => ({ ...x, inventory: e.target.value === '' ? '' : Math.max(0, Math.floor(Number(e.target.value))) }))} />
+              {d.inventory === 0 && <div className="up-hint">None on hand, so you will need to buy one.</div>}
 
-          <label className="up-lbl" htmlFor="up-loc">Location <span className="up-opt">(where the spare or part is)</span></label>
-          <input id="up-loc" className="up-input" type="text" value={d.location || ''} placeholder="Hall closet, garage shelf…"
-            onChange={e => setD(x => ({ ...x, location: e.target.value }))} />
-          {(locations || []).length > 0 && (
-            <div className="up-pills" role="group" aria-label="Saved locations">
-              {locations.map(l => {
-                const on = (d.location || '').trim().toLowerCase() === l.toLowerCase();
-                return <button key={l} type="button" aria-pressed={on} className={on ? 'on' : ''} onClick={() => setD(x => ({ ...x, location: on ? '' : l }))}>{l}</button>;
-              })}
-            </div>
+              <label className="up-lbl" htmlFor="up-loc">Location <span className="up-opt">(where the spare or part is)</span></label>
+              <input id="up-loc" className="up-input" type="text" value={d.location || ''} placeholder="Hall closet, garage shelf…"
+                onChange={e => setD(x => ({ ...x, location: e.target.value }))} />
+              {(locations || []).length > 0 && (
+                <div className="up-pills" role="group" aria-label="Saved locations">
+                  {locations.map(l => {
+                    const on = (d.location || '').trim().toLowerCase() === l.toLowerCase();
+                    return <button key={l} type="button" aria-pressed={on} className={on ? 'on' : ''} onClick={() => setD(x => ({ ...x, location: on ? '' : l }))}>{l}</button>;
+                  })}
+                </div>
+              )}
+            </>
           )}
 
           <div className="up-lbl">Repeats every</div>
@@ -17432,6 +17479,12 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
               {UP_UNITS.map(([u, label]) => <button key={u} type="button" aria-pressed={d.every.unit === u} className={d.every.unit === u ? 'on' : ''} onClick={() => setEvery({ unit: u })}>{label}</button>)}
             </div>
           </div>
+
+          <div className="up-lbl">Repeats from</div>
+          <div className="up-pills" role="group" aria-label="What the next due date is counted from">
+            {[['done', 'Completion'], ['schedule', 'Original schedule']].map(([k, label]) => <button key={k} type="button" aria-pressed={upRepeatFrom(d) === k} className={upRepeatFrom(d) === k ? 'on' : ''} onClick={() => setD(x => ({ ...x, repeatFrom: k }))}>{label}</button>)}
+          </div>
+          <div className="up-hint">{upRepeatFrom(d) === 'schedule' ? 'Keeps its own rhythm. If it is due every Thursday and you finish it on Friday, the next one is still due next Thursday.' : 'Counts from the day you finish it. Finish it late and the next one moves later too.'}</div>
 
           {isNew ? (
             <>
@@ -17460,7 +17513,7 @@ function UpkeepEditor({ item, locations, allTags, defaultTags, onSave, onDelete,
                   </div>
                 )}
               {otherMsg && <div className="up-err" role="status">{otherMsg}</div>}
-              <div className="up-hint" style={{ textAlign: 'center' }}>Next due is counted from the day you finish it.</div>
+              <div className="up-hint" style={{ textAlign: 'center' }}>{upRepeatFrom(d) === 'schedule' ? 'Next due follows the original schedule, not the day you finish.' : 'Next due is counted from the day you finish it.'}</div>
             </div>
           )}
 
