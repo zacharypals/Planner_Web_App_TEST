@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.104.6 -->
+<!-- LP Planner v5.105.0 -->
+<!-- v5.105.0 — Habits: × a week targets keep a history. Changing the target asks "From this week on" (default) or "All past weeks", previews the streak, and past weeks are graded against the target in force then (freqHistory). -->
 <!-- v5.104.6 — Upkeep: fold state is remembered. The "Need to buy" heading remembers open/closed, and each task remembers which of its editor sections (Details, Schedule, Show in Week view, Track spares, Notes, History) you left folded or open, so it comes back the way you left it. Stored per device (localStorage `upFold`), not synced, so your phone and PC each keep their own; deleting a task forgets its choices. Sections you have never touched keep the old defaults (Notes and History folded, the rest open). -->
 <!-- v5.104.5 — Weekly: the daily Notes open/closed state is remembered per day (on this device) instead of one setting for all days. -->
 <!-- v5.104.4 — Weekly: the daily Notes open/closed state is now remembered (on this device, one setting for all days) instead of resetting on reload. -->
@@ -3737,6 +3738,7 @@ function genLiId() { return 'li'+Date.now()+Math.random().toString(36).slice(2,7
 
 // ── HABIT FREQUENCY (v4.6.0) ──
 // goal.freq: undefined = every day | {type:'days', days:[0-6]} | {type:'perWeek', n:1-7}
+// goal.freqHistory (v5.105.0, optional, perWeek only): per-week target history — see habitTargetForWeek.
 // goal.restDates: ['YYYY-MM-DD'] — days that neither count toward nor break a streak.
 // Days off the schedule are neutral too; a completion on any day still counts.
 // perWeek streaks count consecutive weeks (Sun–Sat) with at least n completions; the current
@@ -3751,6 +3753,34 @@ function habitActiveIn(h, fromDk, toDk) { return (!h.startDate || h.startDate <=
 function habitEnded(h, todayDk) { return !!h.endDate && h.endDate < todayDk; }
 function habitUpcoming(h, todayDk) { return !!h.startDate && h.startDate > todayDk; }
 function habitTodayKey() { const d = new Date(); d.setHours(0,0,0,0); return fmt(d); }
+// ── TARGET HISTORY (v5.105.0) ──
+// goal.freqHistory: optional [{from:'YYYY-MM-DD' (a Sunday week-start key), n}], ascending. Only for perWeek habits.
+// The target for a week is the last entry whose `from` is on or before that week's start; weeks before the first
+// entry use the first entry's n. goal.freq.n is always the CURRENT target (= the latest entry). No history = freq.n
+// for every week, exactly as before, so older habits need no migration.
+function habitTargetForWeek(goal, weekStart) {
+  const f = goal.freq;
+  if (!f || f.type !== 'perWeek') return null;
+  const cur = Math.max(1, parseInt(f.n, 10) || 1);
+  const h = Array.isArray(goal.freqHistory) ? goal.freqHistory : [];
+  if (!h.length) return cur;
+  const wk = fmt(weekStart);
+  let n = Math.max(1, parseInt(h[0].n, 10) || 1);
+  for (let i = 0; i < h.length; i++) if (h[i].from <= wk) n = Math.max(1, parseInt(h[i].n, 10) || 1);
+  return n;
+}
+// The patch for changing a × a week target. mode 'from' = this week on (earlier weeks keep their old target),
+// 'all' = re-grade every past week against the new target (drops the history).
+function habitTargetPatch(goal, newN, mode, todayDate) {
+  const n = Math.min(7, Math.max(1, parseInt(newN, 10) || 1));
+  if (mode === 'all') return { freq: { type: 'perWeek', n }, freqHistory: undefined };
+  const wk = fmt(getWeekStart(todayDate || new Date()));
+  const old = Array.isArray(goal.freqHistory) && goal.freqHistory.length
+    ? goal.freqHistory
+    : [{ from: goal.startDate || '2000-01-01', n: Math.max(1, parseInt(goal.freq && goal.freq.n, 10) || 1) }];
+  const hist = old.filter(e => e.from < wk).concat({ from: wk, n });
+  return { freq: { type: 'perWeek', n }, freqHistory: hist };
+}
 function habitStreak(goal, completions, todayDate) {
   const done = dk => ((completions || {})[dk] || []).includes(goal.id);
   const type = goal.freq && goal.freq.type;
@@ -3759,13 +3789,12 @@ function habitStreak(goal, completions, todayDate) {
   const endD = goal.endDate ? parseLocal(goal.endDate) : null;
   if (endD && endD < t0) t0.setTime(endD.getTime());
   if (type === 'perWeek') {
-    const n = Math.max(1, parseInt(goal.freq.n, 10) || 1);
     const count = w => { let c = 0; for (let i = 0; i < 7; i++) if (done(fmt(addDays(w, i)))) c++; return c; };
     let ws = getWeekStart(t0);
-    let streak = count(ws) >= n ? 1 : 0;
+    let streak = count(ws) >= habitTargetForWeek(goal, ws) ? 1 : 0;
     for (let i = 0; i < 520; i++) {
       ws = addDays(ws, -7);
-      if (count(ws) >= n) streak++; else break;
+      if (count(ws) >= habitTargetForWeek(goal, ws)) streak++; else break;
     }
     return streak;
   }
@@ -3789,7 +3818,7 @@ function habitWeekProgress(goal, completions, todayDate) {
   const ws = getWeekStart(todayDate);
   let c = 0;
   for (let i = 0; i < 7; i++) if (((completions || {})[fmt(addDays(ws, i))] || []).includes(goal.id)) c++;
-  return { done: c, n: Math.max(1, parseInt(goal.freq.n, 10) || 1) };
+  return { done: c, n: habitTargetForWeek(goal, ws) };
 }
 function habitFreqSummary(goal) {
   const f = goal.freq;
@@ -4363,7 +4392,7 @@ function habitWeekStats(goal, completions, weekStart) {
   for (let i = 0; i < 7; i++) if (((completions || {})[fmt(addDays(weekStart, i))] || []).includes(goal.id)) done++;
   const f = goal.freq;
   const target = !f ? 7
-    : f.type === 'perWeek' ? Math.max(1, parseInt(f.n, 10) || 1)
+    : f.type === 'perWeek' ? habitTargetForWeek(goal, weekStart)
     : f.type === 'days' ? ((f.days || []).length || 7)
     : 7;
   return { done, target, pct: target ? Math.min(1, done / target) : 0 };
@@ -10186,7 +10215,9 @@ function HabitExerciseLinks({ goal, exercises, onChange }) {
 
 // "How often" editor shown in a habit's expanded section: every day / certain days / × per week,
 // plus a rest-day toggle for the selected day (rest days never break a streak).
-function HabitFreqEditor({ goal, onChange, dayKey }) {
+function HabitFreqEditor({ goal, onChange, dayKey, completions }) {
+  const [pend, setPend] = useState(null);      // v5.105.0: unsaved × a week target (null = no change pending)
+  const [applyMode, setApplyMode] = useState('from');
   const type = (goal.freq && goal.freq.type) || 'daily';
   const days = (goal.freq && goal.freq.days) || [];
   const n = (goal.freq && goal.freq.n) || 3;
@@ -10195,10 +10226,23 @@ function HabitFreqEditor({ goal, onChange, dayKey }) {
   const dayDate = parseLocal(dayKey);
   const dayLabel = dayDate ? `${DAYS[dayDate.getDay()].slice(0,3)} ${fmtDisplay(dayDate)}` : dayKey;
   function pick(t) {
-    if (t === 'daily') onChange({ freq: undefined });
-    else if (t === 'days') onChange({ freq: { type: 'days', days: days.length ? days : [1,3,5] } });
-    else onChange({ freq: { type: 'perWeek', n } });
+    setPend(null);
+    if (t === 'daily') onChange({ freq: undefined, freqHistory: undefined });
+    else if (t === 'days') onChange({ freq: { type: 'days', days: days.length ? days : [1,3,5] }, freqHistory: undefined });
+    else onChange({ freq: { type: 'perWeek', n }, freqHistory: undefined });
   }
+  // v5.105.0: a changed × a week target waits for "Save target" so the user picks which weeks it applies to
+  const target = pend == null ? n : pend;
+  const changing = type === 'perWeek' && target !== n;
+  const history = Array.isArray(goal.freqHistory) ? goal.freqHistory : [];
+  const preview = (() => {
+    if (!changing) return '';
+    const now = new Date();
+    const cur = habitStreak(goal, completions, now);
+    const nxt = habitStreak({ ...goal, ...habitTargetPatch(goal, target, applyMode, now) }, completions, now);
+    return nxt === cur ? `Streak stays at ${cur} week${cur===1?'':'s'}.`
+      : `Streak goes from ${cur} to ${nxt} week${nxt===1?'':'s'}.`;
+  })();
   const label = { fontSize:10, color:'var(--ink-faint)', fontFamily:"'DM Mono',monospace", flexShrink:0 };
   return (
     <div style={{display:'flex',flexDirection:'column',gap:6}} onClick={e=>e.stopPropagation()}>
@@ -10225,11 +10269,46 @@ function HabitFreqEditor({ goal, onChange, dayKey }) {
       )}
       {type === 'perWeek' && (
         <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <button className="habit-schedule-btn" aria-label="Fewer times a week"
-            onClick={e=>{e.stopPropagation();onChange({ freq: { type:'perWeek', n: Math.max(1, n-1) } });}}>−</button>
-          <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}>{n} time{n===1?'':'s'} a week</span>
-          <button className="habit-schedule-btn" aria-label="More times a week"
-            onClick={e=>{e.stopPropagation();onChange({ freq: { type:'perWeek', n: Math.min(7, n+1) } });}}>+</button>
+          <button className="habit-schedule-btn" aria-label="Fewer times a week" style={{minWidth:44,minHeight:44}}
+            onClick={e=>{e.stopPropagation();setPend(Math.max(1, target-1));}}>−</button>
+          <span style={{fontSize:12,fontFamily:"'DM Sans',sans-serif",color:'var(--ink)'}}>{target} time{target===1?'':'s'} a week</span>
+          <button className="habit-schedule-btn" aria-label="More times a week" style={{minWidth:44,minHeight:44}}
+            onClick={e=>{e.stopPropagation();setPend(Math.min(7, target+1));}}>+</button>
+        </div>
+      )}
+      {changing && (
+        <div style={{display:'flex',flexDirection:'column',gap:6,borderTop:'1px solid var(--border)',paddingTop:8}}>
+          <span style={{fontSize:12,fontWeight:600,color:'var(--ink)'}}>Change from {n}× to {target}× a week</span>
+          {[['from','From this week on','Earlier weeks keep their old target'],['all','All past weeks','Re-grade the whole history against the new target']].map(([val,lab,sub]) => (
+            <button key={val} role="radio" aria-checked={applyMode===val}
+              onClick={e=>{e.stopPropagation();setApplyMode(val);}}
+              style={{display:'flex',gap:10,alignItems:'flex-start',textAlign:'left',minHeight:44,padding:'8px 10px',cursor:'pointer',
+                borderRadius:'var(--radius-sm)',fontFamily:"'DM Sans',sans-serif",color:'var(--ink)',
+                border:applyMode===val?'1.5px solid var(--accent)':'1px solid var(--border)',
+                background:applyMode===val?'var(--accent-light)':'var(--surface)'}}>
+              <span style={{width:14,height:14,borderRadius:'50%',boxSizing:'border-box',flexShrink:0,marginTop:2,
+                border:applyMode===val?'4px solid var(--accent)':'1.5px solid var(--ink-faint)'}} />
+              <span><span style={{fontSize:12,fontWeight:600}}>{lab}</span><br /><span style={{fontSize:11,color:'var(--ink-light)'}}>{sub}</span></span>
+            </button>
+          ))}
+          <div style={{fontSize:11,color:'var(--ink-light)',fontFamily:"'DM Sans',sans-serif"}}>🔥 {preview}</div>
+          <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+            <button className="habit-schedule-btn" style={{minHeight:44,padding:'0 14px'}}
+              onClick={e=>{e.stopPropagation();setPend(null);setApplyMode('from');}}>Cancel</button>
+            <button className="habit-schedule-btn active" style={{minHeight:44,padding:'0 14px'}}
+              onClick={e=>{e.stopPropagation();onChange(habitTargetPatch(goal, target, applyMode, new Date()));setPend(null);setApplyMode('from');}}>Save target</button>
+          </div>
+        </div>
+      )}
+      {type === 'perWeek' && !changing && history.length > 1 && (
+        <div style={{display:'flex',flexDirection:'column',gap:2}}>
+          <span style={label}>Target history:</span>
+          {history.map((h,i) => (
+            <div key={h.from+i} style={{display:'flex',justifyContent:'space-between',fontSize:11,fontFamily:"'DM Sans',sans-serif",color:'var(--ink-light)'}}>
+              <span>{h.n}× a week</span>
+              <span>{i===0 ? 'until next change' : `from ${fmtDisplay(parseLocal(h.from))}`}{i===history.length-1 ? ' (now)' : ''}</span>
+            </div>
+          ))}
         </div>
       )}
       {type !== 'perWeek' && (
@@ -10665,7 +10744,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
                   </div>
                 </div>
                 {/* How often (every day / certain days / × a week) + rest day */}
-                <HabitFreqEditor goal={goal} dayKey={selectedDayKey} onChange={patch=>updateGoal(goal.id, patch)} />
+                <HabitFreqEditor goal={goal} dayKey={selectedDayKey} completions={completions} onChange={patch=>updateGoal(goal.id, patch)} />
                 {/* Start / end dates (v5.81.0) */}
                 <HabitDatesEditor goal={goal} onChange={patch=>updateGoal(goal.id, patch)} />
                 {/* Link to fitness exercise (collapsible, v5.27.0) */}
@@ -11200,7 +11279,7 @@ function HabitChecklist({ date, goals, completions, onToggle, onAdd, onDelete, o
                     </div>
                   )}
                   {onRename && (
-                    <HabitFreqEditor goal={g} dayKey={fmt(date)} onChange={patch=>onRename(g.id, patch)} />
+                    <HabitFreqEditor goal={g} dayKey={fmt(date)} completions={completions} onChange={patch=>onRename(g.id, patch)} />
                   )}
                   {onRename && (
                     <HabitDatesEditor goal={g} onChange={patch=>onRename(g.id, patch)} />
@@ -16456,7 +16535,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.104.6</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.105.0</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
