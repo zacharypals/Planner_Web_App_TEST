@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.105.2 -->
+<!-- LP Planner v5.105.3 -->
+<!-- v5.105.3 — Milestone headers on desktop/iPad are now always two lines (title row, then dates row), so the layout no longer flips with card width or a rule chip. -->
 <!-- v5.105.2 — Weekly task tiles: hover-to-delete ✕ now fully shows at 1.4s (was 1.7s). -->
 <!-- v5.105.1 — Weekly task tiles: the hover-to-delete ✕ timer now starts only when the cursor is on the caret's hover square, not anywhere on the tile, so it no longer pops up while you work in a task. -->
 <!-- v5.105.0 — Habits: × a week targets keep a history. Changing the target asks "From this week on" (default) or "All past weeks", previews the streak, and past weeks are graded against the target in force then (freqHistory). -->
@@ -2944,7 +2945,8 @@
   @media (min-width: 768px) {
     .gl-ms-head > .gl-ms-title { order: 1; }
     .gl-ms-head > .gl-check { order: 2; width: 24px; height: 24px; border-radius: 7px; font-size: 15px; }
-    .gl-ms-head > .gl-ms-actions { order: 3; }
+    /* v5.105.3 — always two lines: the dates/count/clone/delete group takes the whole second line, so wrapping never depends on card width or a rule chip */
+    .gl-ms-head > .gl-ms-actions { order: 3; flex: 0 0 100%; justify-content: flex-end; }
   }
   .gl-ms-title:focus { background: var(--surface); border-color: var(--accent); }
   .gl-caret.lg:not(.open) .gl-caret-svg { transform: rotate(-90deg); }
@@ -16541,7 +16543,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.105.2</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.105.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
