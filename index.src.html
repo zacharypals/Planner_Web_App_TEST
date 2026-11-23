@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.105.4 -->
+<!-- LP Planner v5.105.5 -->
+<!-- v5.105.5 — Reading-linked milestones: the ring round the checkbox and the Gantt bar now show progress through THIS milestone's stretch of the book (from the previous milestone's target page to its own), not the whole book. The 120/200 text is unchanged. -->
 <!-- v5.105.4 — Projects timeline: a milestone bar fills in as its auto-check rule progresses (reading, fitness or habits; the same number as the ring round its checkbox), and overdue milestones now show their fill too. Milestones without a rule still fill by tasks done. -->
 <!-- v5.105.3 — Milestone headers on desktop/iPad are now always two lines (title row, then dates row), so the layout no longer flips with card width or a rule chip. -->
 <!-- v5.105.2 — Weekly task tiles: hover-to-delete ✕ now fully shows at 1.4s (was 1.7s). -->
@@ -4777,7 +4778,17 @@ function glReadingMsRule(m, goal, fctx) {
       metOn: s.complete ? (book.finishedDate || s.reachedOn(s.total) || null) : null, why: '' };
   }
   const met = s.read >= tgt || s.complete;
-  return { ...base, ...info, ready: true, value: Math.min(s.read, tgt), met, pct: Math.min(1, s.read / tgt),
+  // v5.105.5 — progress (ring, timeline bar, phone chip %) is measured from the previous "reach page" milestone of the same project:
+  // the highest lower target page among its sibling milestones (0 when there is none). The text values (value/target, "to go") stay whole-book.
+  let base0 = 0;
+  const sibs = (goal && Array.isArray(goal.milestones) && goal.milestones.some(x => x && x.id === m.id)) ? goal.milestones : [];
+  sibs.forEach(x => {
+    if (!x || x.id === m.id || !x.rule || ruleSource(x.rule) !== 'reading' || x.rule.measure !== 'r-reach') return;
+    const t = ruleTarget(x.rule);
+    if (t !== null && t < tgt && t > base0) base0 = t;
+  });
+  const segPct = met ? 1 : Math.min(1, Math.max(0, (s.read - base0) / (tgt - base0)));
+  return { ...base, ...info, ready: true, value: Math.min(s.read, tgt), met, pct: segPct, from0: base0,
     metOn: met ? (s.reachedOn(tgt) || book.finishedDate || null) : null, why: '' };
 }
 // Where a task's rule stands (fitness / habits: its scheduled day only; reading: the project's running total). null when the task has no rule.
@@ -16553,7 +16564,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.105.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.105.5</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
