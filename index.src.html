@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.105.3 -->
+<!-- LP Planner v5.105.4 -->
+<!-- v5.105.4 — Projects timeline: a milestone bar fills in as its auto-check rule progresses (reading, fitness or habits; the same number as the ring round its checkbox), and overdue milestones now show their fill too. Milestones without a rule still fill by tasks done. -->
 <!-- v5.105.3 — Milestone headers on desktop/iPad are now always two lines (title row, then dates row), so the layout no longer flips with card width or a rule chip. -->
 <!-- v5.105.2 — Weekly task tiles: hover-to-delete ✕ now fully shows at 1.4s (was 1.7s). -->
 <!-- v5.105.1 — Weekly task tiles: the hover-to-delete ✕ timer now starts only when the cursor is on the caret's hover square, not anywhere on the tile, so it no longer pops up while you work in a task. -->
@@ -13889,7 +13890,7 @@ function glRange(zoom, offset) {
   return { start: s, end: new Date(s.getFullYear(), s.getMonth() + count * per, 1), cols };
 }
 
-function GlTimeline({ projects, readingLog, onOpenProject, onChangeProject }) {
+function GlTimeline({ projects, readingLog, mctx, onOpenProject, onChangeProject }) {
   const today = glToday();
   const [zoom, setZoom] = useState(() => sessionStorage.getItem('lp_glZoom') || 'month');
   const [offset, setOffset] = useState(0);
@@ -14001,6 +14002,15 @@ function GlTimeline({ projects, readingLog, onOpenProject, onChangeProject }) {
     });
   });
   const todayPct = pct(today);
+  // v5.105.4 — what a milestone bar's fill shows: a milestone with an auto-check rule follows the rule (the same number as the ring
+  // round its checkbox); any other milestone follows its done tasks. fctx has the same shape the milestone editor builds.
+  const tlFctx = { fitnessLog: mctx && mctx.fitnessLog, fitnessExercises: mctx && mctx.fitnessExercises, habitGoals: mctx && mctx.habitGoals, habitCompletions: mctx && mctx.habitCompletions, habitQty: mctx && mctx.habitQty, readingLog: (mctx && mctx.readingLog) || readingLog };
+  function glMsBarProgress(g, m) {
+    if (m.done) return 1;
+    if (!m.rule) return glMsProgress(m);
+    const rs = glMsRule(m, g, tlFctx, today);
+    return rs && rs.ready && !rs.notStarted ? Math.min(1, Math.max(0, rs.pct || 0)) : 0;
+  }
   const endCol = range.cols[range.cols.length - 1];
   const rangeLabel = range.day
     ? `${MONTHS[range.start.getMonth()].slice(0, 3)} ${range.start.getDate()} – ${MONTHS[endCol.start.getMonth()].slice(0, 3)} ${endCol.start.getDate()}, ${endCol.start.getFullYear()}`
@@ -14153,7 +14163,7 @@ function GlTimeline({ projects, readingLog, onOpenProject, onChangeProject }) {
                 : late ? { background: 'rgba(220,74,58,0.12)', border: '1.5px solid var(--red)' }
                 : current ? { background: glTint(g.color, 0.16), border: `1.5px solid ${g.color}` }
                 : { background: glTint(g.color, 0.08), border: `1.5px dashed ${glTint(g.color, 0.55)}` };
-              const prog = glMsProgress(m);
+              const prog = glMsBarProgress(g, m);
               const dia = !m.done && e != null && e >= 0 && e <= 100 ? e : null;
               return (
                 <div key={m.id} className="gl-tl-row ms">
@@ -14162,7 +14172,7 @@ function GlTimeline({ projects, readingLog, onOpenProject, onChangeProject }) {
                       onPointerDown={e2 => beginDrag(e2, 'move', g.id, m.id, m.startDate, m.dueDate)}
                       title={mGrab ? `${m.title || 'Milestone'}: ${glShort(mS)} – ${glShort(mE)} · drag to move, drag an edge to resize` : `${m.title || 'Milestone'}: ${glShort(mS)} – ${glShort(mE)}`}
                       style={{ top: 10, height: 14, left: bar.left + '%', width: bar.width + '%', ...st }}>
-                      {current && prog > 0 && <div style={{ width: (prog * 100) + '%', height: '100%', background: glTint(g.color, 0.45), pointerEvents: 'none' }} />}
+                      {(current || late) && prog > 0 && <div style={{ width: (prog * 100) + '%', height: '100%', background: glTint(g.color, 0.45), pointerEvents: 'none' }} />}
                       {dragHandles(g.id, m.id, m.startDate, m.dueDate)}
                     </div>
                   )}
@@ -15847,7 +15857,7 @@ function ProjectsMain({ goals, setGoals, readingLog, projects, setProjects, page
             onDelete={() => { setProjects(gs => gs.filter(g => g.id !== sel.id)); setSelectedId(null); }} />
         ) : (
           <>
-            <GlTimeline projects={list} readingLog={readingLog} onOpenProject={setSelectedId} onChangeProject={changeProject} />
+            <GlTimeline projects={list} readingLog={readingLog} mctx={mctx} onOpenProject={setSelectedId} onChangeProject={changeProject} />
 
             {weekItems.length > 0 && (
               <section className="gl-card gl-mobile-only" style={{ flexDirection: 'column', overflow: 'hidden' }}>
@@ -16543,7 +16553,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.105.3</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.105.4</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
