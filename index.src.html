@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.105.5 -->
+<!-- LP Planner v5.105.6 -->
+<!-- v5.105.6 — Habit tab opens on the Week view by default (was Month), so the habit checklist is closer on a phone; the view you pick is still remembered for the browser session. -->
 <!-- v5.105.5 — Reading-linked milestones: the ring round the checkbox and the Gantt bar now show progress through THIS milestone's stretch of the book (from the previous milestone's target page to its own), not the whole book. The 120/200 text is unchanged. -->
 <!-- v5.105.4 — Projects timeline: a milestone bar fills in as its auto-check rule progresses (reading, fitness or habits; the same number as the ring round its checkbox), and overdue milestones now show their fill too. Milestones without a rule still fill by tasks done. -->
 <!-- v5.105.3 — Milestone headers on desktop/iPad are now always two lines (title row, then dates row), so the layout no longer flips with card width or a rule chip. -->
@@ -10359,7 +10360,7 @@ function HabitTracker({ onGoToPlanner, onGoToMetrics, goals, setGoals, completio
     sessionStorage.setItem('lp_habitDate', fmtLocal(next));
     return next;
   });
-  const [view, setViewRaw] = useState(() => sessionStorage.getItem('lp_habitView') || 'monthly'); // daily, weekly, monthly, yearly
+  const [view, setViewRaw] = useState(() => sessionStorage.getItem('lp_habitView') || 'weekly'); // daily, weekly, monthly, yearly
   const setView = (v) => { sessionStorage.setItem('lp_habitView', v); setViewRaw(v); };
   const [filterGoal, setFilterGoal] = useState(null); // null = all
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -16564,7 +16565,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.105.5</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.105.6</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
