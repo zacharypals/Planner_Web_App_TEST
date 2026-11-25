@@ -1,5 +1,6 @@
 <!DOCTYPE html>
-<!-- LP Planner v5.105.6 -->
+<!-- LP Planner v5.105.7 -->
+<!-- v5.105.7 — Habits > Metrics: the Cal / Pts chart no longer trims days. The outlier filter and tight axis are gone; every day (including 0) is plotted and the axis fits them all plus the target. Only negatives or values over 5x the median of the non-zero days in the range are hidden, and they are listed under the chart. The Cal / Pts chart is also taller. -->
 <!-- v5.105.6 — Habit tab opens on the Week view by default (was Month), so the habit checklist is closer on a phone; the view you pick is still remembered for the browser session. -->
 <!-- v5.105.5 — Reading-linked milestones: the ring round the checkbox and the Gantt bar now show progress through THIS milestone's stretch of the book (from the previous milestone's target page to its own), not the whole book. The 120/200 text is unchanged. -->
 <!-- v5.105.4 — Projects timeline: a milestone bar fills in as its auto-check rule progresses (reading, fitness or habits; the same number as the ring round its checkbox), and overdue milestones now show their fill too. Milestones without a rule still fill by tasks done. -->
@@ -12805,6 +12806,7 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
   }
   const [dateRange, setDateRange] = useState(dflt30);
   const [hiddenWeights, setHiddenWeights] = useState([]); // v5.26.0 — readings hidden as likely typos
+  const [hiddenCals, setHiddenCals] = useState([]);       // v5.105.7 — same, for Cal / Pts
   const weightChartRef = useRef(null);
   const calsChartRef   = useRef(null);
   const weightChartInst = useRef(null);
@@ -12837,16 +12839,20 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
     return dates;
   }
 
-  // Outlier filter: remove points > 3 IQR from median
-  function filterOutliers(vals) {
-    const nums = vals.filter(v => v !== null);
-    if (nums.length < 4) return vals;
-    const sorted = [...nums].sort((a,b)=>a-b);
-    const q1 = sorted[Math.floor(sorted.length*0.25)];
-    const q3 = sorted[Math.floor(sorted.length*0.75)];
-    const iqr = q3 - q1;
-    const lo = q1 - 3*iqr, hi = q3 + 3*iqr;
-    return vals.map(v => (v !== null && v >= lo && v <= hi) ? v : null);
+  // v5.105.7 — Cal / Pts typo check (replaces the old outlier filter). A wide day-to-day range is
+  // normal and 0 (fasting) is real, so this only hides negatives and values more than 5x the median
+  // of the non-zero days in the range. Everything else is plotted.
+  function sanityFilterCals(vals) {
+    const nums = vals.filter(v => v !== null && v > 0).sort((a,b)=>a-b);
+    const mid = Math.floor(nums.length/2);
+    const median = !nums.length ? 0 : nums.length % 2 ? nums[mid] : (nums[mid-1] + nums[mid]) / 2;
+    const kept = [], hidden = [];
+    vals.forEach((v, i) => {
+      if (v === null) { kept.push(null); return; }
+      const bad = v < 0 || (median > 0 && v > median * 5);
+      if (bad) { kept.push(null); hidden.push(i); } else kept.push(v);
+    });
+    return { kept, hidden };
   }
 
   // v5.26.0 — weight check. Weight sits in a narrow band, so the IQR filter above threw away real
@@ -12877,19 +12883,6 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
     return { min: Math.floor(lo - pad), max: Math.ceil(hi + pad) };
   }
 
-  // For axis bounds only: strip outliers using standard 1.5×IQR so extreme values
-  // (e.g. fasting zeros) don't dominate the scale. Data points still plot, just off-screen.
-  function boundsVals(vals) {
-    const nums = vals.filter(v => v !== null);
-    if (nums.length < 4) return nums;
-    const sorted = [...nums].sort((a,b)=>a-b);
-    const q1 = sorted[Math.floor(sorted.length*0.25)];
-    const q3 = sorted[Math.floor(sorted.length*0.75)];
-    const iqr = q3 - q1;
-    const lo = q1 - 1.5*iqr, hi = q3 + 1.5*iqr;
-    return nums.filter(v => v >= lo && v <= hi);
-  }
-
   // 3-day simple moving average
   function sma3(vals) {
     return vals.map((_, i) => {
@@ -12898,18 +12891,13 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
     });
   }
 
-  // Compute tight Y-axis bounds: ~10% pad around the non-outlier data range
-  function yBounds(vals, floorZero) {
-    const nums = boundsVals(vals);
-    if (nums.length === 0) return floorZero ? {min:0, max:100} : {min:0, max:100};
+  // v5.105.7 — Cal / Pts axis: fit EVERY plotted day with padding, never below zero.
+  function calsBounds(vals) {
+    const nums = vals.filter(v => v !== null);
+    if (nums.length === 0) return { min: 0, max: 100 };
     const lo = Math.min(...nums), hi = Math.max(...nums);
-    const range = hi - lo;
-    // Pad: 12% of range, minimum 2 units so a flat line still shows context
-    const pad = Math.max(range * 0.12, 2);
-    return {
-      min: floorZero ? Math.max(0, Math.floor(lo - pad)) : Math.floor(lo - pad),
-      max: Math.ceil(hi + pad)
-    };
+    const pad = Math.max((hi - lo) * 0.12, 2);
+    return { min: Math.max(0, Math.floor(lo - pad)), max: Math.ceil(hi + pad) };
   }
 
   function buildCharts() {
@@ -12930,13 +12918,15 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
     const wCheck     = sanityFilterWeight(rawWeight);   // v5.26.0 — loose typo check only
     const weightVals = wCheck.kept;
     setHiddenWeights(wCheck.hidden.map(i => ({ label: labels[i], value: rawWeight[i] })));
-    const calsVals   = filterOutliers(rawCals);
+    const cCheck     = sanityFilterCals(rawCals);      // v5.105.7 — typo check only
+    const calsVals   = cCheck.kept;
+    setHiddenCals(cCheck.hidden.map(i => ({ label: labels[i], value: rawCals[i] })));
     const smaVals    = sma3(weightVals);
     const wTarget    = parseFloat(weightTarget);
     const cTarget    = parseFloat(calsTarget);
 
     const wBounds = weightBounds(weightVals, wTarget);  // v5.26.0 — fits every plotted point + target
-    const cBounds = yBounds(calsVals, true);
+    const cBounds = calsBounds(calsVals);
 
     // Cals: ensure target line is always within the visible range
     if (!isNaN(cTarget)) {
@@ -13133,9 +13123,15 @@ function MetricsView({ metrics, weightTarget, setWeightTarget, calsTarget, setCa
                         background:'var(--surface)',color:'#7d3c98',textAlign:'center'}} />
             </div>
           </div>
-          <div style={{height:220,position:'relative'}}>
+          <div style={{height:'clamp(280px, 50vh, 360px)',position:'relative'}}>
             <canvas ref={calsChartRef} />
           </div>
+          {hiddenCals.length > 0 && (
+            <div style={{marginTop:8,fontFamily:"'DM Mono',monospace",fontSize:10,color:'var(--ink-light)'}}>
+              {hiddenCals.length} day{hiddenCals.length===1?'':'s'} hidden as likely typo{hiddenCals.length===1?'':'s'}:{' '}
+              {hiddenCals.slice(0,6).map(h => `${h.label} (${h.value})`).join(', ')}{hiddenCals.length>6?'…':''}
+            </div>
+          )}
         </div>
 
       </div>
@@ -16565,7 +16561,7 @@ function App() {
       )}
       <div className="nav-bar" style={{background: themedBg('--nav-bg', navColor)}}>
         <div className="hdr-color-area">
-          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.105.6</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
+          <span className="nav-brand">✦ LP Planner</span><span style={{fontSize:9,opacity:0.45,fontFamily:"'DM Mono',monospace",marginLeft:6,letterSpacing:'0.05em',alignSelf:'center'}}>v5.105.7</span>{APP_CONFIG.ENV_LABEL && <span style={{fontSize:9,fontWeight:700,letterSpacing:'0.08em',marginLeft:6,padding:'2px 6px',borderRadius:999,background:'rgba(255,255,255,0.2)',color:'#fff',alignSelf:'center'}}>{APP_CONFIG.ENV_LABEL}</span>}
           <ThemePicker theme={lightTheme} onChange={setLightTheme} />
         </div>
         <div className="nav-tabs">
